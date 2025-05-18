@@ -1,5 +1,6 @@
 import logo from './logo.svg';
 import banner02 from './banner02.png';
+import banner05 from './banner05.png';
 import banner02img from './banner02image.png';
 import logo_es from './logoes.png';
 import search_icon from './search_icon.svg';
@@ -73,10 +74,17 @@ import vanilla_muffins_image from './vanilla_muffins_image.png';
 import quinoa_image from './quinoa_image.png';
 import brown_rice_image from './brown_rice_image.png';
 import barley_image from './barley_image.png';
+import deck_noronha from './noronhastroke.png';
+import deck_saquarema from './SAQUAREMA.png';
+import deck_Jbay from './J-BAY.png';
+import deck_hawaii from './hawaii.png';
+import deck_hawaii_grom from './hawaii-grom.png';
+import deck_fiji_classic from './fiji-classic.png';
 
 export const assets = {
   logo,
   banner02,
+  banner05,
   banner02img,
   logo_es,
   search_icon,
@@ -106,43 +114,48 @@ export const assets = {
   bottom_banner_image_sm,
   add_address_iamge,
   box_icon,
+  deck_Jbay,
+  deck_saquarema,
+  deck_hawaii,
+  deck_hawaii_grom,
+  deck_fiji_classic,
 };
 
 export const categories = [
   {
     text: 'Deck J-Bay',
     path: 'Deck-J-Bay',
-    image: organic_vegitable_image,
+    image: deck_Jbay,
     bgColor: '#FEF6DA',
   },
   {
     text: 'Deck Fiji Classic',
     path: 'Fruits',
-    image: fresh_fruits_image,
+    image: deck_fiji_classic,
     bgColor: '#FEE0E0',
   },
   {
     text: 'Deck Noronha',
     path: 'Drinks',
-    image: bottles_image,
+    image: deck_noronha,
     bgColor: '#F0F5DE',
   },
   {
     text: 'Deck Saquarema',
     path: 'Instant',
-    image: maggi_image,
+    image: deck_saquarema,
     bgColor: '#E1F5EC',
   },
   {
     text: 'Deck Hawaii Grom',
     path: 'Dairy',
-    image: dairy_product_image,
+    image: deck_hawaii_grom,
     bgColor: '#FEE6CD',
   },
   {
     text: 'Deck Hawaii',
     path: 'Bakery',
-    image: bakery_image,
+    image: deck_hawaii,
     bgColor: '#E0F6FE',
   },
 ];
