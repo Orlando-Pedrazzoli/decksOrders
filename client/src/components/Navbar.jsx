@@ -46,8 +46,8 @@ const Navbar = () => {
 
       <div className='hidden sm:flex items-center gap-8'>
         <NavLink to='/'>Início</NavLink>
-        <NavLink to='/products'>Modelos</NavLink>
-        <NavLink to='/'>Contato</NavLink>
+        <NavLink to='/products'>Produtos</NavLink>
+        <NavLink to='/'>Contacto</NavLink>
 
         <div className='hidden lg:flex items-center text-sm gap-2 border border-gray-300 px-3 rounded-full'>
           <input

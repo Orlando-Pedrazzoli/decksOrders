@@ -1,19 +1,25 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ProductCard from './ProductCard';
 import { useAppContext } from '../context/AppContext';
 
 const BestSeller = () => {
   const { products } = useAppContext();
+
+  // Memoize the shuffled products to prevent reshuffling on re-renders
+  const shuffledProducts = useMemo(() => {
+    return [...products]
+      .filter(product => product.inStock)
+      .sort(() => 0.5 - Math.random())
+      .slice(0, 12);
+  }, [products]); // Only reshuffle when products change
+
   return (
     <div className='mt-16'>
       <p className='text-2xl md:text-3xl font-medium'>Mais Vendidos</p>
       <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-6 lg:grid-cols-6 mt-6'>
-        {products
-          .filter(product => product.inStock)
-          .slice(0, 6)
-          .map((product, index) => (
-            <ProductCard key={index} product={product} />
-          ))}
+        {shuffledProducts.map(product => (
+          <ProductCard key={product._id} product={product} />
+        ))}
       </div>
     </div>
   );

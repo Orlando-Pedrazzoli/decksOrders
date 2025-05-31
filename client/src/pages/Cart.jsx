@@ -22,6 +22,9 @@ const Cart = () => {
   const [showAddress, setShowAddress] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [paymentOption, setPaymentOption] = useState('COD');
+  const [promoCode, setPromoCode] = useState('');
+  const [discountApplied, setDiscountApplied] = useState(false);
+  const validPromoCode = 'BROTHER'; // The required promo code
 
   const getCart = () => {
     let tempArray = [];
@@ -55,17 +58,18 @@ const Cart = () => {
         return toast.error('Please select an address');
       }
 
-      // Place Order with COD
-      if (paymentOption === 'COD') {
-        const { data } = await axios.post('/api/order/cod', {
-          userId: user._id,
-          items: cartArray.map(item => ({
-            product: item._id,
-            quantity: item.quantity,
-          })),
-          address: selectedAddress._id,
-        });
+      const orderData = {
+        userId: user._id,
+        items: cartArray.map(item => ({
+          product: item._id,
+          quantity: item.quantity,
+        })),
+        address: selectedAddress._id,
+        promoCode: discountApplied ? promoCode : undefined,
+      };
 
+      if (paymentOption === 'COD') {
+        const { data } = await axios.post('/api/order/cod', orderData);
         if (data.success) {
           toast.success(data.message);
           setCartItems({});
@@ -74,16 +78,7 @@ const Cart = () => {
           toast.error(data.message);
         }
       } else {
-        // Place Order with Stripe
-        const { data } = await axios.post('/api/order/stripe', {
-          userId: user._id,
-          items: cartArray.map(item => ({
-            product: item._id,
-            quantity: item.quantity,
-          })),
-          address: selectedAddress._id,
-        });
-
+        const { data } = await axios.post('/api/order/stripe', orderData);
         if (data.success) {
           window.location.replace(data.url);
         } else {
@@ -93,6 +88,34 @@ const Cart = () => {
     } catch (error) {
       toast.error(error.message);
     }
+  };
+
+  const calculateTotal = () => {
+    const subtotal = getCartAmount();
+    const tax = (subtotal * 2) / 100;
+    const totalBeforeDiscount = subtotal + tax;
+
+    if (discountApplied) {
+      const discount = subtotal * 0.3; // 30% discount
+      return totalBeforeDiscount - discount;
+    }
+    return totalBeforeDiscount;
+  };
+
+  const applyPromoCode = () => {
+    if (promoCode.trim().toUpperCase() === validPromoCode) {
+      setDiscountApplied(true);
+      toast.success('30% discount applied!');
+    } else {
+      setDiscountApplied(false);
+      toast.error('Invalid promo code. Please enter correct for 30% off');
+    }
+  };
+
+  const removePromoCode = () => {
+    setPromoCode('');
+    setDiscountApplied(false);
+    toast.success('Promo code removed');
   };
 
   useEffect(() => {
@@ -226,6 +249,7 @@ const Cart = () => {
               <div className='absolute top-12 py-1 bg-white border border-gray-300 text-sm w-full'>
                 {addresses.map((address, index) => (
                   <p
+                    key={index}
                     onClick={() => {
                       setSelectedAddress(address);
                       setShowAddress(false);
@@ -246,8 +270,34 @@ const Cart = () => {
             )}
           </div>
 
-          <p className='text-sm font-medium uppercase mt-6'>Payment Method</p>
+          <p className='text-sm font-medium uppercase mt-6'>Promo Code</p>
+          <div className='flex gap-2 mt-2'>
+            <input
+              type='text'
+              value={promoCode}
+              onChange={e => setPromoCode(e.target.value)}
+              placeholder='Enter valid promo code'
+              className='flex-1 border border-gray-300 bg-white px-3 py-2 outline-none'
+              disabled={discountApplied}
+            />
+            {discountApplied ? (
+              <button
+                onClick={removePromoCode}
+                className='bg-red-500 text-white px-3 py-2 hover:bg-red-600 transition'
+              >
+                Remove
+              </button>
+            ) : (
+              <button
+                onClick={applyPromoCode}
+                className='bg-primary text-white px-3 py-2 hover:bg-primary-dull transition'
+              >
+                Apply
+              </button>
+            )}
+          </div>
 
+          <p className='text-sm font-medium uppercase mt-6'>Payment Method</p>
           <select
             onChange={e => setPaymentOption(e.target.value)}
             className='w-full border border-gray-300 bg-white px-3 py-2 mt-2 outline-none'
@@ -267,6 +317,17 @@ const Cart = () => {
               {getCartAmount()}
             </span>
           </p>
+
+          {discountApplied && (
+            <p className='flex justify-between text-green-600'>
+              <span>Discount (30%)</span>
+              <span>
+                -{currency}
+                {(getCartAmount() * 0.3).toFixed(2)}
+              </span>
+            </p>
+          )}
+
           <p className='flex justify-between'>
             <span>Shipping Fee</span>
             <span className='text-green-600'>Free</span>
@@ -282,7 +343,7 @@ const Cart = () => {
             <span>Total Amount:</span>
             <span>
               {currency}
-              {getCartAmount() + (getCartAmount() * 2) / 100}
+              {calculateTotal().toFixed(2)}
             </span>
           </p>
         </div>
