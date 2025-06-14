@@ -18,14 +18,15 @@ const AllProducts = () => {
       );
     }
 
-    // Apply category filter if any categories are selected
+    // Apply category filter
     if (selectedCategories.length > 0) {
-      result = result.filter(
-        product => selectedCategories.includes(product.category) // Assuming your products have a 'category' field that matches the category paths
+      result = result.filter(product =>
+        selectedCategories.includes(product.category)
       );
     }
 
-    setFilteredProducts(result);
+    // Reverse the array to show newest products first
+    setFilteredProducts([...result].reverse()); // <-- Key change: reverse()
   }, [products, searchQuery, selectedCategories]);
 
   const handleCategoryChange = categoryPath => {
@@ -63,7 +64,6 @@ const AllProducts = () => {
           ))}
         </div>
 
-        {/* Clear filters button on its own line below checkboxes */}
         {selectedCategories.length > 0 && (
           <button
             onClick={() => setSelectedCategories([])}
@@ -75,13 +75,17 @@ const AllProducts = () => {
       </div>
 
       {/* Product Grid */}
-      <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-6 lg:grid-cols-6 mt-6'>
-        {filteredProducts
-          .filter(product => product.inStock)
-          .map((product, index) => (
-            <ProductCard key={index} product={product} />
-          ))}
-      </div>
+      {filteredProducts.length === 0 ? (
+        <p className='text-gray-500 py-8 text-center'>No products found.</p>
+      ) : (
+        <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-6 lg:grid-cols-6 mt-6'>
+          {filteredProducts
+            .filter(product => product.inStock)
+            .map(product => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+        </div>
+      )}
     </div>
   );
 };

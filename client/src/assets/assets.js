@@ -12,6 +12,8 @@ import cart_icon from './cart_icon.svg';
 import nav_cart_icon from './nav_cart_icon.svg';
 import add_icon from './add_icon.svg';
 import refresh_icon from './refresh_icon.svg';
+import arrow_right from './arrow_right.svg';
+import arrow_left from './arrow_left.svg';
 import product_list_icon from './product_list_icon.svg';
 import order_icon from './order_icon.svg';
 import upload_area from './upload_area.png';
@@ -77,7 +79,7 @@ import barley_image from './barley_image.png';
 import deck_noronha from './noronhastroke.png';
 import deck_saquarema from './SAQUAREMA.png';
 import deck_Jbay from './J-BAY.png';
-import deck_hawaii from './hawaii.png';
+import deck_tahiti from './tahiti.png';
 import deck_hawaii_grom from './hawaii-grom.png';
 import deck_fiji_classic from './fiji-classic.png';
 
@@ -116,9 +118,11 @@ export const assets = {
   box_icon,
   deck_Jbay,
   deck_saquarema,
-  deck_hawaii,
   deck_hawaii_grom,
   deck_fiji_classic,
+  deck_tahiti,
+  arrow_right,
+  arrow_left,
 };
 
 export const categories = [
@@ -155,7 +159,7 @@ export const categories = [
   {
     text: 'Deck Tahiti',
     path: 'Deck-Tahiti',
-    image: deck_hawaii,
+    image: deck_tahiti,
     bgColor: '#E0F6FE',
   },
 ];
