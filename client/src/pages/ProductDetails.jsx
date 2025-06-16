@@ -8,26 +8,61 @@ const ProductDetails = () => {
   const { products, navigate, currency, addToCart } = useAppContext();
   const { id } = useParams();
   const [relatedProducts, setRelatedProducts] = useState([]);
-  const [thumbnail, setThumbnail] = useState(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [thumbStartIndex, setThumbStartIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const product = products.find(item => item._id === id);
 
   useEffect(() => {
     if (product && products.length > 0) {
-      let productsCopy = [...products];
-      productsCopy = productsCopy.filter(
+      const productsCopy = [...products].filter(
         item => product.category === item.category && item._id !== product._id
       );
       setRelatedProducts(productsCopy);
     }
   }, [products, product]);
 
-  useEffect(() => {
-    if (product) {
-      setThumbnail(product?.image[0] ? product.image[0] : null);
+  const nextImage = () => {
+    const newIndex = (currentImageIndex + 1) % product.image.length;
+    setCurrentImageIndex(newIndex);
+    // Auto-scroll thumbnails if needed
+    if (newIndex >= thumbStartIndex + 4) {
+      setThumbStartIndex(prev => prev + 1);
     }
-  }, [product]);
+  };
+
+  const prevImage = () => {
+    const newIndex =
+      (currentImageIndex - 1 + product.image.length) % product.image.length;
+    setCurrentImageIndex(newIndex);
+    // Auto-scroll thumbnails if needed
+    if (newIndex < thumbStartIndex) {
+      setThumbStartIndex(prev => prev - 1);
+    }
+  };
+
+  const scrollThumbsUp = () => {
+    if (thumbStartIndex > 0) {
+      setThumbStartIndex(prev => prev - 1);
+    }
+  };
+
+  const scrollThumbsDown = () => {
+    if (thumbStartIndex < product.image.length - 4) {
+      setThumbStartIndex(prev => prev + 1);
+    }
+  };
+
+  const selectThumbnail = index => {
+    setCurrentImageIndex(index);
+    // Adjust thumbnail window if needed
+    if (index >= thumbStartIndex + 4) {
+      setThumbStartIndex(index - 3);
+    } else if (index < thumbStartIndex) {
+      setThumbStartIndex(index);
+    }
+  };
 
   if (!product) {
     return <div>Product not found</div>;
@@ -35,27 +70,65 @@ const ProductDetails = () => {
 
   return (
     <div className='mt-12'>
-      {/* Full Image Modal */}
+      {/* Full Image Modal with Navigation and Close Options */}
       {isModalOpen && (
         <div
-          className='fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center cursor-pointer'
-          onClick={() => setIsModalOpen(false)}
+          className='fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center'
+          onClick={() => setIsModalOpen(false)} // Close when clicking overlay
         >
-          <div className='relative max-w-4xl w-full p-4'>
+          <div
+            className='relative max-w-4xl w-full p-4'
+            onClick={e => e.stopPropagation()} // Prevent closing when clicking inside modal
+          >
+            {/* Close Button (X) */}
             <button
-              className='absolute -top-10 -right-10 text-white text-3xl hover:text-gray-300 transition'
-              onClick={e => {
-                e.stopPropagation();
-                setIsModalOpen(false);
-              }}
+              className='absolute -top-10 -right-10 text-white text-3xl hover:text-gray-300 transition z-50'
+              onClick={() => setIsModalOpen(false)}
+              aria-label='Close modal'
             >
               &times;
             </button>
-            <img
-              src={thumbnail}
-              alt='Selected product'
-              className='w-full h-full object-contain max-h-screen cursor-pointer'
-            />
+
+            {/* Image with Navigation */}
+            <div className='relative'>
+              <img
+                src={product.image[currentImageIndex]}
+                alt='Selected product'
+                className='w-full h-full object-contain max-h-screen cursor-pointer'
+                onClick={() => setIsModalOpen(false)} // Also close when clicking image
+              />
+
+              {product.image.length > 1 && (
+                <>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      prevImage();
+                    }}
+                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition'
+                  >
+                    <img
+                      src={assets.arrow_left}
+                      alt='Previous'
+                      className='w-5 h-5'
+                    />
+                  </button>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      nextImage();
+                    }}
+                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition'
+                  >
+                    <img
+                      src={assets.arrow_right}
+                      alt='Next'
+                      className='w-5 h-5'
+                    />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -72,74 +145,101 @@ const ProductDetails = () => {
       <div className='flex flex-col md:flex-row gap-16 mt-4'>
         {/* Images Container */}
         <div className='flex flex-col md:flex-row gap-3'>
-          {/* Side Thumbnails */}
-          <div className='flex md:flex-col gap-3 md:order-none order-1 mt-3 md:mt-0'>
-            {product.image.slice(0, 4).map((image, index) => (
-              <div
-                key={index}
-                onClick={() => setThumbnail(image)}
-                className='border w-20 h-20 border-gray-500/30 rounded overflow-hidden cursor-pointer'
+          {/* Vertical Thumbnail Carousel */}
+          <div className='relative flex flex-col items-center justify-center gap-2'>
+            {/* Up Arrow - Adjusted positioning */}
+            {product.image.length > 4 && (
+              <button
+                onClick={scrollThumbsUp}
+                disabled={thumbStartIndex === 0}
+                className={`p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition ${
+                  thumbStartIndex === 0 ? 'opacity-30 cursor-not-allowed' : ''
+                }`}
               >
-                <img
-                  src={image}
-                  alt={`Thumbnail ${index + 1}`}
-                  className='w-full h-full object-cover'
-                />
-              </div>
-            ))}
-          </div>
+                <img src={assets.arrow_up} alt='Up' className='w-4 h-4' />
+              </button>
+            )}
 
-          {/* Main Image + Extra Thumbnails */}
-          <div className='flex flex-col items-center'>
-            {/* Main Image */}
-            <div
-              className='border border-gray-500/30 w-full max-w-[400px] h-[400px] rounded overflow-hidden cursor-pointer'
-              onClick={() => setIsModalOpen(true)}
-            >
-              <img
-                src={thumbnail}
-                alt='Selected product'
-                className='w-full h-full object-contain'
-              />
+            {/* Visible Thumbnails (4 items) */}
+            <div className='flex md:flex-col gap-3'>
+              {product.image
+                .slice(thumbStartIndex, thumbStartIndex + 4)
+                .map((image, index) => (
+                  <div
+                    key={thumbStartIndex + index}
+                    onClick={() => selectThumbnail(thumbStartIndex + index)}
+                    className={`border w-20 h-20 border-gray-500/30 rounded overflow-hidden cursor-pointer transition ${
+                      currentImageIndex === thumbStartIndex + index
+                        ? 'ring-2 ring-primary scale-105'
+                        : 'hover:scale-105'
+                    }`}
+                  >
+                    <img
+                      src={image}
+                      alt={`Thumbnail ${thumbStartIndex + index + 1}`}
+                      className='w-full h-full object-cover'
+                    />
+                  </div>
+                ))}
             </div>
 
-            {/* Extra Thumbnails for Desktop */}
+            {/* Down Arrow - Adjusted positioning */}
             {product.image.length > 4 && (
-              <div className='hidden md:flex gap-3 mt-6 flex-wrap'>
-                {product.image.slice(4).map((image, index) => (
-                  <div
-                    key={index + 4}
-                    onClick={() => setThumbnail(image)}
-                    className='border w-20 h-20 border-gray-500/30 rounded overflow-hidden cursor-pointer'
-                  >
-                    <img
-                      src={image}
-                      alt={`Extra Thumbnail ${index + 5}`}
-                      className='w-full h-full object-cover'
-                    />
-                  </div>
-                ))}
-              </div>
+              <button
+                onClick={scrollThumbsDown}
+                disabled={thumbStartIndex >= product.image.length - 4}
+                className={`p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition ${
+                  thumbStartIndex >= product.image.length - 4
+                    ? 'opacity-30 cursor-not-allowed'
+                    : ''
+                }`}
+              >
+                <img src={assets.arrow_down} alt='Down' className='w-4 h-4' />
+              </button>
             )}
+          </div>
 
-            {/* Mobile Carousel Thumbnails */}
-            {product.image.length > 4 && (
-              <div className='flex md:hidden overflow-x-auto gap-3 mt-6 pb-2 scrollbar-thin'>
-                {product.image.slice(4).map((image, index) => (
-                  <div
-                    key={index + 4}
-                    onClick={() => setThumbnail(image)}
-                    className='flex-shrink-0 w-20 h-20 border border-gray-500/30 rounded overflow-hidden cursor-pointer'
+          {/* Main Image with Carousel */}
+          <div className='flex-1'>
+            <div className='relative border border-gray-500/30 w-full max-w-[400px] h-[400px] rounded overflow-hidden'>
+              <img
+                src={product.image[currentImageIndex]}
+                alt='Selected product'
+                className='w-full h-full object-contain cursor-pointer'
+                onClick={() => setIsModalOpen(true)}
+              />
+
+              {product.image.length > 1 && (
+                <>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      prevImage();
+                    }}
+                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-2 shadow-md hover:bg-white transition'
                   >
                     <img
-                      src={image}
-                      alt={`Mobile Carousel Thumbnail ${index + 5}`}
-                      className='w-full h-full object-cover'
+                      src={assets.arrow_left}
+                      alt='Previous'
+                      className='w-4 h-4'
                     />
-                  </div>
-                ))}
-              </div>
-            )}
+                  </button>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      nextImage();
+                    }}
+                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-2 shadow-md hover:bg-white transition'
+                  >
+                    <img
+                      src={assets.arrow_right}
+                      alt='Next'
+                      className='w-4 h-4'
+                    />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

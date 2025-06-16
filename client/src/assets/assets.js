@@ -14,6 +14,8 @@ import add_icon from './add_icon.svg';
 import refresh_icon from './refresh_icon.svg';
 import arrow_right from './arrow_right.svg';
 import arrow_left from './arrow_left.svg';
+import arrow_up from './arrow_up.svg';
+import arrow_down from './arrow_down.svg';
 import product_list_icon from './product_list_icon.svg';
 import order_icon from './order_icon.svg';
 import upload_area from './upload_area.png';
@@ -123,6 +125,8 @@ export const assets = {
   deck_tahiti,
   arrow_right,
   arrow_left,
+  arrow_up,
+  arrow_down,
 };
 
 export const categories = [
