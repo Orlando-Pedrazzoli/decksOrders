@@ -16,6 +16,9 @@ const ProductCategory = () => {
     product => product.category.toLowerCase() === category
   );
 
+  // Create a reversed copy of the filtered products array
+  const reversedProducts = [...filteredProducts].reverse();
+
   return (
     <div className='mt-16'>
       {searchCategory && (
@@ -23,12 +26,12 @@ const ProductCategory = () => {
           <p className='text-2xl font-medium'>
             {searchCategory.text.toUpperCase()}
           </p>
-          <div className='w-16 h-0.5 bg-primary rounded-full'></div>
+          <div className='w-16 h-0.2 bg-primary rounded-full'></div>
         </div>
       )}
       {filteredProducts.length > 0 ? (
         <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-6 mt-6'>
-          {filteredProducts.map(product => (
+          {reversedProducts.map(product => (
             <ProductCard key={product._id} product={product} />
           ))}
         </div>

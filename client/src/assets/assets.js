@@ -84,6 +84,7 @@ import deck_Jbay from './J-BAY.png';
 import deck_tahiti from './tahiti.png';
 import deck_hawaii_grom from './hawaii-grom.png';
 import deck_fiji_classic from './fiji-classic.png';
+import fuwaxImg from './fuwax.jpg';
 
 export const assets = {
   logo,
@@ -127,6 +128,7 @@ export const assets = {
   arrow_left,
   arrow_up,
   arrow_down,
+  fuwaxImg,
 };
 
 export const categories = [
@@ -164,6 +166,12 @@ export const categories = [
     text: 'Deck Tahiti',
     path: 'Deck-Tahiti',
     image: deck_tahiti,
+    bgColor: '#E0F6FE',
+  },
+  {
+    text: 'Fu Wax Cool',
+    path: 'Fuwax-Cool',
+    image: fuwaxImg,
     bgColor: '#E0F6FE',
   },
 ];
