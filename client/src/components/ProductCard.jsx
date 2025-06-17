@@ -93,7 +93,6 @@ const ProductCard = ({ product }) => {
 
       {/* Product Info */}
       <div className='flex flex-col flex-grow text-gray-500/60 text-sm'>
-        <p className='text-xs md:text-sm'>{product.category}</p>
         <p className='text-gray-700 font-medium text-base md:text-lg line-clamp-2 h-[3em] mt-1'>
           {product.name}
         </p>
@@ -117,13 +116,19 @@ const ProductCard = ({ product }) => {
         <div className='flex items-end justify-between mt-3 flex-grow'>
           <div>
             <p className='text-lg md:text-xl font-medium text-gray-700'>
+              {product.offerPrice.toLocaleString('pt-PT', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{' '}
               {currency}
-              {product.offerPrice}
             </p>
             {product.offerPrice < product.price && (
               <p className='text-gray-500/60 text-xs md:text-sm line-through'>
+                {product.price.toLocaleString('pt-PT', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{' '}
                 {currency}
-                {product.price}
               </p>
             )}
           </div>

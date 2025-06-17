@@ -262,13 +262,19 @@ const ProductDetails = () => {
           </div>
 
           <div className='mt-6'>
-            <p className='text-gray-500/70 line-through'>
+            <p className='text-gray-500/60 text-xs md:text-sm line-through'>
+              {product.price.toLocaleString('pt-PT', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{' '}
               {currency}
-              {product.price}
             </p>
-            <p className='text-3xl font-medium'>
+            <p className='text-lg md:text-xl font-medium text-gray-700'>
+              {product.offerPrice.toLocaleString('pt-PT', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{' '}
               {currency}
-              {product.offerPrice}
             </p>
             <span className='text-gray-500/70'>(inclusive of all taxes)</span>
           </div>

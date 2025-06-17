@@ -16,6 +16,7 @@ const Cart = () => {
     axios,
     user,
     setCartItems,
+    setShowUserLogin,
   } = useAppContext();
   const [cartArray, setCartArray] = useState([]);
   const [addresses, setAddresses] = useState([]);
@@ -25,6 +26,15 @@ const Cart = () => {
   const [promoCode, setPromoCode] = useState('');
   const [discountApplied, setDiscountApplied] = useState(false);
   const validPromoCode = 'BROTHER'; // The required promo code
+
+  const requireLogin = action => {
+    if (!user) {
+      setShowUserLogin(true);
+      toast.error(`Please login to ${action}`);
+      return false;
+    }
+    return true;
+  };
 
   const getCart = () => {
     let tempArray = [];
@@ -53,6 +63,8 @@ const Cart = () => {
   };
 
   const placeOrder = async () => {
+    if (!requireLogin('place order')) return;
+
     try {
       if (!selectedAddress) {
         return toast.error('Please select an address');
@@ -103,6 +115,8 @@ const Cart = () => {
   };
 
   const applyPromoCode = () => {
+    if (!requireLogin('apply promo code')) return;
+
     if (promoCode.trim().toUpperCase() === validPromoCode) {
       setDiscountApplied(true);
       toast.success('30% discount applied!');
@@ -116,6 +130,16 @@ const Cart = () => {
     setPromoCode('');
     setDiscountApplied(false);
     toast.success('Promo code removed');
+  };
+
+  const handleAddressChange = () => {
+    if (!requireLogin('change address')) return;
+    setShowAddress(!showAddress);
+  };
+
+  const handlePaymentChange = e => {
+    if (!requireLogin('change payment method')) return;
+    setPaymentOption(e.target.value);
   };
 
   useEffect(() => {
@@ -240,12 +264,12 @@ const Cart = () => {
                 : 'No address found'}
             </p>
             <button
-              onClick={() => setShowAddress(!showAddress)}
+              onClick={handleAddressChange}
               className='text-primary hover:underline cursor-pointer'
             >
               Change
             </button>
-            {showAddress && (
+            {showAddress && user && (
               <div className='absolute top-12 py-1 bg-white border border-gray-300 text-sm w-full'>
                 {addresses.map((address, index) => (
                   <p
@@ -299,7 +323,7 @@ const Cart = () => {
 
           <p className='text-sm font-medium uppercase mt-6'>Payment Method</p>
           <select
-            onChange={e => setPaymentOption(e.target.value)}
+            onChange={handlePaymentChange}
             className='w-full border border-gray-300 bg-white px-3 py-2 mt-2 outline-none'
           >
             <option value='COD'>Cash On Delivery</option>
