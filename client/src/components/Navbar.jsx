@@ -69,7 +69,7 @@ const Navbar = () => {
         >
           Produtos
         </NavLink>
-        <NavLink to='/' className='hover:text-primary transition-colors'>
+        <NavLink to='/contact' className='hover:text-primary transition-colors'>
           Contacto
         </NavLink>
 
@@ -190,7 +190,7 @@ const Navbar = () => {
               </NavLink>
             )}
             <NavLink
-              to='/'
+              to='/contact'
               onClick={() => setOpen(false)}
               className='w-full px-4 py-3 hover:bg-primary/10 rounded-md transition-colors'
             >

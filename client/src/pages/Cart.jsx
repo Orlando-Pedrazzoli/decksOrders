@@ -158,14 +158,16 @@ const Cart = () => {
     <div className='flex flex-col md:flex-row mt-16'>
       <div className='flex-1 max-w-4xl'>
         <h1 className='text-3xl font-medium mb-6'>
-          Shopping Cart{' '}
-          <span className='text-sm text-primary'>{getCartCount()} Items</span>
+          Carrinho de Compras
+          <span className='text-sm text-primary ml-2'>
+            {getCartCount()} Items
+          </span>
         </h1>
 
         <div className='grid grid-cols-[2fr_1fr_1fr] text-gray-500 text-base font-medium pb-3'>
           <p className='text-left'>Product Details</p>
           <p className='text-center'>Subtotal</p>
-          <p className='text-center'>Action</p>
+          <p className='text-center'>Excluir</p>
         </div>
 
         {cartArray.map((product, index) => (
@@ -220,8 +222,12 @@ const Cart = () => {
             </div>
             <p className='text-center'>
               {currency}
-              {product.offerPrice * product.quantity}
+              {(product.offerPrice * product.quantity).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
+
             <button
               onClick={() => removeFromCart(product._id)}
               className='cursor-pointer mx-auto'
@@ -252,11 +258,11 @@ const Cart = () => {
       </div>
 
       <div className='max-w-[360px] w-full bg-gray-100/40 p-5 max-md:mt-16 border border-gray-300/70'>
-        <h2 className='text-xl md:text-xl font-medium'>Order Summary</h2>
+        <h2 className='text-xl md:text-xl font-medium'>Seu Checkout</h2>
         <hr className='border-gray-300 my-5' />
 
         <div className='mb-6'>
-          <p className='text-sm font-medium uppercase'>Delivery Address</p>
+          <p className='text-sm font-medium uppercase'>Faturação</p>
           <div className='relative flex justify-between items-start mt-2'>
             <p className='text-gray-500'>
               {selectedAddress
@@ -267,7 +273,7 @@ const Cart = () => {
               onClick={handleAddressChange}
               className='text-primary hover:underline cursor-pointer'
             >
-              Change
+              Alterar
             </button>
             {showAddress && user && (
               <div className='absolute top-12 py-1 bg-white border border-gray-300 text-sm w-full'>
@@ -294,13 +300,15 @@ const Cart = () => {
             )}
           </div>
 
-          <p className='text-sm font-medium uppercase mt-6'>Promo Code</p>
+          <p className='text-sm font-medium uppercase mt-6'>
+            Aplicar código de desconto{' '}
+          </p>
           <div className='flex gap-2 mt-2'>
             <input
               type='text'
               value={promoCode}
               onChange={e => setPromoCode(e.target.value)}
-              placeholder='Enter valid promo code'
+              placeholder='Inserir Código de Desconto'
               className='flex-1 border border-gray-300 bg-white px-3 py-2 outline-none'
               disabled={discountApplied}
             />
@@ -321,7 +329,9 @@ const Cart = () => {
             )}
           </div>
 
-          <p className='text-sm font-medium uppercase mt-6'>Payment Method</p>
+          <p className='text-sm font-medium uppercase mt-6'>
+            Método de Pagamento
+          </p>
           <select
             onChange={handlePaymentChange}
             className='w-full border border-gray-300 bg-white px-3 py-2 mt-2 outline-none'
