@@ -19,7 +19,10 @@ await connectDB();
 await connectCloudinary();
 
 // Allow multiple origins
-const allowedOrigins = ['http://localhost:5173', 'elitesurfing.vercel.app'];
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://elitesurfing.vercel.app',
+];
 
 app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
 
