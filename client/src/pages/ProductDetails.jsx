@@ -279,7 +279,7 @@ const ProductDetails = () => {
             <span className='text-gray-500/70'>(inclusive of all taxes)</span>
           </div>
 
-          <p className='text-base font-medium mt-6'>About Product</p>
+          <p className='text-base font-medium mt-6'>Especificações Técnicas</p>
           <ul className='list-disc ml-4 text-gray-500/70'>
             {product.description.map((desc, index) => (
               <li key={index}>{desc}</li>
@@ -307,9 +307,9 @@ const ProductDetails = () => {
       </div>
 
       {/* Related Products */}
-      <div className='flex flex-col items-center mt-20'>
+      <div className='flex flex-col items-center mt-5'>
         <div className='flex flex-col items-center w-max'>
-          <p className='text-3xl font-medium'>Related Products</p>
+          <p className='text-3xl font-medium'>Opção de Cores</p>
           <div className='w-20 h-0.5 bg-primary rounded-full mt-2'></div>
         </div>
         <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-6 lg:grid-cols-5 mt-6 w-full'>

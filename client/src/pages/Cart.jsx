@@ -165,7 +165,7 @@ const Cart = () => {
         </h1>
 
         <div className='grid grid-cols-[2fr_1fr_1fr] text-gray-500 text-base font-medium pb-3'>
-          <p className='text-left'>Product Details</p>
+          <p className='text-left'>Detalhes do produto</p>
           <p className='text-center'>Subtotal</p>
           <p className='text-center'>Excluir</p>
         </div>
@@ -193,12 +193,12 @@ const Cart = () => {
               </div>
               <div>
                 <p className='hidden md:block font-semibold'>{product.name}</p>
-                <div className='font-normal text-gray-500/70'>
+                <div className='font-normal text-gray-500/90'>
                   <p>
                     Weight: <span>{product.weight || 'N/A'}</span>
                   </p>
                   <div className='flex items-center'>
-                    <p>Qty:</p>
+                    <p>Quantidade:</p>
                     <select
                       onChange={e =>
                         updateCartItem(product._id, Number(e.target.value))
@@ -207,7 +207,9 @@ const Cart = () => {
                       className='outline-none'
                     >
                       {Array(
-                        cartItems[product._id] > 9 ? cartItems[product._id] : 9
+                        cartItems[product._id] > 20
+                          ? cartItems[product._id]
+                          : 20
                       )
                         .fill('')
                         .map((_, index) => (
@@ -253,7 +255,7 @@ const Cart = () => {
             src={assets.arrow_right_icon_colored}
             alt='arrow'
           />
-          Continue Shopping
+          Continuar comprando
         </button>
       </div>
 

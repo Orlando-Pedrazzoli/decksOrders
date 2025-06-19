@@ -40,13 +40,13 @@ const AllProducts = () => {
   return (
     <div className='mt-16 flex flex-col'>
       <div className='flex flex-col items-end w-max'>
-        <p className='text-2xl font-medium uppercase'>All products</p>
+        <p className='text-2xl font-medium uppercase'>Produtos</p>
         <div className='w-16 h-0.5 bg-primary rounded-full'></div>
       </div>
 
       {/* Category Filter Section */}
       <div className='mt-6 mb-4'>
-        <h3 className='text-lg font-medium mb-2'>Filter by Category:</h3>
+        <h3 className='text-lg font-medium mb-2'>Filtrar por categoria:</h3>
         <div className='flex flex-wrap gap-5'>
           {categories.map(category => (
             <label

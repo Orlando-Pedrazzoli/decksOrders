@@ -7,9 +7,7 @@ const Footer = () => {
         <div>
           <img className='w-34 md:w-32' src={assets.logo_es} alt='logo' />
           <p className='max-w-[410px] mt-6'>
-            We deliver fresh groceries and snacks straight to your door. Trusted
-            by thousands, we aim to make your shopping experience simple and
-            affordable.
+           "A Elite Surfing nasceu para oferecer produtos de alta qualidade, feitos para os surfistas mais exigentes. Com inovação e paixão pelo surf, procuramos transformar cada onda numa oportunidade de superação."
           </p>
         </div>
         <div className='flex flex-wrap justify-between w-full md:w-[45%] gap-5'>
