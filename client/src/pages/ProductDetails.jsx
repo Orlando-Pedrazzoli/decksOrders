@@ -11,6 +11,7 @@ const ProductDetails = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [thumbStartIndex, setThumbStartIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const product = products.find(item => item._id === id);
 
@@ -23,45 +24,43 @@ const ProductDetails = () => {
     }
   }, [products, product]);
 
-  const nextImage = () => {
-    const newIndex = (currentImageIndex + 1) % product.image.length;
+  const changeImage = newIndex => {
+    setIsTransitioning(true);
     setCurrentImageIndex(newIndex);
+
     // Auto-scroll thumbnails if needed
     if (newIndex >= thumbStartIndex + 4) {
       setThumbStartIndex(prev => prev + 1);
+    } else if (newIndex < thumbStartIndex) {
+      setThumbStartIndex(prev => prev - 1);
     }
+
+    setTimeout(() => setIsTransitioning(false), 300);
+  };
+
+  const nextImage = () => {
+    const newIndex = (currentImageIndex + 1) % product.image.length;
+    changeImage(newIndex);
   };
 
   const prevImage = () => {
     const newIndex =
       (currentImageIndex - 1 + product.image.length) % product.image.length;
-    setCurrentImageIndex(newIndex);
-    // Auto-scroll thumbnails if needed
-    if (newIndex < thumbStartIndex) {
-      setThumbStartIndex(prev => prev - 1);
-    }
+    changeImage(newIndex);
   };
 
   const scrollThumbsUp = () => {
-    if (thumbStartIndex > 0) {
-      setThumbStartIndex(prev => prev - 1);
-    }
+    const newIndex = thumbStartIndex - 1;
+    setThumbStartIndex(newIndex < 0 ? product.image.length - 4 : newIndex);
   };
 
   const scrollThumbsDown = () => {
-    if (thumbStartIndex < product.image.length - 4) {
-      setThumbStartIndex(prev => prev + 1);
-    }
+    const newIndex = thumbStartIndex + 1;
+    setThumbStartIndex(newIndex > product.image.length - 4 ? 0 : newIndex);
   };
 
   const selectThumbnail = index => {
-    setCurrentImageIndex(index);
-    // Adjust thumbnail window if needed
-    if (index >= thumbStartIndex + 4) {
-      setThumbStartIndex(index - 3);
-    } else if (index < thumbStartIndex) {
-      setThumbStartIndex(index);
-    }
+    changeImage(index);
   };
 
   if (!product) {
@@ -70,32 +69,31 @@ const ProductDetails = () => {
 
   return (
     <div className='mt-12'>
-      {/* Full Image Modal with Navigation and Close Options */}
+      {/* Full Image Modal */}
       {isModalOpen && (
         <div
           className='fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center'
-          onClick={() => setIsModalOpen(false)} // Close when clicking overlay
+          onClick={() => setIsModalOpen(false)}
         >
           <div
             className='relative max-w-4xl w-full p-4'
-            onClick={e => e.stopPropagation()} // Prevent closing when clicking inside modal
+            onClick={e => e.stopPropagation()}
           >
-            {/* Close Button (X) */}
             <button
-              className='absolute -top-10 -right-10 text-white text-3xl hover:text-gray-300 transition z-50'
+              className='absolute -top-10 -right-10 text-white text-3xl hover:text-gray-300 transition-all duration-300 z-50'
               onClick={() => setIsModalOpen(false)}
-              aria-label='Close modal'
             >
               &times;
             </button>
 
-            {/* Image with Navigation */}
             <div className='relative'>
               <img
                 src={product.image[currentImageIndex]}
                 alt='Selected product'
-                className='w-full h-full object-contain max-h-screen cursor-pointer'
-                onClick={() => setIsModalOpen(false)} // Also close when clicking image
+                className={`w-full h-full object-contain max-h-screen cursor-pointer transition-opacity duration-300 ${
+                  isTransitioning ? 'opacity-70' : 'opacity-100'
+                }`}
+                onClick={() => setIsModalOpen(false)}
               />
 
               {product.image.length > 1 && (
@@ -105,7 +103,7 @@ const ProductDetails = () => {
                       e.stopPropagation();
                       prevImage();
                     }}
-                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition'
+                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
                   >
                     <img
                       src={assets.arrow_left}
@@ -118,7 +116,7 @@ const ProductDetails = () => {
                       e.stopPropagation();
                       nextImage();
                     }}
-                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition'
+                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
                   >
                     <img
                       src={assets.arrow_right}
@@ -133,79 +131,113 @@ const ProductDetails = () => {
         </div>
       )}
 
-      <p>
-        <Link to={'/'}>Home</Link> /<Link to={'/products'}> Products</Link> /
-        <Link to={`/products/${product.category.toLowerCase()}`}>
+      {/* Breadcrumbs */}
+      <p className='text-sm md:text-base'>
+        <Link
+          to={'/'}
+          className='hover:text-primary transition-colors duration-200'
+        >
+          Home
+        </Link>{' '}
+        /
+        <Link
+          to={'/products'}
+          className='hover:text-primary transition-colors duration-200'
+        >
+          {' '}
+          Products
+        </Link>{' '}
+        /
+        <Link
+          to={`/products/${product.category.toLowerCase()}`}
+          className='hover:text-primary transition-colors duration-200'
+        >
           {' '}
           {product.category}
         </Link>{' '}
         /<span className='text-primary'> {product.name}</span>
       </p>
 
-      <div className='flex flex-col md:flex-row gap-16 mt-4'>
-        {/* Images Container */}
-        <div className='flex flex-col md:flex-row gap-3'>
-          {/* Vertical Thumbnail Carousel */}
-          <div className='relative flex flex-col items-center justify-center gap-2'>
-            {/* Up Arrow - Adjusted positioning */}
+      {/* Product Content */}
+      <div className='flex flex-col md:flex-row gap-8 lg:gap-16 mt-4'>
+        {/* Images Section */}
+        <div className='flex flex-col-reverse sm:flex-row gap-3 md:gap-6'>
+          {/* Thumbnail Carousel */}
+          <div className='relative flex sm:flex-col items-center justify-center gap-2'>
             {product.image.length > 4 && (
-              <button
-                onClick={scrollThumbsUp}
-                disabled={thumbStartIndex === 0}
-                className={`p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition ${
-                  thumbStartIndex === 0 ? 'opacity-30 cursor-not-allowed' : ''
-                }`}
-              >
-                <img src={assets.arrow_up} alt='Up' className='w-4 h-4' />
-              </button>
+              <>
+                <button
+                  onClick={scrollThumbsUp}
+                  className='sm:hidden p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition-all duration-300 absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 active:scale-90'
+                >
+                  <img
+                    src={assets.arrow_left}
+                    alt='Previous'
+                    className='w-4 h-4'
+                  />
+                </button>
+                <button
+                  onClick={scrollThumbsUp}
+                  className='hidden sm:block p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
+                >
+                  <img src={assets.arrow_up} alt='Up' className='w-4 h-4' />
+                </button>
+              </>
             )}
 
-            {/* Visible Thumbnails (4 items) */}
-            <div className='flex md:flex-col gap-3'>
+            <div className='flex sm:flex-col gap-3 overflow-hidden'>
               {product.image
                 .slice(thumbStartIndex, thumbStartIndex + 4)
                 .map((image, index) => (
                   <div
                     key={thumbStartIndex + index}
                     onClick={() => selectThumbnail(thumbStartIndex + index)}
-                    className={`border w-20 h-20 border-gray-500/30 rounded overflow-hidden cursor-pointer transition ${
+                    className={`border-2 w-16 h-16 sm:w-20 sm:h-20 rounded overflow-hidden cursor-pointer transition-all duration-300 ${
                       currentImageIndex === thumbStartIndex + index
-                        ? 'ring-2 ring-primary scale-105'
-                        : 'hover:scale-105'
+                        ? 'border-primary scale-105 shadow-md'
+                        : 'border-gray-300 hover:scale-105'
                     }`}
                   >
                     <img
                       src={image}
                       alt={`Thumbnail ${thumbStartIndex + index + 1}`}
-                      className='w-full h-full object-cover'
+                      className='w-full h-full object-cover transition-transform duration-300'
                     />
                   </div>
                 ))}
             </div>
 
-            {/* Down Arrow - Adjusted positioning */}
             {product.image.length > 4 && (
-              <button
-                onClick={scrollThumbsDown}
-                disabled={thumbStartIndex >= product.image.length - 4}
-                className={`p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition ${
-                  thumbStartIndex >= product.image.length - 4
-                    ? 'opacity-30 cursor-not-allowed'
-                    : ''
-                }`}
-              >
-                <img src={assets.arrow_down} alt='Down' className='w-4 h-4' />
-              </button>
+              <>
+                <button
+                  onClick={scrollThumbsDown}
+                  className='sm:hidden p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition-all duration-300 absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 active:scale-90'
+                >
+                  <img
+                    src={assets.arrow_right}
+                    alt='Next'
+                    className='w-4 h-4'
+                  />
+                </button>
+                <button
+                  onClick={scrollThumbsDown}
+                  className='hidden sm:block p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
+                >
+                  <img src={assets.arrow_down} alt='Down' className='w-4 h-4' />
+                </button>
+              </>
             )}
           </div>
 
-          {/* Main Image with Carousel */}
+          {/* Main Image */}
           <div className='flex-1'>
-            <div className='relative border border-gray-500/30 w-full max-w-[400px] h-[400px] rounded overflow-hidden'>
+            <div className='relative border border-gray-500/30 w-full max-w-[400px] h-[300px] sm:h-[400px] rounded overflow-hidden'>
               <img
                 src={product.image[currentImageIndex]}
                 alt='Selected product'
-                className='w-full h-full object-contain cursor-pointer'
+                className={`w-full h-full object-contain cursor-pointer transition-opacity duration-300 ${
+                  isTransitioning ? 'opacity-70' : 'opacity-100'
+                }`}
                 onClick={() => setIsModalOpen(true)}
               />
 
@@ -216,7 +248,7 @@ const ProductDetails = () => {
                       e.stopPropagation();
                       prevImage();
                     }}
-                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-2 shadow-md hover:bg-white transition'
+                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-2 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
                   >
                     <img
                       src={assets.arrow_left}
@@ -229,7 +261,7 @@ const ProductDetails = () => {
                       e.stopPropagation();
                       nextImage();
                     }}
-                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-2 shadow-md hover:bg-white transition'
+                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-2 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
                   >
                     <img
                       src={assets.arrow_right}
@@ -245,7 +277,7 @@ const ProductDetails = () => {
 
         {/* Product Details */}
         <div className='text-sm w-full md:w-1/2 mt-6 md:mt-0'>
-          <h1 className='text-3xl font-medium'>{product.name}</h1>
+          <h1 className='text-2xl md:text-3xl font-medium'>{product.name}</h1>
 
           <div className='flex items-center gap-0.5 mt-1'>
             {Array(5)
@@ -255,7 +287,7 @@ const ProductDetails = () => {
                   key={i}
                   src={i < 4 ? assets.star_icon : assets.star_dull_icon}
                   alt=''
-                  className='md:w-4 w-3.5'
+                  className='w-3.5 md:w-4 transition-transform duration-200 hover:scale-110'
                 />
               ))}
             <p className='text-base ml-2'>(4)</p>
@@ -282,14 +314,19 @@ const ProductDetails = () => {
           <p className='text-base font-medium mt-6'>Especificações Técnicas</p>
           <ul className='list-disc ml-4 text-gray-500/70'>
             {product.description.map((desc, index) => (
-              <li key={index}>{desc}</li>
+              <li
+                key={index}
+                className='mb-1 transition-colors duration-200 hover:text-gray-700'
+              >
+                {desc}
+              </li>
             ))}
           </ul>
 
           <div className='flex items-center mt-10 gap-4 text-base'>
             <button
               onClick={() => addToCart(product._id)}
-              className='w-full py-3.5 cursor-pointer font-medium bg-gray-100 text-gray-800/80 hover:bg-gray-200 transition'
+              className='w-full py-3.5 cursor-pointer font-medium bg-gray-100 text-gray-800/80 hover:bg-gray-200 transition-all duration-300 active:scale-95'
             >
               Adicionar ao carrinho
             </button>
@@ -298,7 +335,7 @@ const ProductDetails = () => {
                 addToCart(product._id);
                 navigate('/cart');
               }}
-              className='w-full py-3.5 cursor-pointer font-medium bg-primary text-white hover:bg-primary-dull transition'
+              className='w-full py-3.5 cursor-pointer font-medium bg-primary text-white hover:bg-primary-dull transition-all duration-300 active:scale-95'
             >
               Comprar agora
             </button>
@@ -307,9 +344,9 @@ const ProductDetails = () => {
       </div>
 
       {/* Related Products */}
-      <div className='flex flex-col items-center mt-5'>
+      <div className='flex flex-col items-center mt-10'>
         <div className='flex flex-col items-center w-max'>
-          <p className='text-3xl font-medium'>Opção de Cores</p>
+          <p className='text-2xl md:text-3xl font-medium'>Opção de Cores</p>
           <div className='w-20 h-0.5 bg-primary rounded-full mt-2'></div>
         </div>
         <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-6 lg:grid-cols-5 mt-6 w-full'>
@@ -324,7 +361,7 @@ const ProductDetails = () => {
             navigate('/products');
             window.scrollTo(0, 0);
           }}
-          className='mx-auto cursor-pointer px-12 my-16 py-2.5 border rounded text-primary hover:bg-primary/10 transition'
+          className='mx-auto cursor-pointer px-12 my-16 py-2.5 border rounded text-primary hover:bg-primary/10 transition-all duration-300 active:scale-95'
         >
           See more
         </button>

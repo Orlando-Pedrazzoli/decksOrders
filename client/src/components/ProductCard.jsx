@@ -27,26 +27,26 @@ const ProductCard = ({ product }) => {
         navigate(`/products/${product.category.toLowerCase()}/${product._id}`);
         window.scrollTo(0, 0);
       }}
-      className='border border-gray-500/20 rounded-md p-3 bg-white w-full hover:shadow-md transition-shadow cursor-pointer flex flex-col h-full'
+      className='border border-gray-500/20 rounded-md p-2 bg-white w-full hover:shadow-md transition-shadow cursor-pointer flex flex-col h-full'
     >
-      {/* Image Carousel Container */}
+      {/* Image Carousel Container com ajustes de layout */}
       <div
         className='group relative flex items-center justify-center mb-3 overflow-hidden bg-gray-50 rounded-lg'
-        style={{ aspectRatio: '1/1', minHeight: '160px' }}
+        style={{ aspectRatio: '1 / 1', minHeight: '160px' }}
       >
         <img
-          className='w-full h-full object-contain p-4 transition-transform duration-300'
+          className='max-w-[90%] max-h-[90%] object-contain object-center transition-transform duration-300'
           src={product.image[currentImageIndex]}
           alt={product.name}
           loading='lazy'
         />
 
-        {/* Navigation Arrows */}
+        {/* Setas de navegação */}
         {product.image.length > 1 && (
           <>
             <button
               onClick={prevImage}
-              className='absolute left-2 bg-white/80 rounded-full p-1.5 shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100 md:opacity-30 md:group-hover:opacity-100'
+              className='absolute z-10 left-2 sm:left-3 bg-white/80 rounded-full p-1.5 shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100 md:opacity-30 md:group-hover:opacity-100'
               aria-label='Previous image'
             >
               <img
@@ -57,21 +57,21 @@ const ProductCard = ({ product }) => {
             </button>
             <button
               onClick={nextImage}
-              className='absolute right-2 bg-white/80 rounded-full p-1.5 shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100 md:opacity-30 md:group-hover:opacity-100'
+              className='absolute z-10 right-2 sm:right-3 bg-white/80 rounded-full p-1.5 shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100 md:opacity-30 md:group-hover:opacity-100'
               aria-label='Next image'
             >
               <img
                 src={assets.arrow_right}
                 alt=''
-                className='w-3 h-3 md:w-4 md:h-4 '
+                className='w-3 h-3 md:w-4 md:h-4'
               />
             </button>
           </>
         )}
 
-        {/* Image Indicators (Dots) */}
+        {/* Indicadores (pontos) */}
         {product.image.length > 1 && (
-          <div className='absolute bottom-2 left-0 right-0 flex justify-center gap-1.5'>
+          <div className='absolute bottom-2 z-10 left-0 right-0 flex justify-center gap-1.5'>
             {product.image.map((_, index) => (
               <button
                 key={index}

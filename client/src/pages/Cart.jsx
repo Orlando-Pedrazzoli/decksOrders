@@ -27,6 +27,11 @@ const Cart = () => {
   const [discountApplied, setDiscountApplied] = useState(false);
   const validPromoCode = 'BROTHER'; // The required promo code
 
+  // Auto-scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const requireLogin = action => {
     if (!user) {
       setShowUserLogin(true);
@@ -86,6 +91,7 @@ const Cart = () => {
           toast.success(data.message);
           setCartItems({});
           navigate('/my-orders');
+          window.scrollTo(0, 0); // Scroll to top after navigation
         } else {
           toast.error(data.message);
         }
@@ -181,7 +187,7 @@ const Cart = () => {
                   navigate(
                     `/products/${product.category.toLowerCase()}/${product._id}`
                   );
-                  scrollTo(0, 0);
+                  window.scrollTo(0, 0);
                 }}
                 className='cursor-pointer w-24 h-24 flex items-center justify-center border border-gray-300 rounded'
               >
@@ -246,7 +252,7 @@ const Cart = () => {
         <button
           onClick={() => {
             navigate('/products');
-            scrollTo(0, 0);
+            window.scrollTo(0, 0);
           }}
           className='group cursor-pointer flex items-center mt-8 gap-2 text-primary font-medium'
         >
