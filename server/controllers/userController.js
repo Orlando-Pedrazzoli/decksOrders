@@ -87,26 +87,12 @@ export const login = async (req, res) => {
 // Check Auth : /api/user/is-auth
 export const isAuth = async (req, res) => {
   try {
-    const token = req.cookies.token;
-
-    if (!token) {
-      return res.json({
-        success: false,
-        message: 'No token, authorization denied',
-      });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const user = await User.findById(decoded.id).select('-password');
-    if (!user) {
-      return res.json({ success: false, message: 'User not found' });
-    }
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) return res.json({ success: false, message: 'User not found' });
 
     return res.json({ success: true, user });
   } catch (error) {
-    console.log(error.message);
-    return res.json({ success: false, message: 'Token is not valid' });
+    return res.json({ success: false, message: error.message });
   }
 };
 
