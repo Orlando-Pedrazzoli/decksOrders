@@ -2,18 +2,33 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+// Enhanced cookie options for cross-domain and Safari compatibility
+const getCookieOptions = req => ({
+  httpOnly: true,
+  secure: true, // Must be true for Vercel
+  sameSite: 'none', // Required for cross-site
+  domain: '.elitesurfing.vercel.app', // Leading dot for subdomains
+  path: '/',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  partitioned: true, // Critical for Safari ITP
+});
+
 // Register User : /api/user/register
 export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      return res.json({ success: false, message: 'Missing Details' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Missing Details' });
     }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.json({ success: false, message: 'User already exists' });
+      return res
+        .status(409)
+        .json({ success: false, message: 'User already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -23,21 +38,27 @@ export const register = async (req, res) => {
       expiresIn: '7d',
     });
 
-    // ✅ Cookie forçado para compatibilidade com Safari/iPhone
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    // Set cookie with enhanced options
+    res.cookie('token', token, getCookieOptions(req));
 
-    return res.json({
+    // Mobile Safari workaround - also return token in response
+    const isIOS = /iPhone|iPad|iPod/i.test(req.headers['user-agent']);
+    const responseData = {
       success: true,
       user: { email: user.email, name: user.name },
-    });
+      ...(isIOS && { token }), // Only include token for iOS
+    };
+
+    return res.status(201).json(responseData);
   } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
+    console.error('Registration error:', error);
+    return res.status(500).json({
+      success: false,
+      message:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Registration failed',
+    });
   }
 };
 
@@ -47,7 +68,7 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.json({
+      return res.status(400).json({
         success: false,
         message: 'Email and password are required',
       });
@@ -55,33 +76,46 @@ export const login = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.json({ success: false, message: 'Invalid email or password' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials', // Generic for security
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.json({ success: false, message: 'Invalid email or password' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials',
+      });
     }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: '7d',
     });
 
-    // ✅ Cookie forçado para compatibilidade com Safari/iPhone
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    // Set secure cookie
+    res.cookie('token', token, getCookieOptions(req));
 
-    return res.json({
+    // Prepare response with conditional mobile token
+    const isIOS = /iPhone|iPad|iPod/i.test(req.headers['user-agent']);
+    const responseData = {
       success: true,
-      user: { email: user.email, name: user.name },
-    });
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
+      ...(isIOS && { token }), // Include token for iOS
+    };
+
+    return res.status(200).json(responseData);
   } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
+    console.error('Login error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Authentication failed',
+    });
   }
 };
 
@@ -89,25 +123,56 @@ export const login = async (req, res) => {
 export const isAuth = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select('-password');
-    if (!user) return res.json({ success: false, message: 'User not found' });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
 
-    return res.json({ success: true, user });
+    // Refresh token for mobile clients
+    const isIOS = /iPhone|iPad|iPod/i.test(req.headers['user-agent']);
+    if (isIOS) {
+      const newToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+        expiresIn: '7d',
+      });
+      res.cookie('token', newToken, getCookieOptions(req));
+      return res.status(200).json({
+        success: true,
+        user,
+        token: newToken,
+      });
+    }
+
+    return res.status(200).json({ success: true, user });
   } catch (error) {
-    return res.json({ success: false, message: error.message });
+    console.error('Auth check error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Authentication check failed',
+    });
   }
 };
 
 // Logout User : /api/user/logout
 export const logout = async (req, res) => {
   try {
-    res.clearCookie('token', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-    });
-    return res.json({ success: true, message: 'Logged Out' });
+    res.clearCookie('token', getCookieOptions(req));
+
+    // Additional mobile cleanup
+    const isIOS = /iPhone|iPad|iPod/i.test(req.headers['user-agent']);
+    const response = {
+      success: true,
+      message: 'Logged out successfully',
+      ...(isIOS && { clearToken: true }), // Signal client to clear storage
+    };
+
+    return res.status(200).json(response);
   } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
+    console.error('Logout error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Logout failed',
+    });
   }
 };

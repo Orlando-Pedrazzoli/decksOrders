@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { assets, dummyAddress } from '../assets/assets';
+import { assets } from '../assets/assets';
 import toast from 'react-hot-toast';
 
 const Cart = () => {
@@ -17,7 +17,9 @@ const Cart = () => {
     user,
     setCartItems,
     setShowUserLogin,
+    isMobile,
   } = useAppContext();
+
   const [cartArray, setCartArray] = useState([]);
   const [addresses, setAddresses] = useState([]);
   const [showAddress, setShowAddress] = useState(false);
@@ -25,12 +27,19 @@ const Cart = () => {
   const [paymentOption, setPaymentOption] = useState('COD');
   const [promoCode, setPromoCode] = useState('');
   const [discountApplied, setDiscountApplied] = useState(false);
-  const validPromoCode = 'BROTHER'; // The required promo code
+  const [isProcessing, setIsProcessing] = useState(false);
+  const validPromoCode = 'BROTHER';
 
-  // Auto-scroll to top when component mounts
+  // Auto-scroll to top and load data
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, []);
+    if (products.length > 0 && cartItems) {
+      updateCartArray();
+    }
+    if (user) {
+      loadUserAddresses();
+    }
+  }, [products, cartItems, user]);
 
   const requireLogin = action => {
     if (!user) {
@@ -41,17 +50,17 @@ const Cart = () => {
     return true;
   };
 
-  const getCart = () => {
-    let tempArray = [];
-    for (const key in cartItems) {
-      const product = products.find(item => item._id === key);
-      product.quantity = cartItems[key];
-      tempArray.push(product);
-    }
+  const updateCartArray = () => {
+    const tempArray = Object.keys(cartItems)
+      .map(key => {
+        const product = products.find(item => item._id === key);
+        return product ? { ...product, quantity: cartItems[key] } : null;
+      })
+      .filter(Boolean);
     setCartArray(tempArray);
   };
 
-  const getUserAddress = async () => {
+  const loadUserAddresses = async () => {
     try {
       const { data } = await axios.get('/api/address/get');
       if (data.success) {
@@ -59,22 +68,20 @@ const Cart = () => {
         if (data.addresses.length > 0) {
           setSelectedAddress(data.addresses[0]);
         }
-      } else {
-        toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error('Failed to load addresses:', error);
     }
   };
 
-  const placeOrder = async () => {
+  const handlePlaceOrder = async () => {
     if (!requireLogin('place order')) return;
+    if (!selectedAddress) {
+      return toast.error('Please select an address');
+    }
 
+    setIsProcessing(true);
     try {
-      if (!selectedAddress) {
-        return toast.error('Please select an address');
-      }
-
       const orderData = {
         userId: user._id,
         items: cartArray.map(item => ({
@@ -85,320 +92,324 @@ const Cart = () => {
         promoCode: discountApplied ? promoCode : undefined,
       };
 
+      let response;
       if (paymentOption === 'COD') {
-        const { data } = await axios.post('/api/order/cod', orderData);
-        if (data.success) {
-          toast.success(data.message);
+        response = await axios.post('/api/order/cod', orderData);
+      } else {
+        response = await axios.post('/api/order/stripe', orderData);
+      }
+
+      if (response.data.success) {
+        if (paymentOption === 'COD') {
+          toast.success('Order placed successfully!');
           setCartItems({});
           navigate('/my-orders');
-          window.scrollTo(0, 0); // Scroll to top after navigation
         } else {
-          toast.error(data.message);
-        }
-      } else {
-        const { data } = await axios.post('/api/order/stripe', orderData);
-        if (data.success) {
-          window.location.replace(data.url);
-        } else {
-          toast.error(data.message);
+          window.location.href = response.data.url;
         }
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error('Order error:', error);
+      toast.error(error.response?.data?.message || 'Failed to place order');
+
+      // Handle token expiration for mobile
+      if (error.response?.status === 401 && isMobile) {
+        localStorage.removeItem('mobile_auth_token');
+      }
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const calculateTotal = () => {
-    const subtotal = getCartAmount();
-    const tax = (subtotal * 2) / 100;
+    const subtotal = parseFloat(getCartAmount());
+    const tax = subtotal * 0.02;
     const totalBeforeDiscount = subtotal + tax;
 
     if (discountApplied) {
-      const discount = subtotal * 0.3; // 30% discount
-      return totalBeforeDiscount - discount;
+      const discount = subtotal * 0.3;
+      return (totalBeforeDiscount - discount).toFixed(2);
     }
-    return totalBeforeDiscount;
+    return totalBeforeDiscount.toFixed(2);
   };
 
-  const applyPromoCode = () => {
+  const handlePromoCode = () => {
     if (!requireLogin('apply promo code')) return;
 
     if (promoCode.trim().toUpperCase() === validPromoCode) {
       setDiscountApplied(true);
       toast.success('30% discount applied!');
     } else {
-      setDiscountApplied(false);
-      toast.error('Invalid promo code. Please enter correct for 30% off');
+      toast.error('Invalid promo code');
     }
   };
 
-  const removePromoCode = () => {
+  const handleRemovePromo = () => {
     setPromoCode('');
     setDiscountApplied(false);
-    toast.success('Promo code removed');
+    toast('Promo code removed');
   };
 
-  const handleAddressChange = () => {
-    if (!requireLogin('change address')) return;
-    setShowAddress(!showAddress);
-  };
+  if (!products.length || !cartItems || Object.keys(cartItems).length === 0) {
+    return (
+      <div className='flex flex-col items-center justify-center min-h-[60vh]'>
+        <img src={assets.empty_cart} alt='Empty cart' className='w-40 mb-4' />
+        <h3 className='text-xl font-medium mb-2'>Your cart is empty</h3>
+        <button
+          onClick={() => navigate('/products')}
+          className='bg-primary text-white px-6 py-2 rounded hover:bg-primary-dull transition'
+        >
+          Continue Shopping
+        </button>
+      </div>
+    );
+  }
 
-  const handlePaymentChange = e => {
-    if (!requireLogin('change payment method')) return;
-    setPaymentOption(e.target.value);
-  };
-
-  useEffect(() => {
-    if (products.length > 0 && cartItems) {
-      getCart();
-    }
-  }, [products, cartItems]);
-
-  useEffect(() => {
-    if (user) {
-      getUserAddress();
-    }
-  }, [user]);
-
-  return products.length > 0 && cartItems ? (
-    <div className='flex flex-col md:flex-row mt-16'>
-      <div className='flex-1 max-w-4xl'>
-        <h1 className='text-3xl font-medium mb-6'>
-          Carrinho de Compras
-          <span className='text-sm text-primary ml-2'>
-            {getCartCount()} Items
-          </span>
-        </h1>
-
-        <div className='grid grid-cols-[2fr_1fr_1fr] text-gray-500 text-base font-medium pb-3'>
-          <p className='text-left'>Detalhes do produto</p>
-          <p className='text-center'>Subtotal</p>
-          <p className='text-center'>Excluir</p>
-        </div>
-
-        {cartArray.map((product, index) => (
-          <div
-            key={index}
-            className='grid grid-cols-[2fr_1fr_1fr] text-gray-500 items-center text-sm md:text-base font-medium pt-3'
-          >
-            <div className='flex items-center md:gap-6 gap-3'>
-              <div
-                onClick={() => {
-                  navigate(
-                    `/products/${product.category.toLowerCase()}/${product._id}`
-                  );
-                  window.scrollTo(0, 0);
-                }}
-                className='cursor-pointer w-24 h-24 flex items-center justify-center border border-gray-300 rounded'
-              >
-                <img
-                  className='max-w-full h-full object-cover'
-                  src={product.image[0]}
-                  alt={product.name}
-                />
-              </div>
-              <div>
-                <p className='hidden md:block font-semibold'>{product.name}</p>
-                <div className='font-normal text-gray-500/90'>
-                  <p>
-                    Weight: <span>{product.weight || 'N/A'}</span>
-                  </p>
-                  <div className='flex items-center'>
-                    <p>Quantidade:</p>
-                    <select
-                      onChange={e =>
-                        updateCartItem(product._id, Number(e.target.value))
-                      }
-                      value={cartItems[product._id]}
-                      className='outline-none'
-                    >
-                      {Array(
-                        cartItems[product._id] > 20
-                          ? cartItems[product._id]
-                          : 20
-                      )
-                        .fill('')
-                        .map((_, index) => (
-                          <option key={index} value={index + 1}>
-                            {index + 1}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p className='text-center'>
-              {currency}
-              {(product.offerPrice * product.quantity).toLocaleString('pt-BR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </p>
-
+  return (
+    <div className='container mx-auto px-4 py-8'>
+      <div className='flex flex-col lg:flex-row gap-8'>
+        {/* Cart Items Section */}
+        <div className='lg:w-2/3'>
+          <div className='flex items-center justify-between mb-6'>
+            <h1 className='text-2xl font-bold'>
+              Shopping Cart ({getCartCount()} items)
+            </h1>
             <button
-              onClick={() => removeFromCart(product._id)}
-              className='cursor-pointer mx-auto'
+              onClick={() => navigate('/products')}
+              className='flex items-center text-primary hover:underline'
             >
+              Continue Shopping
               <img
-                src={assets.remove_icon}
-                alt='remove'
-                className='inline-block w-6 h-6'
+                src={assets.arrow_right_icon_colored}
+                alt='>'
+                className='ml-1 h-4'
               />
             </button>
           </div>
-        ))}
 
-        <button
-          onClick={() => {
-            navigate('/products');
-            window.scrollTo(0, 0);
-          }}
-          className='group cursor-pointer flex items-center mt-8 gap-2 text-primary font-medium'
-        >
-          <img
-            className='group-hover:-translate-x-1 transition'
-            src={assets.arrow_right_icon_colored}
-            alt='arrow'
-          />
-          Continuar comprando
-        </button>
-      </div>
+          <div className='bg-white rounded-lg shadow overflow-hidden'>
+            {/* Cart Items Table */}
+            {cartArray.map(product => (
+              <div
+                key={product._id}
+                className='flex flex-col sm:flex-row border-b p-4'
+              >
+                <div className='flex items-center sm:w-2/3 mb-4 sm:mb-0'>
+                  <img
+                    src={product.image[0]}
+                    alt={product.name}
+                    className='w-20 h-20 object-cover rounded border cursor-pointer'
+                    onClick={() =>
+                      navigate(
+                        `/products/${product.category.toLowerCase()}/${
+                          product._id
+                        }`
+                      )
+                    }
+                  />
+                  <div className='ml-4'>
+                    <h3 className='font-medium'>{product.name}</h3>
+                    <p className='text-sm text-gray-500'>
+                      Weight: {product.weight || 'N/A'}
+                    </p>
+                  </div>
+                </div>
 
-      <div className='max-w-[360px] w-full bg-gray-100/40 p-5 max-md:mt-16 border border-gray-300/70'>
-        <h2 className='text-xl md:text-xl font-medium'>Seu Checkout</h2>
-        <hr className='border-gray-300 my-5' />
+                <div className='flex items-center justify-between sm:w-1/3'>
+                  <div className='flex items-center'>
+                    <span className='mr-2'>Qty:</span>
+                    <select
+                      value={cartItems[product._id]}
+                      onChange={e =>
+                        updateCartItem(product._id, Number(e.target.value))
+                      }
+                      className='border rounded p-1'
+                    >
+                      {[...Array(20).keys()].map(num => (
+                        <option key={num + 1} value={num + 1}>
+                          {num + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-        <div className='mb-6'>
-          <p className='text-sm font-medium uppercase'>Faturação</p>
-          <div className='relative flex justify-between items-start mt-2'>
-            <p className='text-gray-500'>
-              {selectedAddress
-                ? `${selectedAddress.street}, ${selectedAddress.city}, ${selectedAddress.state}, ${selectedAddress.country}`
-                : 'No address found'}
-            </p>
-            <button
-              onClick={handleAddressChange}
-              className='text-primary hover:underline cursor-pointer'
-            >
-              Alterar
-            </button>
-            {showAddress && user && (
-              <div className='absolute top-12 py-1 bg-white border border-gray-300 text-sm w-full'>
-                {addresses.map((address, index) => (
-                  <p
-                    key={index}
-                    onClick={() => {
-                      setSelectedAddress(address);
-                      setShowAddress(false);
-                    }}
-                    className='text-gray-500 p-2 hover:bg-gray-100'
-                  >
-                    {address.street}, {address.city}, {address.state},{' '}
-                    {address.country}
-                  </p>
-                ))}
-                <p
-                  onClick={() => navigate('/add-address')}
-                  className='text-primary text-center cursor-pointer p-2 hover:bg-primary/10'
-                >
-                  Add address
-                </p>
+                  <div className='text-right'>
+                    <p className='font-medium'>
+                      {currency}
+                      {(product.offerPrice * product.quantity).toFixed(2)}
+                    </p>
+                    <button
+                      onClick={() => removeFromCart(product._id)}
+                      className='text-red-500 hover:text-red-700 text-sm mt-1'
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
+            ))}
           </div>
-
-          <p className='text-sm font-medium uppercase mt-6'>
-            Aplicar código de desconto{' '}
-          </p>
-          <div className='flex gap-2 mt-2'>
-            <input
-              type='text'
-              value={promoCode}
-              onChange={e => setPromoCode(e.target.value)}
-              placeholder='Inserir Código de Desconto'
-              className='flex-1 border border-gray-300 bg-white px-3 py-2 outline-none'
-              disabled={discountApplied}
-            />
-            {discountApplied ? (
-              <button
-                onClick={removePromoCode}
-                className='bg-red-500 text-white px-3 py-2 hover:bg-red-600 transition'
-              >
-                Remove
-              </button>
-            ) : (
-              <button
-                onClick={applyPromoCode}
-                className='bg-primary text-white px-3 py-2 hover:bg-primary-dull transition'
-              >
-                Apply
-              </button>
-            )}
-          </div>
-
-          <p className='text-sm font-medium uppercase mt-6'>
-            Método de Pagamento
-          </p>
-          <select
-            onChange={handlePaymentChange}
-            className='w-full border border-gray-300 bg-white px-3 py-2 mt-2 outline-none'
-          >
-            <option value='COD'>Cash On Delivery</option>
-            <option value='Online'>Online Payment</option>
-          </select>
         </div>
 
-        <hr className='border-gray-300' />
+        {/* Order Summary Section */}
+        <div className='lg:w-1/3'>
+          <div className='bg-white rounded-lg shadow p-6 sticky top-4'>
+            <h2 className='text-xl font-bold mb-4'>Order Summary</h2>
 
-        <div className='text-gray-500 mt-4 space-y-2'>
-          <p className='flex justify-between'>
-            <span>Price</span>
-            <span>
-              {currency}
-              {getCartAmount()}
-            </span>
-          </p>
+            {/* Address Selection */}
+            <div className='mb-6'>
+              <div className='flex justify-between items-center mb-2'>
+                <h3 className='font-medium'>Delivery Address</h3>
+                <button
+                  onClick={() =>
+                    requireLogin('select address') &&
+                    setShowAddress(!showAddress)
+                  }
+                  className='text-primary text-sm hover:underline'
+                >
+                  Change
+                </button>
+              </div>
 
-          {discountApplied && (
-            <p className='flex justify-between text-green-600'>
-              <span>Discount (30%)</span>
-              <span>
-                -{currency}
-                {(getCartAmount() * 0.3).toFixed(2)}
-              </span>
-            </p>
-          )}
+              {selectedAddress ? (
+                <div className='bg-gray-50 p-3 rounded text-sm'>
+                  <p>{selectedAddress.street}</p>
+                  <p>
+                    {selectedAddress.city}, {selectedAddress.state}
+                  </p>
+                  <p>{selectedAddress.country}</p>
+                </div>
+              ) : (
+                <p className='text-sm text-gray-500'>No address selected</p>
+              )}
 
-          <p className='flex justify-between'>
-            <span>Shipping Fee</span>
-            <span className='text-green-600'>Free</span>
-          </p>
-          <p className='flex justify-between'>
-            <span>Tax (2%)</span>
-            <span>
-              {currency}
-              {(getCartAmount() * 2) / 100}
-            </span>
-          </p>
-          <p className='flex justify-between text-lg font-medium mt-3'>
-            <span>Total Amount:</span>
-            <span>
-              {currency}
-              {calculateTotal().toFixed(2)}
-            </span>
-          </p>
+              {showAddress && user && (
+                <div className='mt-2 border rounded overflow-hidden'>
+                  {addresses.map(address => (
+                    <div
+                      key={address._id}
+                      onClick={() => {
+                        setSelectedAddress(address);
+                        setShowAddress(false);
+                      }}
+                      className='p-3 border-b hover:bg-gray-50 cursor-pointer'
+                    >
+                      <p>
+                        {address.street}, {address.city}
+                      </p>
+                    </div>
+                  ))}
+                  <div
+                    onClick={() => navigate('/add-address')}
+                    className='p-3 text-primary hover:bg-gray-50 cursor-pointer text-center'
+                  >
+                    + Add New Address
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Promo Code */}
+            <div className='mb-6'>
+              <h3 className='font-medium mb-2'>Promo Code</h3>
+              <div className='flex'>
+                <input
+                  type='text'
+                  value={promoCode}
+                  onChange={e => setPromoCode(e.target.value)}
+                  placeholder='Enter promo code'
+                  disabled={discountApplied}
+                  className='flex-1 border rounded-l px-3 py-2 focus:outline-none'
+                />
+                {discountApplied ? (
+                  <button
+                    onClick={handleRemovePromo}
+                    className='bg-red-500 text-white px-4 rounded-r hover:bg-red-600'
+                  >
+                    Remove
+                  </button>
+                ) : (
+                  <button
+                    onClick={handlePromoCode}
+                    className='bg-primary text-white px-4 rounded-r hover:bg-primary-dull'
+                  >
+                    Apply
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Payment Method */}
+            <div className='mb-6'>
+              <h3 className='font-medium mb-2'>Payment Method</h3>
+              <select
+                value={paymentOption}
+                onChange={e =>
+                  requireLogin('change payment') &&
+                  setPaymentOption(e.target.value)
+                }
+                className='w-full border rounded p-2 focus:outline-none'
+              >
+                <option value='COD'>Cash on Delivery</option>
+                <option value='Online'>Online Payment</option>
+              </select>
+            </div>
+
+            {/* Order Total */}
+            <div className='border-t pt-4'>
+              <div className='flex justify-between mb-2'>
+                <span>Subtotal:</span>
+                <span>
+                  {currency}
+                  {getCartAmount()}
+                </span>
+              </div>
+              {discountApplied && (
+                <div className='flex justify-between text-green-600 mb-2'>
+                  <span>Discount (30%):</span>
+                  <span>
+                    -{currency}
+                    {(getCartAmount() * 0.3).toFixed(2)}
+                  </span>
+                </div>
+              )}
+              <div className='flex justify-between mb-2'>
+                <span>Tax (2%):</span>
+                <span>
+                  {currency}
+                  {(getCartAmount() * 0.02).toFixed(2)}
+                </span>
+              </div>
+              <div className='flex justify-between font-bold text-lg mt-4'>
+                <span>Total:</span>
+                <span>
+                  {currency}
+                  {calculateTotal()}
+                </span>
+              </div>
+            </div>
+
+            {/* Checkout Button */}
+            <button
+              onClick={handlePlaceOrder}
+              disabled={isProcessing || !selectedAddress}
+              className={`w-full mt-6 py-3 rounded font-medium text-white ${
+                isProcessing
+                  ? 'bg-gray-400'
+                  : 'bg-primary hover:bg-primary-dull'
+              } transition`}
+            >
+              {isProcessing
+                ? 'Processing...'
+                : paymentOption === 'COD'
+                ? 'Place Order'
+                : 'Pay Now'}
+            </button>
+          </div>
         </div>
-
-        <button
-          onClick={placeOrder}
-          className='w-full py-3 mt-6 cursor-pointer bg-primary text-white font-medium hover:bg-primary-dull transition'
-        >
-          {paymentOption === 'COD' ? 'Place Order' : 'Proceed to Checkout'}
-        </button>
       </div>
     </div>
-  ) : null;
+  );
 };
 
 export default Cart;

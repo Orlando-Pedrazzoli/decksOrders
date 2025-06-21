@@ -9,56 +9,78 @@ import authUser from '../middlewares/authUser.js';
 
 const userRouter = express.Router();
 
-// Enhanced CORS pre-flight for all routes
+// 1. Enhanced CORS Pre-Flight Handling
 userRouter.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
-  res.header('Access-Control-Allow-Credentials', true);
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.status(200).end();
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'https://elitesurfing.vercel.app',
+  ];
+  const origin = req.headers.origin;
+
+  if (allowedOrigins.includes(origin)) {
+    res.header({
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers':
+        'Content-Type, Authorization, X-Device-Type',
+      'Access-Control-Expose-Headers': 'Authorization, Set-Cookie',
+      Vary: 'Origin',
+    });
+  }
+  res.status(204).end(); // 204 No Content for preflight
 });
 
-// Registration with device detection
-userRouter.post(
-  '/register',
-  (req, res, next) => {
-    req.isMobile = /iPhone|iPad|iPod|Android/i.test(req.headers['user-agent']);
-    next();
-  },
-  register
-);
+// 2. Device Detection Middleware
+const detectDevice = (req, res, next) => {
+  req.isMobile = /iPhone|iPad|iPod|Android/i.test(req.headers['user-agent']);
+  req.isIOS = /iPhone|iPad|iPod/i.test(req.headers['user-agent']);
+  next();
+};
 
-// Login with mobile support
-userRouter.post(
-  '/login',
-  (req, res, next) => {
-    req.isMobile = /iPhone|iPad|iPod|Android/i.test(req.headers['user-agent']);
-    next();
-  },
-  login
-);
+// 3. Registration Endpoint
+userRouter.post('/register', detectDevice, register);
 
-// Authentication check with dual token support
+// 4. Login Endpoint with Mobile Support
+userRouter.post('/login', detectDevice, login);
+
+// 5. Authentication Check with Token Refresh
 userRouter.get('/is-auth', authUser, (req, res) => {
-  if (req.isMobile && req.user) {
+  if (req.isMobile) {
+    // Send fresh token in both header and body for mobile
     res.set('Authorization', `Bearer ${req.user.token}`);
+    res.set('Cache-Control', 'no-store');
+
+    return res.json({
+      success: true,
+      user: req.user,
+      token: req.isIOS ? req.user.token : undefined, // Only for iOS
+    });
   }
   isAuth(req, res);
 });
 
-// Logout with cookie clearing
+// 6. Secure Logout Handling
 userRouter.get('/logout', authUser, (req, res) => {
-  // Clear cookie
-  res.clearCookie('auth_token', {
+  // Clear HTTP-only cookie
+  const cookieOptions = {
     httpOnly: true,
     secure: req.secure,
-    sameSite: 'none',
+    sameSite: req.secure ? 'none' : 'lax',
     domain: req.secure ? '.elitesurfing.vercel.app' : undefined,
-  });
+    path: '/',
+  };
 
-  // Clear mobile token header
+  res.clearCookie('auth_token', cookieOptions);
+
+  // Mobile-specific cleanup
   if (req.isMobile) {
     res.removeHeader('Authorization');
+    res.json({
+      success: true,
+      clearLocalToken: true, // Signal client to clear localStorage
+    });
+    return;
   }
 
   logout(req, res);
