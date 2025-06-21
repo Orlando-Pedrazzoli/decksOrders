@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Link, useParams } from 'react-router-dom';
 import { assets } from '../assets/assets';
@@ -13,6 +13,9 @@ const ProductDetails = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
+  // Ref for the horizontally scrollable image container on mobile
+  const imageScrollRef = useRef(null);
+
   const product = products.find(item => item._id === id);
 
   useEffect(() => {
@@ -24,15 +27,28 @@ const ProductDetails = () => {
     }
   }, [products, product]);
 
+  // Sync the currentImageIndex with the scroll position on mobile
+  useEffect(() => {
+    if (imageScrollRef.current && window.innerWidth < 640) {
+      // Apply only for screens smaller than 'sm' breakpoint
+      const scrollContainer = imageScrollRef.current;
+      const imageWidth = scrollContainer.offsetWidth; // Get width of one image
+      scrollContainer.scrollLeft = currentImageIndex * imageWidth;
+    }
+  }, [currentImageIndex]);
+
   const changeImage = newIndex => {
     setIsTransitioning(true);
     setCurrentImageIndex(newIndex);
 
-    // Auto-scroll thumbnails if needed
-    if (newIndex >= thumbStartIndex + 4) {
-      setThumbStartIndex(prev => prev + 1);
-    } else if (newIndex < thumbStartIndex) {
-      setThumbStartIndex(prev => prev - 1);
+    // Auto-scroll thumbnails if needed (desktop view)
+    if (window.innerWidth >= 640) {
+      // Only for screens larger than or equal to 'sm' breakpoint
+      if (newIndex >= thumbStartIndex + 4) {
+        setThumbStartIndex(prev => prev + 1);
+      } else if (newIndex < thumbStartIndex) {
+        setThumbStartIndex(prev => prev - 1);
+      }
     }
 
     setTimeout(() => setIsTransitioning(false), 300);
@@ -63,12 +79,25 @@ const ProductDetails = () => {
     changeImage(index);
   };
 
+  // Handle scroll for mobile image carousel
+  const handleImageScroll = () => {
+    if (imageScrollRef.current) {
+      const scrollContainer = imageScrollRef.current;
+      const imageWidth = scrollContainer.offsetWidth;
+      // Calculate the current visible image based on scroll position
+      const newIndex = Math.round(scrollContainer.scrollLeft / imageWidth);
+      if (newIndex !== currentImageIndex) {
+        setCurrentImageIndex(newIndex);
+      }
+    }
+  };
+
   if (!product) {
     return <div>Product not found</div>;
   }
 
   return (
-    <div className='mt-12'>
+    <div className='mt-12 px-6 md:px-16 lg:px-24 xl:px-32'>
       {/* Full Image Modal */}
       {isModalOpen && (
         <div
@@ -96,6 +125,7 @@ const ProductDetails = () => {
                 onClick={() => setIsModalOpen(false)}
               />
 
+              {/* Modal navigation arrows (always show arrows in modal) */}
               {product.image.length > 1 && (
                 <>
                   <button
@@ -161,28 +191,16 @@ const ProductDetails = () => {
       {/* Product Content */}
       <div className='flex flex-col md:flex-row gap-8 lg:gap-16 mt-4'>
         {/* Images Section */}
-        <div className='flex flex-col-reverse sm:flex-row gap-3 md:gap-6'>
-          {/* Thumbnail Carousel */}
-          <div className='relative flex sm:flex-col items-center justify-center gap-2'>
+        <div className='flex flex-col-reverse sm:flex-row gap-3 md:gap-6 w-full md:w-1/2'>
+          {/* Thumbnail Carousel (hidden on mobile, visible on sm and up) */}
+          <div className='relative hidden sm:flex sm:flex-col items-center justify-center gap-2'>
             {product.image.length > 4 && (
-              <>
-                <button
-                  onClick={scrollThumbsUp}
-                  className='sm:hidden p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition-all duration-300 absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 active:scale-90'
-                >
-                  <img
-                    src={assets.arrow_left}
-                    alt='Previous'
-                    className='w-4 h-4'
-                  />
-                </button>
-                <button
-                  onClick={scrollThumbsUp}
-                  className='hidden sm:block p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
-                >
-                  <img src={assets.arrow_up} alt='Up' className='w-4 h-4' />
-                </button>
-              </>
+              <button
+                onClick={scrollThumbsUp}
+                className='p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
+              >
+                <img src={assets.arrow_up} alt='Up' className='w-4 h-4' />
+              </button>
             )}
 
             <div className='flex sm:flex-col gap-3 overflow-hidden'>
@@ -208,30 +226,36 @@ const ProductDetails = () => {
             </div>
 
             {product.image.length > 4 && (
-              <>
-                <button
-                  onClick={scrollThumbsDown}
-                  className='sm:hidden p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition-all duration-300 absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 active:scale-90'
-                >
-                  <img
-                    src={assets.arrow_right}
-                    alt='Next'
-                    className='w-4 h-4'
-                  />
-                </button>
-                <button
-                  onClick={scrollThumbsDown}
-                  className='hidden sm:block p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
-                >
-                  <img src={assets.arrow_down} alt='Down' className='w-4 h-4' />
-                </button>
-              </>
+              <button
+                onClick={scrollThumbsDown}
+                className='p-1.5 rounded-full bg-white/90 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
+              >
+                <img src={assets.arrow_down} alt='Down' className='w-4 h-4' />
+              </button>
             )}
           </div>
 
-          {/* Main Image */}
-          <div className='flex-1'>
-            <div className='relative border border-gray-500/30 w-full max-w-[400px] h-[300px] sm:h-[400px] rounded overflow-hidden'>
+          {/* Main Image Container */}
+          <div className='relative w-full max-w-[400px] h-[300px] sm:h-[400px] mx-auto md:mx-0'>
+            {/* Mobile Carousel (horizontal scroll with dots) */}
+            <div
+              ref={imageScrollRef}
+              onScroll={handleImageScroll}
+              className='flex w-full h-full overflow-x-scroll snap-x snap-mandatory scroll-smooth hide-scrollbar sm:hidden border border-gray-500/30 rounded'
+            >
+              {product.image.map((image, index) => (
+                <img
+                  key={index}
+                  src={image}
+                  alt={`Product image ${index + 1}`}
+                  className='w-full h-full object-contain flex-shrink-0 snap-center cursor-pointer'
+                  onClick={() => setIsModalOpen(true)}
+                />
+              ))}
+            </div>
+
+            {/* Desktop Main Image (standard with arrows) */}
+            <div className='relative border border-gray-500/30 w-full h-full rounded overflow-hidden hidden sm:block'>
               <img
                 src={product.image[currentImageIndex]}
                 alt='Selected product'
@@ -271,6 +295,22 @@ const ProductDetails = () => {
                   </button>
                 </>
               )}
+            </div>
+
+            {/* Dots for Mobile View */}
+            <div className='flex justify-center gap-2 mt-4 sm:hidden'>
+              {product.image.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => changeImage(index)}
+                  className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
+                    currentImageIndex === index
+                      ? 'bg-primary'
+                      : 'bg-gray-300 hover:bg-gray-400'
+                  }`}
+                  aria-label={`Go to image ${index + 1}`}
+                ></button>
+              ))}
             </div>
           </div>
         </div>

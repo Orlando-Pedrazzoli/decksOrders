@@ -26,6 +26,7 @@ import leaf_icon from './leaf_icon.svg';
 import coin_icon from './coin_icon.svg';
 import box_icon from './box_icon.svg';
 import trust_icon from './trust_icon.svg';
+import empty_cart from './empty_cart.svg';
 import black_arrow_icon from './black_arrow_icon.svg';
 import white_arrow_icon from './white_arrow_icon.svg';
 import main_banner_bg from './main_banner_bg.png';
@@ -34,13 +35,7 @@ import water_video from './water_video.mp4';
 import bottom_banner_image from './bottom_banner_image.png';
 import bottom_banner_image_sm from './bottom_banner_image_sm.png';
 import add_address_iamge from './add_address_image.svg';
-import organic_vegitable_image from './organic_vegitable_image.png';
-import fresh_fruits_image from './fresh_fruits_image.png';
-import bottles_image from './bottles_image.png';
 import maggi_image from './maggi_image.png';
-import dairy_product_image from './dairy_product_image.png';
-import bakery_image from './bakery_image.png';
-import grain_image from './grain_image.png';
 import potato_image_1 from './potato_image_1.png';
 import potato_image_2 from './potato_image_2.png';
 import potato_image_3 from './potato_image_3.png';
@@ -129,6 +124,7 @@ export const assets = {
   arrow_up,
   arrow_down,
   fuwaxImg,
+  empty_cart,
 };
 
 export const categories = [
