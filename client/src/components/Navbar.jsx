@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 import toast from 'react-hot-toast';
 
 const Navbar = () => {
-  const [open, setOpen] = React.useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const {
     user,
     setUser,
@@ -24,6 +24,7 @@ const Navbar = () => {
         toast.success(data.message);
         setUser(null);
         navigate('/');
+        setMenuOpen(false);
       } else {
         toast.error(data.message);
       }
@@ -38,27 +39,15 @@ const Navbar = () => {
     }
   }, [searchQuery]);
 
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = event => {
-      if (open && !event.target.closest('.mobile-menu-container')) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [open]);
-
   return (
     <nav className='flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b border-gray-300 bg-white sticky top-0 z-50'>
-      <NavLink to='/' onClick={() => {
-    setOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }}
->
+      <NavLink
+        to='/'
+        onClick={() => {
+          setMenuOpen(false);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      >
         <img className='h-11' src={assets.logo_es} alt='logo' />
       </NavLink>
 
@@ -149,7 +138,7 @@ const Navbar = () => {
           </button>
         </div>
         <button
-          onClick={() => setOpen(!open)}
+          onClick={() => setMenuOpen(!menuOpen)}
           aria-label='Menu'
           className='p-1 hover:bg-gray-100 rounded-md transition-colors'
         >
@@ -158,71 +147,54 @@ const Navbar = () => {
       </div>
 
       {/* Mobile Dropdown Menu */}
-      {open && (
-        <>
-          {/* Overlay */}
-          <div
-            className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden'
-            onClick={() => setOpen(false)}
-          />
-
-          {/* Menu */}
-          <div
-            className={`fixed top-[68px] left-0 w-full bg-white shadow-lg py-4 flex flex-col items-start gap-1 px-5 text-sm sm:hidden z-50 transition-all duration-300`}
+      {menuOpen && (
+        <div className='sm:hidden bg-white shadow-md border-t border-gray-100 px-6 py-4 flex flex-col gap-3 absolute top-full left-0 w-full z-50'>
+          <NavLink to='/' onClick={() => setMenuOpen(false)} className='py-2'>
+            Início
+          </NavLink>
+          <NavLink
+            to='/products'
+            onClick={() => setMenuOpen(false)}
+            className='py-2'
           >
+            Produtos
+          </NavLink>
+          {user && (
             <NavLink
-              to='/'
-              onClick={() => setOpen(false)}
-              className='w-full px-4 py-3 hover:bg-primary/10 rounded-md transition-colors'
+              to='/my-orders'
+              onClick={() => setMenuOpen(false)}
+              className='py-2'
             >
-              Início
+              Meus Pedidos
             </NavLink>
-            <NavLink
-              to='/products'
-              onClick={() => setOpen(false)}
-              className='w-full px-4 py-3 hover:bg-primary/10 rounded-md transition-colors'
+          )}
+          <NavLink
+            to='/contact'
+            onClick={() => setMenuOpen(false)}
+            className='py-2'
+          >
+            Contacto
+          </NavLink>
+          <div className='border-t border-gray-200 my-2'></div>
+          {!user ? (
+            <button
+              onClick={() => {
+                setMenuOpen(false);
+                setShowUserLogin(true);
+              }}
+              className='w-full bg-primary text-white py-3 rounded-full text-sm'
             >
-              Produtos
-            </NavLink>
-            {user && (
-              <NavLink
-                to='/my-orders'
-                onClick={() => setOpen(false)}
-                className='w-full px-4 py-3 hover:bg-primary/10 rounded-md transition-colors'
-              >
-                Meus Pedidos
-              </NavLink>
-            )}
-            <NavLink
-              to='/contact'
-              onClick={() => setOpen(false)}
-              className='w-full px-4 py-3 hover:bg-primary/10 rounded-md transition-colors'
+              Login
+            </button>
+          ) : (
+            <button
+              onClick={logout}
+              className='w-full bg-primary text-white py-3 rounded-full text-sm'
             >
-              Contacto
-            </NavLink>
-
-            <div className='w-full border-t border-gray-200 my-2'></div>
-
-            {!user ? (
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  setShowUserLogin(true);
-                }}
-                className='w-full mt-2 cursor-pointer px-6 py-3 bg-primary hover:bg-primary-dull transition text-white rounded-full text-sm'
-              >
-                Login
-              </button>
-            ) : (
-              <button
-                onClick={logout}
-                className='w-full mt-2 cursor-pointer px-6 py-3 bg-primary hover:bg-primary-dull transition text-white rounded-full text-sm'
-              >
-                Logout
-              </button>
-            )}
-          </div>
-        </>
+              Logout
+            </button>
+          )}
+        </div>
       )}
     </nav>
   );

@@ -19,6 +19,7 @@ import ProductList from './pages/seller/ProductList';
 import Orders from './pages/seller/Orders';
 import Loading from './components/Loading';
 import Contact from './pages/Contact';
+import ScrollToTop from './components/ScrollToTop';
 
 const App = () => {
   const isSellerPath = useLocation().pathname.includes('seller');
@@ -30,7 +31,7 @@ const App = () => {
       {showUserLogin ? <Login /> : null}
 
       <Toaster />
-
+      <ScrollToTop />
       <div
         className={`${isSellerPath ? '' : 'px-6 md:px-16 lg:px-24 xl:px-32'}`}
       >
