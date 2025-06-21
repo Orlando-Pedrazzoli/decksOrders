@@ -1,208 +1,108 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useAppContext } from '../context/AppContext';
 import toast from 'react-hot-toast';
 
 const Login = () => {
-  const { setShowUserLogin, setUser, axios, navigate, isMobile } =
-    useAppContext();
-  const [state, setState] = useState('login');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
+  const { setShowUserLogin, setUser, axios, navigate } = useAppContext();
 
-  // Detect iOS on component mount
-  useEffect(() => {
-    setIsIOS(/iPhone|iPad|iPod/i.test(navigator.userAgent));
-    return () => {
-      setName('');
-      setEmail('');
-      setPassword('');
-    };
-  }, []);
+  const [state, setState] = React.useState('login');
+  const [name, setName] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
 
   const onSubmitHandler = async event => {
-    event.preventDefault();
-    setIsLoading(true);
-
     try {
+      event.preventDefault();
+
       const { data } = await axios.post(`/api/user/${state}`, {
         name,
         email,
         password,
       });
-
       if (data.success) {
-        handleSuccessfulAuth(data);
+        navigate('/');
+        setUser(data.user);
+        setShowUserLogin(false);
       } else {
-        toast.error(data.message || 'Authentication failed');
+        toast.error(data.message);
       }
     } catch (error) {
-      handleAuthError(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSuccessfulAuth = data => {
-    setUser(data.user);
-    setShowUserLogin(false);
-    navigate('/');
-    toast.success(`Welcome back, ${data.user.name || 'User'}!`);
-
-    // Enhanced mobile token handling
-    if (isMobile && data.token) {
-      localStorage.setItem('mobile_auth_token', data.token);
-
-      // For iOS, also store in sessionStorage as fallback
-      if (isIOS) {
-        sessionStorage.setItem('temp_auth_token', data.token);
-      }
-    }
-  };
-
-  const handleAuthError = error => {
-    console.error('Login error:', error);
-    const errorMessage =
-      error.response?.data?.message ||
-      error.message ||
-      'Failed to connect to server';
-    toast.error(errorMessage);
-
-    // Clear all auth tokens on 401
-    if (error.response?.status === 401) {
-      localStorage.removeItem('mobile_auth_token');
-      if (isIOS) {
-        sessionStorage.removeItem('temp_auth_token');
-      }
+      toast.error(error.message);
     }
   };
 
   return (
     <div
       onClick={() => setShowUserLogin(false)}
-      className='fixed inset-0 z-50 flex items-center justify-center bg-black/50'
+      className='fixed top-0 bottom-0 left-0 right-0 z-30 flex items-center text-sm text-gray-600 bg-black/50'
     >
       <form
         onSubmit={onSubmitHandler}
         onClick={e => e.stopPropagation()}
-        className='relative flex flex-col gap-4 w-full max-w-md mx-4 p-8 rounded-lg shadow-xl border border-gray-200 bg-white'
+        className='flex flex-col gap-4 m-auto items-start p-8 py-12 w-80 sm:w-[352px] rounded-lg shadow-xl border border-gray-200 bg-white'
       >
-        <button
-          type='button'
-          onClick={() => setShowUserLogin(false)}
-          className='absolute top-4 right-4 text-gray-500 hover:text-gray-700'
-          aria-label='Close login'
-        >
-          ✕
-        </button>
-
-        <h2 className='text-2xl font-medium text-center mb-4'>
+        <p className='text-2xl font-medium m-auto'>
           <span className='text-primary'>User</span>{' '}
           {state === 'login' ? 'Login' : 'Sign Up'}
-        </h2>
-
+        </p>
         {state === 'register' && (
           <div className='w-full'>
-            <label htmlFor='name' className='block mb-1'>
-              Name
-            </label>
+            <p>Name</p>
             <input
-              id='name'
               onChange={e => setName(e.target.value)}
               value={name}
-              placeholder='Type your name'
-              className='w-full p-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary'
+              placeholder='type here'
+              className='border border-gray-200 rounded w-full p-2 mt-1 outline-primary'
               type='text'
               required
-              autoComplete='name'
-              autoCapitalize='words'
             />
           </div>
         )}
-
-        <div className='w-full'>
-          <label htmlFor='email' className='block mb-1'>
-            Email
-          </label>
+        <div className='w-full '>
+          <p>Email</p>
           <input
-            id='email'
             onChange={e => setEmail(e.target.value)}
             value={email}
-            placeholder='Type your email'
-            className='w-full p-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary'
+            placeholder='type here'
+            className='border border-gray-200 rounded w-full p-2 mt-1 outline-primary'
             type='email'
-            inputMode='email'
             required
-            autoComplete='email'
           />
         </div>
-
-        <div className='w-full'>
-          <label htmlFor='password' className='block mb-1'>
-            Password
-          </label>
+        <div className='w-full '>
+          <p>Password</p>
           <input
-            id='password'
             onChange={e => setPassword(e.target.value)}
             value={password}
-            placeholder='Type your password'
-            className='w-full p-2 border border-gray-200 rounded focus:outline-none focus:ring-2 focus:ring-primary'
+            placeholder='type here'
+            className='border border-gray-200 rounded w-full p-2 mt-1 outline-primary'
             type='password'
             required
-            minLength={6}
-            autoComplete={
-              state === 'login' ? 'current-password' : 'new-password'
-            }
           />
         </div>
-
-        <div className='text-center mt-2'>
-          {state === 'register' ? (
-            <p>
-              Already have an account?{' '}
-              <button
-                type='button'
-                onClick={() => setState('login')}
-                className='text-primary hover:underline focus:outline-none'
-              >
-                Login here
-              </button>
-            </p>
-          ) : (
-            <p>
-              Need an account?{' '}
-              <button
-                type='button'
-                onClick={() => setState('register')}
-                className='text-primary hover:underline focus:outline-none'
-              >
-                Register here
-              </button>
-            </p>
-          )}
-        </div>
-
-        <button
-          type='submit'
-          disabled={isLoading}
-          className={`w-full py-3 px-4 rounded-md text-white font-medium ${
-            isLoading
-              ? 'bg-primary-dull cursor-wait'
-              : 'bg-primary hover:bg-primary-dull'
-          } transition-colors`}
-          aria-busy={isLoading}
-        >
-          {isLoading ? (
-            <span className='inline-flex items-center justify-center'>
-              Processing...
+        {state === 'register' ? (
+          <p>
+            Already have account?{' '}
+            <span
+              onClick={() => setState('login')}
+              className='text-primary cursor-pointer'
+            >
+              click here
             </span>
-          ) : state === 'register' ? (
-            'Create Account'
-          ) : (
-            'Login'
-          )}
+          </p>
+        ) : (
+          <p>
+            Create an account?{' '}
+            <span
+              onClick={() => setState('register')}
+              className='text-primary cursor-pointer'
+            >
+              click here
+            </span>
+          </p>
+        )}
+        <button className='bg-primary hover:bg-primary-dull transition-all text-white w-full py-2 rounded-md cursor-pointer'>
+          {state === 'register' ? 'Create Account' : 'Login'}
         </button>
       </form>
     </div>
