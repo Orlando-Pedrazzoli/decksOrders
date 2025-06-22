@@ -14,10 +14,10 @@ const ProductDetails = () => {
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   const imageScrollRef = useRef(null);
-  const modalImageScrollRef = useRef(null);
-
-  // Flag to control programmatic scroll (prevents scroll updates from fighting user's touch)
-  const isProgrammaticScroll = useRef(false);
+  // We no longer need modalImageScrollRef or isProgrammaticScroll for the modal
+  // as scrolling is disabled and dots are removed.
+  // const modalImageScrollRef = useRef(null);
+  // const isProgrammaticScroll = useRef(false);
 
   const product = products.find(item => item._id === id);
 
@@ -39,38 +39,11 @@ const ProductDetails = () => {
     }
   }, [currentImageIndex]);
 
-  // Programmatic scroll for the mobile modal (adjusted for smoother control)
-  useEffect(() => {
-    if (modalImageScrollRef.current && isModalOpen && window.innerWidth < 640) {
-      const scrollContainer = modalImageScrollRef.current;
-      const imageWidth = scrollContainer.offsetWidth;
-
-      // Only scroll programmatically if the current index is different
-      // and ensure we don't trigger the onScroll handler immediately
-      if (
-        Math.round(scrollContainer.scrollLeft / imageWidth) !==
-        currentImageIndex
-      ) {
-        isProgrammaticScroll.current = true;
-        scrollContainer.scrollTo({
-          left: currentImageIndex * imageWidth,
-          behavior: 'smooth',
-        });
-
-        // Reset flag after a delay longer than the scroll animation
-        const timeout = setTimeout(() => {
-          isProgrammaticScroll.current = false;
-        }, 300); // Match or exceed CSS scroll-smooth duration
-
-        return () => clearTimeout(timeout);
-      }
-    }
-  }, [currentImageIndex, isModalOpen]);
+  // Removed the useEffect for modal programmatic scroll as it's no longer needed.
 
   const changeImage = newIndex => {
     setIsTransitioning(true);
-    // When changing image via dots/arrows, set programmatic scroll flag
-    isProgrammaticScroll.current = true;
+    // isProgrammaticScroll.current is no longer relevant for the modal.
     setCurrentImageIndex(newIndex);
 
     // Auto-scroll thumbnails if needed (desktop view)
@@ -111,14 +84,13 @@ const ProductDetails = () => {
     changeImage(index);
   };
 
-  // Handle scroll for mobile image carousel (main and modal)
+  // Only handle scroll for the main mobile image carousel
   const handleImageScroll = ref => {
     if (ref.current) {
-      // If a programmatic scroll just occurred, ignore this onScroll event
-      if (isProgrammaticScroll.current) {
-        return;
-      }
-
+      // No need for isProgrammaticScroll.current flag for this carousel
+      // if we are solely relying on user scroll for index updates here.
+      // If you re-introduce programmatic scrolling for this main carousel later,
+      // you might need to bring back the flag.
       const scrollContainer = ref.current;
       const imageWidth = scrollContainer.offsetWidth;
       // Calculate the new index based on scroll position
@@ -141,11 +113,11 @@ const ProductDetails = () => {
       {isModalOpen && (
         <div
           className='fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center'
-          onClick={() => setIsModalOpen(false)}
+          onClick={() => setIsModalOpen(false)} // Click anywhere to close
         >
           <div
             className='relative max-w-4xl w-full p-4'
-            onClick={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()} // Prevent modal from closing when clicking inside
           >
             <button
               className='absolute -top-10 -right-10 text-white text-3xl hover:text-gray-300 transition-all duration-300 z-50'
@@ -155,22 +127,15 @@ const ProductDetails = () => {
             </button>
 
             <div className='relative'>
-              {/* Mobile Carousel for Modal */}
-              <div
-                ref={modalImageScrollRef}
-                onScroll={() => handleImageScroll(modalImageScrollRef)}
-                className='flex w-full h-full overflow-x-scroll snap-x snap-mandatory scroll-smooth hide-scrollbar sm:hidden border border-gray-500/30 rounded'
-              >
-                {product.image.map((image, index) => (
-                  <img
-                    key={index}
-                    src={image}
-                    alt={`Product image ${index + 1}`}
-                    className='w-full h-full object-contain flex-shrink-0 snap-center cursor-pointer'
-                    onClick={() => setIsModalOpen(false)}
-                  />
-                ))}
-              </div>
+              {/* Mobile Modal Image (no scroll, no dots) */}
+              <img
+                src={product.image[currentImageIndex]}
+                alt='Selected product'
+                className={`w-full h-full object-contain max-h-screen cursor-pointer transition-opacity duration-300 ${
+                  isTransitioning ? 'opacity-70' : 'opacity-100'
+                } sm:hidden border border-gray-500/30 rounded`} // Only for mobile (sm:hidden)
+                onClick={() => setIsModalOpen(false)} // Click image to close on mobile
+              />
 
               {/* Modal Image Desktop */}
               <img
@@ -178,11 +143,11 @@ const ProductDetails = () => {
                 alt='Selected product'
                 className={`w-full h-full object-contain max-h-screen cursor-pointer transition-opacity duration-300 ${
                   isTransitioning ? 'opacity-70' : 'opacity-100'
-                } hidden sm:block`}
+                } hidden sm:block`} // Only for desktop (hidden sm:block)
                 onClick={() => setIsModalOpen(false)}
               />
 
-              {/* Modal navigation arrows (always show arrows in modal, but hide on mobile for scroll) */}
+              {/* Modal navigation arrows (only show arrows in modal for desktop, hidden on mobile) */}
               {product.image.length > 1 && (
                 <>
                   <button
@@ -190,7 +155,7 @@ const ProductDetails = () => {
                       e.stopPropagation();
                       prevImage();
                     }}
-                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90 hidden sm:block'
+                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90 hidden sm:block' // Hidden on mobile
                   >
                     <img
                       src={assets.arrow_left}
@@ -203,7 +168,7 @@ const ProductDetails = () => {
                       e.stopPropagation();
                       nextImage();
                     }}
-                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90 hidden sm:block'
+                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90 hidden sm:block' // Hidden on mobile
                   >
                     <img
                       src={assets.arrow_right}
@@ -214,7 +179,8 @@ const ProductDetails = () => {
                 </>
               )}
 
-              {/* Dots for Mobile Modal View */}
+              {/* Removed Dots for Mobile Modal View */}
+              {/* The div below is entirely removed:
               <div className='flex justify-center gap-2 mt-4 sm:hidden'>
                 {product.image.map((_, index) => (
                   <button
@@ -229,6 +195,7 @@ const ProductDetails = () => {
                   ></button>
                 ))}
               </div>
+              */}
             </div>
           </div>
         </div>
@@ -308,7 +275,7 @@ const ProductDetails = () => {
 
           {/* Main Image Container */}
           <div className='relative w-full max-w-[400px] h-[300px] sm:h-[400px] mx-auto md:mx-0'>
-            {/* Mobile Carousel (horizontal scroll with dots) */}
+            {/* Mobile Carousel (horizontal scroll with dots - remains as is for main product page) */}
             <div
               ref={imageScrollRef}
               onScroll={() => handleImageScroll(imageScrollRef)}
@@ -368,7 +335,7 @@ const ProductDetails = () => {
               )}
             </div>
 
-            {/* Dots for Mobile View */}
+            {/* Dots for Mobile View (main product page only) */}
             <div className='flex justify-center gap-2 mt-4 sm:hidden'>
               {product.image.map((_, index) => (
                 <button
