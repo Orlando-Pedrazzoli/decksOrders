@@ -117,7 +117,7 @@ const reviews = [
 
 export default function ReviewsCarousel() {
   return (
-    <div className='relative container mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-gray-50'>
+    <div className='relative container mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-gray-50 mt-10'>
       <h2 className='text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-12'>
         O que os nossos clientes dizem sobre a Elite Surfing
       </h2>
