@@ -1,11 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 import toast from 'react-hot-toast';
 
 const Navbar = () => {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
+  const [localSearchInput, setLocalSearchInput] = useState('');
+
   const {
     user,
     setUser,
@@ -17,6 +19,20 @@ const Navbar = () => {
     axios,
   } = useAppContext();
 
+  // Sync with global search query
+  useEffect(() => {
+    if (typeof searchQuery === 'string') {
+      setLocalSearchInput(searchQuery);
+    }
+  }, [searchQuery]);
+
+  // Navigate to products when search query changes
+  useEffect(() => {
+    if (searchQuery && searchQuery.length > 0) {
+      navigate('/products');
+    }
+  }, [searchQuery, navigate]);
+
   const logout = async () => {
     try {
       const { data } = await axios.get('/api/user/logout');
@@ -24,6 +40,7 @@ const Navbar = () => {
         toast.success(data.message);
         setUser(null);
         navigate('/');
+        setOpen(false);
       } else {
         toast.error(data.message);
       }
@@ -32,33 +49,53 @@ const Navbar = () => {
     }
   };
 
-  useEffect(() => {
-    if (searchQuery.length > 0) {
-      navigate('/products');
-    }
-  }, [searchQuery]);
+  const handleSearch = e => {
+    const value = e.target.value;
+    setLocalSearchInput(value);
+    setSearchQuery(value); // Update global search immediately
+  };
+
+  const handleNavLinkClick = path => {
+    setOpen(false);
+    navigate(path);
+  };
+
+  // Render search input consistently
+  const renderSearchInput = (isMobile = false) => (
+    <div
+      className={`flex items-center gap-2 border border-gray-300 px-3 rounded-full ${
+        isMobile ? 'w-full px-4 py-2' : 'text-sm py-1.5'
+      }`}
+    >
+      <input
+        onChange={handleSearch}
+        value={localSearchInput}
+        className={`w-full bg-transparent outline-none placeholder-gray-500 ${
+          isMobile ? 'text-base' : ''
+        }`}
+        type='text'
+        placeholder='Pesquisar produtos'
+      />
+      <img src={assets.search_icon} alt='search' className='w-4 h-4' />
+    </div>
+  );
 
   return (
-    <nav className='flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b border-gray-300 bg-white relative transition-all z-50'>
+    <nav className='flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b border-gray-300 bg-white relative shadow-sm z-50'>
       <NavLink to='/' onClick={() => setOpen(false)}>
         <img className='h-9' src={assets.logo_es} alt='logo' />
       </NavLink>
 
+      {/* Desktop Navigation */}
       <div className='hidden sm:flex items-center gap-8'>
         <NavLink to='/'>Home</NavLink>
         <NavLink to='/products'>Produtos</NavLink>
         <NavLink to='/contact'>Contacto</NavLink>
 
-        <div className='hidden lg:flex items-center text-sm gap-2 border border-gray-300 px-3 rounded-full'>
-          <input
-            onChange={e => setSearchQuery(e.target.value)}
-            className='py-1.5 w-full bg-transparent outline-none placeholder-gray-500'
-            type='text'
-            placeholder='Search products'
-          />
-          <img src={assets.search_icon} alt='search' className='w-4 h-4' />
-        </div>
+        {/* Desktop Search */}
+        <div className='hidden lg:flex items-center'>{renderSearchInput()}</div>
 
+        {/* Desktop Cart Icon */}
         <div
           onClick={() => navigate('/cart')}
           className='relative cursor-pointer'
@@ -73,6 +110,7 @@ const Navbar = () => {
           </button>
         </div>
 
+        {/* Desktop User Login/Profile */}
         {!user ? (
           <button
             onClick={() => setShowUserLogin(true)}
@@ -82,26 +120,28 @@ const Navbar = () => {
           </button>
         ) : (
           <div className='relative group'>
-            <img src={assets.profile_icon} className='w-10' alt='' />
-            <ul className='hidden group-hover:block absolute top-10 right-0 bg-white shadow border border-gray-200 py-2.5 w-30 rounded-md text-sm z-40'>
+            <img src={assets.profile_icon} className='w-10' alt='profile' />
+            <ul className='hidden group-hover:block absolute top-10 right-0 bg-white shadow border border-gray-200 py-2.5 w-36 rounded-md text-sm z-40 transition-all duration-200'>
               <li
-                onClick={() => navigate('my-orders')}
-                className='p-1.5 pl-3 hover:bg-primary/10 cursor-pointer'
+                onClick={() => navigate('/my-orders')}
+                className='p-2 pl-4 hover:bg-primary/10 cursor-pointer'
               >
-                My Orders
+                Os meus Pedidos
               </li>
               <li
                 onClick={logout}
-                className='p-1.5 pl-3 hover:bg-primary/10 cursor-pointer'
+                className='p-2 pl-4 hover:bg-primary/10 cursor-pointer'
               >
-                Logout
+                Sair
               </li>
             </ul>
           </div>
         )}
       </div>
 
+      {/* Mobile-specific elements */}
       <div className='flex items-center gap-6 sm:hidden'>
+        {/* Mobile Cart Icon */}
         <div
           onClick={() => navigate('/cart')}
           className='relative cursor-pointer'
@@ -115,54 +155,92 @@ const Navbar = () => {
             {getCartCount()}
           </button>
         </div>
+
+        {/* Mobile Menu Toggle */}
         <button
-          onClick={() => (open ? setOpen(false) : setOpen(true))}
+          onClick={() => setOpen(!open)}
           aria-label='Menu'
-          className=''
+          className='focus:outline-none'
         >
-          <img src={assets.menu_icon} alt='menu' />
+          <img src={assets.menu_icon} alt='menu' className='w-7 h-7' />
         </button>
       </div>
 
+      {/* Mobile Menu Panel */}
       {open && (
-        <div
-          className={`${
-            open ? 'flex' : 'hidden'
-          } absolute top-[60px] left-0 w-full bg-white shadow-md py-4 flex-col items-start gap-2 px-5 text-sm md:hidden`}
-        >
-          <NavLink to='/' onClick={() => setOpen(false)}>
-            Home
-          </NavLink>
-          <NavLink to='/products' onClick={() => setOpen(false)}>
-            All Product
-          </NavLink>
-          {user && (
-            <NavLink to='/products' onClick={() => setOpen(false)}>
-              My Orders
-            </NavLink>
-          )}
-          <NavLink to='/' onClick={() => setOpen(false)}>
-            Contact
-          </NavLink>
+        <div className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden transition-opacity duration-300'>
+          <div className='absolute top-0 right-0 h-full w-3/4 sm:w-1/2 bg-white shadow-lg p-6 flex flex-col items-start gap-6 transition-transform duration-300 ease-out transform translate-x-0'>
+            <button
+              onClick={() => setOpen(false)}
+              className='self-end text-gray-500 hover:text-gray-800 transition-colors duration-200'
+            >
+              <svg
+                xmlns='http://www.w3.org/2000/svg'
+                className='h-7 w-7'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M6 18L18 6M6 6l12 12'
+                />
+              </svg>
+            </button>
 
-          {!user ? (
-            <button
-              onClick={() => {
-                setOpen(false);
-                setShowUserLogin(true);
-              }}
-              className='cursor-pointer px-6 py-2 mt-2 bg-primary hover:bg-primary-dull transition text-white rounded-full text-sm'
+            <NavLink
+              to='/'
+              className='block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
+              onClick={() => handleNavLinkClick('/')}
             >
-              Login
-            </button>
-          ) : (
-            <button
-              onClick={logout}
-              className='cursor-pointer px-6 py-2 mt-2 bg-primary hover:bg-primary-dull transition text-white rounded-full text-sm'
+              Home
+            </NavLink>
+            <NavLink
+              to='/products'
+              className='block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
+              onClick={() => handleNavLinkClick('/products')}
             >
-              Logout
-            </button>
-          )}
+              Produtos
+            </NavLink>
+            <NavLink
+              to='/contact'
+              className='block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
+              onClick={() => handleNavLinkClick('/contact')}
+            >
+              Contacto
+            </NavLink>
+
+            {/* Mobile User Profile / Login / Logout */}
+            {user ? (
+              <>
+                <NavLink
+                  to='/my-orders'
+                  className='block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
+                  onClick={() => handleNavLinkClick('/my-orders')}
+                >
+                  Os meus Pedidos
+                </NavLink>
+                <button
+                  onClick={logout}
+                  className='w-full cursor-pointer px-6 py-3 mt-4 bg-primary hover:bg-primary-dull transition text-white rounded-lg text-base font-semibold'
+                >
+                  Sair
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  setShowUserLogin(true);
+                }}
+                className='w-full cursor-pointer px-6 py-3 mt-4 bg-primary hover:bg-primary-dull transition text-white rounded-lg text-base font-semibold'
+              >
+                Login
+              </button>
+            )}
+          </div>
         </div>
       )}
     </nav>

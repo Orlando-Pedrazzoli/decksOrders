@@ -14,3 +14,9 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Hide default Swiper navigation arrows */
+.swiper-button-prev,
+.swiper-button-next {
+  display: none !important; /* Important to override Swiper's default styles */
+}

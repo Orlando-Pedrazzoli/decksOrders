@@ -15,6 +15,8 @@ const ProductDetails = () => {
 
   // Ref for the horizontally scrollable image container on mobile
   const imageScrollRef = useRef(null);
+  // NEW: Ref for the horizontally scrollable image container in the modal on mobile
+  const modalImageScrollRef = useRef(null);
 
   const product = products.find(item => item._id === id);
 
@@ -27,15 +29,23 @@ const ProductDetails = () => {
     }
   }, [products, product]);
 
-  // Sync the currentImageIndex with the scroll position on mobile
+  // Sync the currentImageIndex with the scroll position on mobile for main image
   useEffect(() => {
     if (imageScrollRef.current && window.innerWidth < 640) {
-      // Apply only for screens smaller than 'sm' breakpoint
       const scrollContainer = imageScrollRef.current;
-      const imageWidth = scrollContainer.offsetWidth; // Get width of one image
+      const imageWidth = scrollContainer.offsetWidth;
       scrollContainer.scrollLeft = currentImageIndex * imageWidth;
     }
   }, [currentImageIndex]);
+
+  // NEW: Sync the currentImageIndex with the scroll position on mobile for modal image
+  useEffect(() => {
+    if (modalImageScrollRef.current && isModalOpen && window.innerWidth < 640) {
+      const scrollContainer = modalImageScrollRef.current;
+      const imageWidth = scrollContainer.offsetWidth;
+      scrollContainer.scrollLeft = currentImageIndex * imageWidth;
+    }
+  }, [currentImageIndex, isModalOpen]); // Add isModalOpen as a dependency
 
   const changeImage = newIndex => {
     setIsTransitioning(true);
@@ -43,7 +53,6 @@ const ProductDetails = () => {
 
     // Auto-scroll thumbnails if needed (desktop view)
     if (window.innerWidth >= 640) {
-      // Only for screens larger than or equal to 'sm' breakpoint
       if (newIndex >= thumbStartIndex + 4) {
         setThumbStartIndex(prev => prev + 1);
       } else if (newIndex < thumbStartIndex) {
@@ -79,12 +88,11 @@ const ProductDetails = () => {
     changeImage(index);
   };
 
-  // Handle scroll for mobile image carousel
-  const handleImageScroll = () => {
-    if (imageScrollRef.current) {
-      const scrollContainer = imageScrollRef.current;
+  // Handle scroll for mobile image carousel (main and modal)
+  const handleImageScroll = ref => {
+    if (ref.current) {
+      const scrollContainer = ref.current;
       const imageWidth = scrollContainer.offsetWidth;
-      // Calculate the current visible image based on scroll position
       const newIndex = Math.round(scrollContainer.scrollLeft / imageWidth);
       if (newIndex !== currentImageIndex) {
         setCurrentImageIndex(newIndex);
@@ -116,16 +124,34 @@ const ProductDetails = () => {
             </button>
 
             <div className='relative'>
+              {/* NEW: Mobile Carousel for Modal (horizontal scroll with dots) */}
+              <div
+                ref={modalImageScrollRef}
+                onScroll={() => handleImageScroll(modalImageScrollRef)}
+                className='flex w-full h-full overflow-x-scroll snap-x snap-mandatory scroll-smooth hide-scrollbar sm:hidden border border-gray-500/30 rounded'
+              >
+                {product.image.map((image, index) => (
+                  <img
+                    key={index}
+                    src={image}
+                    alt={`Product image ${index + 1}`}
+                    className='w-full h-full object-contain flex-shrink-0 snap-center cursor-pointer'
+                    onClick={() => setIsModalOpen(false)}
+                  />
+                ))}
+              </div>
+
+              {/* Existing Modal Image for Desktop */}
               <img
                 src={product.image[currentImageIndex]}
                 alt='Selected product'
                 className={`w-full h-full object-contain max-h-screen cursor-pointer transition-opacity duration-300 ${
                   isTransitioning ? 'opacity-70' : 'opacity-100'
-                }`}
+                } hidden sm:block`}
                 onClick={() => setIsModalOpen(false)}
               />
 
-              {/* Modal navigation arrows (always show arrows in modal) */}
+              {/* Modal navigation arrows (always show arrows in modal, but hide on mobile for scroll) */}
               {product.image.length > 1 && (
                 <>
                   <button
@@ -133,7 +159,7 @@ const ProductDetails = () => {
                       e.stopPropagation();
                       prevImage();
                     }}
-                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
+                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90 hidden sm:block' // Hide on small screens, show on sm and up
                   >
                     <img
                       src={assets.arrow_left}
@@ -146,7 +172,7 @@ const ProductDetails = () => {
                       e.stopPropagation();
                       nextImage();
                     }}
-                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90'
+                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90 hidden sm:block' // Hide on small screens, show on sm and up
                   >
                     <img
                       src={assets.arrow_right}
@@ -156,6 +182,22 @@ const ProductDetails = () => {
                   </button>
                 </>
               )}
+
+              {/* NEW: Dots for Mobile Modal View */}
+              <div className='flex justify-center gap-2 mt-4 sm:hidden'>
+                {product.image.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => changeImage(index)}
+                    className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
+                      currentImageIndex === index
+                        ? 'bg-primary'
+                        : 'bg-gray-300 hover:bg-gray-400'
+                    }`}
+                    aria-label={`Go to image ${index + 1}`}
+                  ></button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -240,7 +282,7 @@ const ProductDetails = () => {
             {/* Mobile Carousel (horizontal scroll with dots) */}
             <div
               ref={imageScrollRef}
-              onScroll={handleImageScroll}
+              onScroll={() => handleImageScroll(imageScrollRef)}
               className='flex w-full h-full overflow-x-scroll snap-x snap-mandatory scroll-smooth hide-scrollbar sm:hidden border border-gray-500/30 rounded'
             >
               {product.image.map((image, index) => (

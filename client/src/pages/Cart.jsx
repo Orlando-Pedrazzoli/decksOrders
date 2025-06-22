@@ -184,17 +184,17 @@ const Cart = () => {
           className='w-56 sm:w-64 md:w-72 mb-6 max-w-full'
         />
         <h3 className='text-xl sm:text-2xl font-semibold mb-3 text-gray-700'>
-          Your cart is empty!
+          O seu carrinho está vazio!
         </h3>
         <p className='text-gray-600 mb-6 max-w-md'>
-          Looks like you haven't added anything to your cart yet. Explore our
-          products and find something you like!
+          Parece que ainda não adicionou nada ao seu carrinho. Explore os nossos
+          produtos e descubra algo de que goste!
         </p>
         <button
           onClick={() => navigate('/products')}
           className='bg-primary text-white px-7 py-3 rounded-lg shadow-md hover:bg-primary-dull transition-all duration-300 text-base font-medium active:scale-95'
         >
-          Start Shopping
+          Explorar produtos
         </button>
       </div>
     );

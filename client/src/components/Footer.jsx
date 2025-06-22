@@ -7,7 +7,10 @@ const Footer = () => {
         <div>
           <img className='w-34 md:w-32' src={assets.logo_es} alt='logo' />
           <p className='max-w-[410px] mt-6'>
-           "A Elite Surfing nasceu para oferecer produtos de alta qualidade, feitos para os surfistas mais exigentes. Com inovação e paixão pelo surf, procuramos transformar cada onda numa oportunidade de superação."
+            "A Elite Surfing nasceu para oferecer produtos de alta qualidade,
+            feitos para os surfistas mais exigentes. Com inovação e paixão pelo
+            surf, procuramos transformar cada onda numa oportunidade de
+            superação."
           </p>
         </div>
         <div className='flex flex-wrap justify-between w-full md:w-[45%] gap-5'>
@@ -30,7 +33,7 @@ const Footer = () => {
         </div>
       </div>
       <p className='py-4 text-center text-sm md:text-base text-gray-500/80'>
-        Copyright {new Date().getFullYear()} © GreatStack.dev All Right
+        Copyright {new Date().getFullYear()} © Pedrazzoli.dev All Right
         Reserved.
       </p>
     </div>

@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dummyProducts } from '../assets/assets';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -31,8 +30,9 @@ export const AppContextProvider = ({ children }) => {
   const [showUserLogin, setShowUserLogin] = useState(false);
   const [products, setProducts] = useState([]);
   const [cartItems, setCartItems] = useState({});
-  const [searchQuery, setSearchQuery] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
   const [isMobile, setIsMobile] = useState(false);
+  const clearSearchQuery = () => setSearchQuery('');
 
   // Check device type on mount
   useEffect(() => {
@@ -206,6 +206,7 @@ export const AppContextProvider = ({ children }) => {
     cartItems,
     searchQuery,
     setSearchQuery,
+    clearSearchQuery,
     getCartAmount,
     getCartCount,
     axios,
