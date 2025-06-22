@@ -16,7 +16,7 @@ const ProductDetails = () => {
   const imageScrollRef = useRef(null);
   const modalImageScrollRef = useRef(null);
 
-  // Flag para controlar scroll programático no modal
+  // Flag to control programmatic scroll in the modal
   const isProgrammaticScroll = useRef(false);
 
   const product = products.find(item => item._id === id);
@@ -30,7 +30,7 @@ const ProductDetails = () => {
     }
   }, [products, product]);
 
-  // Scroll programático no carrossel principal mobile (pode deixar assim ou aplicar flag similar)
+  // Programmatic scroll for the main mobile carousel
   useEffect(() => {
     if (imageScrollRef.current && window.innerWidth < 640) {
       const scrollContainer = imageScrollRef.current;
@@ -39,18 +39,20 @@ const ProductDetails = () => {
     }
   }, [currentImageIndex]);
 
-  // Scroll programático no modal mobile com controle da flag
+  // Programmatic scroll for the mobile modal with flag control
   useEffect(() => {
     if (modalImageScrollRef.current && isModalOpen && window.innerWidth < 640) {
       const scrollContainer = modalImageScrollRef.current;
       const imageWidth = scrollContainer.offsetWidth;
 
+      // Set flag to true before programmatic scroll
       isProgrammaticScroll.current = true;
       scrollContainer.scrollLeft = currentImageIndex * imageWidth;
 
+      // Reset flag after a short delay to allow user scrolling again
       const timeout = setTimeout(() => {
         isProgrammaticScroll.current = false;
-      }, 300); // tempo igual ao transition duration
+      }, 300); // Should match the scroll-smooth transition time if applicable
 
       return () => clearTimeout(timeout);
     }
@@ -60,6 +62,7 @@ const ProductDetails = () => {
     setIsTransitioning(true);
     setCurrentImageIndex(newIndex);
 
+    // Auto-scroll thumbnails if needed (desktop view)
     if (window.innerWidth >= 640) {
       if (newIndex >= thumbStartIndex + 4) {
         setThumbStartIndex(prev => prev + 1);
@@ -96,12 +99,12 @@ const ProductDetails = () => {
     changeImage(index);
   };
 
-  // Agora ignoramos scroll se for programático no modal
+  // Handles scroll for mobile image carousel (main and modal)
   const handleImageScroll = ref => {
     if (ref.current) {
+      // Only update currentImageIndex if scroll was NOT programmatic
       if (ref === modalImageScrollRef && isProgrammaticScroll.current) {
-        // Ignora scroll causado pelo efeito programático
-        return;
+        return; // Ignore scroll events caused by programmatic scroll
       }
       const scrollContainer = ref.current;
       const imageWidth = scrollContainer.offsetWidth;
@@ -214,7 +217,7 @@ const ProductDetails = () => {
           </div>
         </div>
       )}
-      ;{/* Breadcrumbs */}
+      {/* Breadcrumbs */}
       <p className='text-sm md:text-base'>
         <Link
           to={'/'}
