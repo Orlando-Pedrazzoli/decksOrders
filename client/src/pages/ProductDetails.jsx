@@ -16,7 +16,7 @@ const ProductDetails = () => {
   const imageScrollRef = useRef(null);
   const modalImageScrollRef = useRef(null);
 
-  // Flag to control programmatic scroll in the modal
+  // Flag to control programmatic scroll (prevents scroll updates from fighting user's touch)
   const isProgrammaticScroll = useRef(false);
 
   const product = products.find(item => item._id === id);
@@ -30,7 +30,7 @@ const ProductDetails = () => {
     }
   }, [products, product]);
 
-  // Programmatic scroll for the main mobile carousel
+  // Programmatic scroll for the main mobile carousel (remains as is)
   useEffect(() => {
     if (imageScrollRef.current && window.innerWidth < 640) {
       const scrollContainer = imageScrollRef.current;
@@ -39,27 +39,38 @@ const ProductDetails = () => {
     }
   }, [currentImageIndex]);
 
-  // Programmatic scroll for the mobile modal with flag control
+  // Programmatic scroll for the mobile modal (adjusted for smoother control)
   useEffect(() => {
     if (modalImageScrollRef.current && isModalOpen && window.innerWidth < 640) {
       const scrollContainer = modalImageScrollRef.current;
       const imageWidth = scrollContainer.offsetWidth;
 
-      // Set flag to true before programmatic scroll
-      isProgrammaticScroll.current = true;
-      scrollContainer.scrollLeft = currentImageIndex * imageWidth;
+      // Only scroll programmatically if the current index is different
+      // and ensure we don't trigger the onScroll handler immediately
+      if (
+        Math.round(scrollContainer.scrollLeft / imageWidth) !==
+        currentImageIndex
+      ) {
+        isProgrammaticScroll.current = true;
+        scrollContainer.scrollTo({
+          left: currentImageIndex * imageWidth,
+          behavior: 'smooth',
+        });
 
-      // Reset flag after a short delay to allow user scrolling again
-      const timeout = setTimeout(() => {
-        isProgrammaticScroll.current = false;
-      }, 300); // Should match the scroll-smooth transition time if applicable
+        // Reset flag after a delay longer than the scroll animation
+        const timeout = setTimeout(() => {
+          isProgrammaticScroll.current = false;
+        }, 300); // Match or exceed CSS scroll-smooth duration
 
-      return () => clearTimeout(timeout);
+        return () => clearTimeout(timeout);
+      }
     }
   }, [currentImageIndex, isModalOpen]);
 
   const changeImage = newIndex => {
     setIsTransitioning(true);
+    // When changing image via dots/arrows, set programmatic scroll flag
+    isProgrammaticScroll.current = true;
     setCurrentImageIndex(newIndex);
 
     // Auto-scroll thumbnails if needed (desktop view)
@@ -71,6 +82,7 @@ const ProductDetails = () => {
       }
     }
 
+    // Reset transition flag
     setTimeout(() => setIsTransitioning(false), 300);
   };
 
@@ -99,16 +111,20 @@ const ProductDetails = () => {
     changeImage(index);
   };
 
-  // Handles scroll for mobile image carousel (main and modal)
+  // Handle scroll for mobile image carousel (main and modal)
   const handleImageScroll = ref => {
     if (ref.current) {
-      // Only update currentImageIndex if scroll was NOT programmatic
-      if (ref === modalImageScrollRef && isProgrammaticScroll.current) {
-        return; // Ignore scroll events caused by programmatic scroll
+      // If a programmatic scroll just occurred, ignore this onScroll event
+      if (isProgrammaticScroll.current) {
+        return;
       }
+
       const scrollContainer = ref.current;
       const imageWidth = scrollContainer.offsetWidth;
+      // Calculate the new index based on scroll position
       const newIndex = Math.round(scrollContainer.scrollLeft / imageWidth);
+
+      // Only update state if the index has actually changed by user scroll
       if (newIndex !== currentImageIndex) {
         setCurrentImageIndex(newIndex);
       }
@@ -166,7 +182,7 @@ const ProductDetails = () => {
                 onClick={() => setIsModalOpen(false)}
               />
 
-              {/* Modal navigation arrows */}
+              {/* Modal navigation arrows (always show arrows in modal, but hide on mobile for scroll) */}
               {product.image.length > 1 && (
                 <>
                   <button
@@ -198,7 +214,7 @@ const ProductDetails = () => {
                 </>
               )}
 
-              {/* Dots for Mobile Modal */}
+              {/* Dots for Mobile Modal View */}
               <div className='flex justify-center gap-2 mt-4 sm:hidden'>
                 {product.image.map((_, index) => (
                   <button
