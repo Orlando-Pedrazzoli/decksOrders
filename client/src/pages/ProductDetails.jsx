@@ -13,10 +13,11 @@ const ProductDetails = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Ref for the horizontally scrollable image container on mobile
   const imageScrollRef = useRef(null);
-  // NEW: Ref for the horizontally scrollable image container in the modal on mobile
   const modalImageScrollRef = useRef(null);
+
+  // Flag para controlar scroll programático no modal
+  const isProgrammaticScroll = useRef(false);
 
   const product = products.find(item => item._id === id);
 
@@ -29,7 +30,7 @@ const ProductDetails = () => {
     }
   }, [products, product]);
 
-  // Sync the currentImageIndex with the scroll position on mobile for main image
+  // Scroll programático no carrossel principal mobile (pode deixar assim ou aplicar flag similar)
   useEffect(() => {
     if (imageScrollRef.current && window.innerWidth < 640) {
       const scrollContainer = imageScrollRef.current;
@@ -38,20 +39,27 @@ const ProductDetails = () => {
     }
   }, [currentImageIndex]);
 
-  // NEW: Sync the currentImageIndex with the scroll position on mobile for modal image
+  // Scroll programático no modal mobile com controle da flag
   useEffect(() => {
     if (modalImageScrollRef.current && isModalOpen && window.innerWidth < 640) {
       const scrollContainer = modalImageScrollRef.current;
       const imageWidth = scrollContainer.offsetWidth;
+
+      isProgrammaticScroll.current = true;
       scrollContainer.scrollLeft = currentImageIndex * imageWidth;
+
+      const timeout = setTimeout(() => {
+        isProgrammaticScroll.current = false;
+      }, 300); // tempo igual ao transition duration
+
+      return () => clearTimeout(timeout);
     }
-  }, [currentImageIndex, isModalOpen]); // Add isModalOpen as a dependency
+  }, [currentImageIndex, isModalOpen]);
 
   const changeImage = newIndex => {
     setIsTransitioning(true);
     setCurrentImageIndex(newIndex);
 
-    // Auto-scroll thumbnails if needed (desktop view)
     if (window.innerWidth >= 640) {
       if (newIndex >= thumbStartIndex + 4) {
         setThumbStartIndex(prev => prev + 1);
@@ -88,9 +96,13 @@ const ProductDetails = () => {
     changeImage(index);
   };
 
-  // Handle scroll for mobile image carousel (main and modal)
+  // Agora ignoramos scroll se for programático no modal
   const handleImageScroll = ref => {
     if (ref.current) {
+      if (ref === modalImageScrollRef && isProgrammaticScroll.current) {
+        // Ignora scroll causado pelo efeito programático
+        return;
+      }
       const scrollContainer = ref.current;
       const imageWidth = scrollContainer.offsetWidth;
       const newIndex = Math.round(scrollContainer.scrollLeft / imageWidth);
@@ -124,7 +136,7 @@ const ProductDetails = () => {
             </button>
 
             <div className='relative'>
-              {/* NEW: Mobile Carousel for Modal (horizontal scroll with dots) */}
+              {/* Mobile Carousel for Modal */}
               <div
                 ref={modalImageScrollRef}
                 onScroll={() => handleImageScroll(modalImageScrollRef)}
@@ -141,7 +153,7 @@ const ProductDetails = () => {
                 ))}
               </div>
 
-              {/* Existing Modal Image for Desktop */}
+              {/* Modal Image Desktop */}
               <img
                 src={product.image[currentImageIndex]}
                 alt='Selected product'
@@ -151,7 +163,7 @@ const ProductDetails = () => {
                 onClick={() => setIsModalOpen(false)}
               />
 
-              {/* Modal navigation arrows (always show arrows in modal, but hide on mobile for scroll) */}
+              {/* Modal navigation arrows */}
               {product.image.length > 1 && (
                 <>
                   <button
@@ -159,7 +171,7 @@ const ProductDetails = () => {
                       e.stopPropagation();
                       prevImage();
                     }}
-                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90 hidden sm:block' // Hide on small screens, show on sm and up
+                    className='absolute left-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90 hidden sm:block'
                   >
                     <img
                       src={assets.arrow_left}
@@ -172,7 +184,7 @@ const ProductDetails = () => {
                       e.stopPropagation();
                       nextImage();
                     }}
-                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90 hidden sm:block' // Hide on small screens, show on sm and up
+                    className='absolute right-2 top-1/2 -translate-y-1/2 bg-white/80 rounded-full p-3 shadow-md hover:bg-white transition-all duration-300 active:scale-90 hidden sm:block'
                   >
                     <img
                       src={assets.arrow_right}
@@ -183,7 +195,7 @@ const ProductDetails = () => {
                 </>
               )}
 
-              {/* NEW: Dots for Mobile Modal View */}
+              {/* Dots for Mobile Modal */}
               <div className='flex justify-center gap-2 mt-4 sm:hidden'>
                 {product.image.map((_, index) => (
                   <button
@@ -202,8 +214,7 @@ const ProductDetails = () => {
           </div>
         </div>
       )}
-
-      {/* Breadcrumbs */}
+      ;{/* Breadcrumbs */}
       <p className='text-sm md:text-base'>
         <Link
           to={'/'}
@@ -229,7 +240,6 @@ const ProductDetails = () => {
         </Link>{' '}
         /<span className='text-primary'> {product.name}</span>
       </p>
-
       {/* Product Content */}
       <div className='flex flex-col md:flex-row gap-8 lg:gap-16 mt-4'>
         {/* Images Section */}
@@ -424,7 +434,6 @@ const ProductDetails = () => {
           </div>
         </div>
       </div>
-
       {/* Related Products */}
       <div className='flex flex-col items-center mt-10'>
         <div className='flex flex-col items-center w-max'>
