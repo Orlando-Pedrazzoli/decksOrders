@@ -23,7 +23,6 @@ await connectCloudinary();
 
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://elitesurfingeu-backend.vercel.app',
   'https://elitesurfing.pt',
   'https://www.elitesurfing.pt',
 ];
