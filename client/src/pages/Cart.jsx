@@ -263,7 +263,7 @@ const Cart = () => {
                       onChange={e =>
                         updateCartItem(product._id, Number(e.target.value))
                       }
-                      className='border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 outline-none'
+                      className='border border-gray-300 rounded-md p-1 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 outline-none cursor-pointer'
                     >
                       {[...Array(20).keys()].map(num => (
                         <option key={num + 1} value={num + 1}>
@@ -284,7 +284,7 @@ const Cart = () => {
                   </div>
                   <button
                     onClick={() => removeFromCart(product._id)}
-                    className='text-red-500 hover:text-red-700 text-sm font-medium transition-colors duration-200 ml-4'
+                    className='text-red-500 hover:text-red-700 text-sm font-medium transition-colors duration-200 ml-4 cursor-pointer'
                   >
                     Remove
                   </button>
