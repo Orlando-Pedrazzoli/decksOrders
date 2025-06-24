@@ -34,21 +34,49 @@ export const AppContextProvider = ({ children }) => {
   const [isMobile, setIsMobile] = useState(false);
   const clearSearchQuery = () => setSearchQuery('');
 
-  // Check device type on mount
+  // Detect mobile
   useEffect(() => {
     setIsMobile(/iPhone|iPad|iPod/i.test(navigator.userAgent));
   }, []);
 
-  // Enhanced fetchUser with mobile token handling
+  // Persist cartItems to localStorage
+  useEffect(() => {
+    if (cartItems && Object.keys(cartItems).length > 0) {
+      localStorage.setItem('cartItems', JSON.stringify(cartItems));
+    } else {
+      localStorage.removeItem('cartItems');
+    }
+  }, [cartItems]);
+
+  // Restore cartItems from localStorage and initialize data
+  useEffect(() => {
+    const storedCart = localStorage.getItem('cartItems');
+    if (storedCart) {
+      setCartItems(JSON.parse(storedCart));
+    }
+
+    fetchUser();
+    fetchSeller();
+    fetchProducts();
+
+    const interval = setInterval(fetchUser, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auth
   const fetchUser = async () => {
     try {
       const { data } = await axios.get('/api/user/is-auth');
-
       if (data.success) {
         setUser(data.user);
-        setCartItems(data.user.cartItems || {});
+        if (
+          data.user.cartItems &&
+          Object.keys(data.user.cartItems).length > 0
+        ) {
+          setCartItems(data.user.cartItems);
+        }
 
-        // Store token for mobile Safari
+        // Store token for iOS Safari
         if (isMobile && data.token) {
           localStorage.setItem('mobile_auth_token', data.token);
         }
@@ -66,11 +94,10 @@ export const AppContextProvider = ({ children }) => {
       localStorage.removeItem('mobile_auth_token');
     }
     if (error?.response?.status === 401) {
-      toast.error('Session expired. Please login again.');
+      toast.error('Sessão expirada. Faça login novamente.');
     }
   };
 
-  // Enhanced fetchSeller with auth handling
   const fetchSeller = async () => {
     try {
       const { data } = await axios.get('/api/seller/is-auth');
@@ -83,31 +110,29 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Fetch products with error boundary
   const fetchProducts = async () => {
     try {
       const { data } = await axios.get('/api/product/list');
       if (data.success) {
         setProducts(data.products);
       } else {
-        toast.error(data.message || 'Failed to load products');
+        toast.error(data.message || 'Erro ao carregar produtos');
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Network error');
+      toast.error(error.response?.data?.message || 'Erro de rede');
     }
   };
 
-  // Cart operations with sync to backend
+  // Cart operations
   const addToCart = async itemId => {
     try {
       const newCartItems = { ...cartItems };
       newCartItems[itemId] = (newCartItems[itemId] || 0) + 1;
-
       setCartItems(newCartItems);
       await syncCart(newCartItems);
-      toast.success('Added to cart');
-    } catch (error) {
-      toast.error('Failed to update cart');
+      toast.success('Adicionado ao carrinho');
+    } catch {
+      toast.error('Erro ao atualizar carrinho');
     }
   };
 
@@ -115,12 +140,11 @@ export const AppContextProvider = ({ children }) => {
     try {
       const newCartItems = { ...cartItems };
       newCartItems[itemId] = quantity;
-
       setCartItems(newCartItems);
       await syncCart(newCartItems);
-      toast.success('Cart updated');
-    } catch (error) {
-      toast.error('Failed to update cart');
+      toast.success('Carrinho atualizado');
+    } catch {
+      toast.error('Erro ao atualizar carrinho');
     }
   };
 
@@ -133,23 +157,24 @@ export const AppContextProvider = ({ children }) => {
           delete newCartItems[itemId];
         }
       }
-
       setCartItems(newCartItems);
       await syncCart(newCartItems);
-      toast.success('Removed from cart');
-    } catch (error) {
-      toast.error('Failed to update cart');
+      toast.success('Removido do carrinho');
+    } catch {
+      toast.error('Erro ao atualizar carrinho');
     }
   };
 
-  // Centralized cart sync function
   const syncCart = async items => {
-    if (user) {
-      await axios.post('/api/cart/update', { cartItems: items });
+    if (user && Object.keys(items).length > 0) {
+      try {
+        await axios.post('/api/cart/update', { cartItems: items });
+      } catch (err) {
+        console.error('Erro ao sincronizar carrinho:', err.message);
+      }
     }
   };
 
-  // Product management
   const removeProduct = async id => {
     try {
       const { data } = await axios.post('/api/product/remove', { id });
@@ -160,11 +185,10 @@ export const AppContextProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Deletion failed');
+      toast.error(error.response?.data?.message || 'Erro ao remover');
     }
   };
 
-  // Cart calculations
   const getCartCount = () => {
     return Object.values(cartItems).reduce((sum, qty) => sum + qty, 0);
   };
@@ -178,18 +202,6 @@ export const AppContextProvider = ({ children }) => {
       .toFixed(2);
   };
 
-  // Initialize data and set up auth polling
-  useEffect(() => {
-    fetchUser();
-    fetchSeller();
-    fetchProducts();
-
-    // Refresh auth every 5 minutes
-    const interval = setInterval(fetchUser, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Context value
   const value = {
     navigate,
     user,
@@ -204,6 +216,7 @@ export const AppContextProvider = ({ children }) => {
     updateCartItem,
     removeFromCart,
     cartItems,
+    setCartItems,
     searchQuery,
     setSearchQuery,
     clearSearchQuery,
@@ -211,7 +224,6 @@ export const AppContextProvider = ({ children }) => {
     getCartCount,
     axios,
     fetchProducts,
-    setCartItems,
     removeProduct,
     isMobile,
   };
