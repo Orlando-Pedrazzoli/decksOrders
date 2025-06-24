@@ -18,7 +18,7 @@ export const AppContextProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
 
   const [cartItems, setCartItems] = useState({});
-  const [searchQuery, setSearchQuery] = useState({});
+  const [searchQuery, setSearchQuery] = useState(''); // Changed from {} to ''
 
   // Fetch Seller Status
   const fetchSeller = async () => {
@@ -116,6 +116,11 @@ export const AppContextProvider = ({ children }) => {
     return Math.floor(totalAmount * 100) / 100;
   };
 
+  // Clear Search Query
+  const clearSearchQuery = () => {
+    setSearchQuery('');
+  };
+
   useEffect(() => {
     fetchUser();
     fetchSeller();
@@ -156,6 +161,7 @@ export const AppContextProvider = ({ children }) => {
     cartItems,
     searchQuery,
     setSearchQuery,
+    clearSearchQuery, // Added clearSearchQuery to context value
     getCartAmount,
     getCartCount,
     axios,

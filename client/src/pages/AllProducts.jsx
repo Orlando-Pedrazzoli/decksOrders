@@ -60,7 +60,7 @@ const AllProducts = () => {
   }, [products, searchQuery, selectedCategories]);
 
   const handleCategoryChange = categoryPath => {
-    clearSearchQuery(); // limpa o termo de busca ao aplicar filtros
+    clearSearchQuery(); // Clears the search term when applying filters
     const lowerCaseCategoryPath = categoryPath.toLowerCase();
     setSelectedCategories(prev =>
       prev.includes(lowerCaseCategoryPath)
