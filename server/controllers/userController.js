@@ -26,9 +26,10 @@ export const register = async (req, res) => {
 
     res.cookie('token', token, {
       httpOnly: true,
-      secure: true, // Sempre true se usar HTTPS
-      sameSite: 'None', // Crucial para cookies entre domínios (frontend + backend separados)
+      secure: true, // This is good, essential for SameSite=None
+      sameSite: 'None', // This is good for cross-site
       maxAge: 7 * 24 * 60 * 60 * 1000,
+      // domain: '.elitesurfing.pt', // Consider adding this if frontend and backend are on different subdomains like www. vs api.
     });
 
     return res.json({

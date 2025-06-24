@@ -13,6 +13,9 @@ import orderRouter from './routes/orderRoute.js';
 import { stripeWebhooks } from './controllers/orderController.js';
 
 const app = express();
+// Add this line if you are behind a proxy (like Nginx, Render, Heroku, Vercel, etc.)
+app.set('trust proxy', 1); // Trust the first proxy
+
 const port = process.env.PORT || 4000;
 
 await connectDB();
