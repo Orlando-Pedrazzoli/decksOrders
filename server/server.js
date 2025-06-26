@@ -14,7 +14,7 @@ import { stripeWebhooks } from './controllers/orderController.js';
 
 const app = express();
 
-// Trust proxy - importante para HTTPS
+// Configuração ESSENCIAL para o Vercel
 app.set('trust proxy', 1);
 
 const port = process.env.PORT || 4000;
@@ -30,14 +30,12 @@ const allowedOrigins = [
   'https://elitesurfingeu-backend.vercel.app',
 ];
 
-// CORS deve vir antes dos middlewares
+// Configuração de CORS
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Permite requisições sem origin (mobile apps, etc.)
       if (!origin) return callback(null, true);
-
-      if (allowedOrigins.indexOf(origin) !== -1) {
+      if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
         console.log('Origem bloqueada:', origin);
@@ -50,7 +48,7 @@ app.use(
   })
 );
 
-// Webhook do Stripe DEVE vir antes do express.json()
+// 🚨 ORDEM CRÍTICA: Stripe Webhook PRIMEIRO!
 app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
 
 // Middlewares padrão
@@ -58,7 +56,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Middleware de debug para cookies (remova em produção)
+// Middleware de debug para cookies (opcional)
 app.use((req, res, next) => {
   console.log('Cookies recebidos:', req.cookies);
   next();
@@ -80,6 +78,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-  console.log('Environment:', process.env.NODE_ENV);
+  console.log(`Server is running on port ${port}`);
+  console.log('Environment:', process.env.NODE_ENV || 'development');
 });
