@@ -24,7 +24,7 @@ await connectCloudinary();
 
 const allowedOrigins = [
   'http://localhost:5173',
-  'http://localhost:5174', // Adicione outras portas se necessário
+  'http://localhost:4000', // Adicione outras portas se necessário
   'https://elitesurfing.pt',
   'https://www.elitesurfing.pt',
   'https://elitesurfingeu-backend.vercel.app',

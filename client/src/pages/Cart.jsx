@@ -62,11 +62,15 @@ const Cart = () => {
 
   const loadUserAddresses = async () => {
     try {
-      const { data } = await axios.get('/api/address/get');
+      const { data } = await axios.post(
+        '/api/address/get',
+        {},
+        { withCredentials: true }
+      );
+
       if (data.success) {
         setAddresses(data.addresses);
         if (data.addresses.length > 0) {
-          // Set the first address as selected by default, or keep previous if exists
           setSelectedAddress(prev => prev || data.addresses[0]);
         } else {
           setSelectedAddress(null);
