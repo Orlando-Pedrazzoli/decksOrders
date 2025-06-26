@@ -24,17 +24,21 @@ export const register = async (req, res) => {
       expiresIn: '7d',
     });
 
-    res.cookie('token', token, {
+    // Configuração consistente de cookies
+    const cookieOptions = {
       httpOnly: true,
-      secure: true, // This is good, essential for SameSite=None
-      sameSite: 'None', // This is good for cross-site
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      // domain: '.elitesurfing.pt', // Consider adding this if frontend and backend are on different subdomains like www. vs api.
-    });
+      // Adicione domain se necessário para subdomínios
+      // domain: process.env.NODE_ENV === 'production' ? '.elitesurfing.pt' : undefined,
+    };
+
+    res.cookie('token', token, cookieOptions);
 
     return res.json({
       success: true,
-      user: { email: user.email, name: user.name },
+      user: { email: user.email, name: user.name, id: user._id },
     });
   } catch (error) {
     console.log(error.message);
@@ -43,7 +47,6 @@ export const register = async (req, res) => {
 };
 
 // Login User : /api/user/login
-
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -53,6 +56,7 @@ export const login = async (req, res) => {
         success: false,
         message: 'Email and password are required',
       });
+
     const user = await User.findOne({ email });
 
     if (!user) {
@@ -68,16 +72,20 @@ export const login = async (req, res) => {
       expiresIn: '7d',
     });
 
-    res.cookie('token', token, {
+    // Mesma configuração de cookies do register
+    const cookieOptions = {
       httpOnly: true,
-      secure: true,
-      sameSite: 'None',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+      // domain: process.env.NODE_ENV === 'production' ? '.elitesurfing.pt' : undefined,
+    };
+
+    res.cookie('token', token, cookieOptions);
 
     return res.json({
       success: true,
-      user: { email: user.email, name: user.name },
+      user: { email: user.email, name: user.name, id: user._id },
     });
   } catch (error) {
     console.log(error.message);
@@ -90,6 +98,11 @@ export const isAuth = async (req, res) => {
   try {
     const { userId } = req.body;
     const user = await User.findById(userId).select('-password');
+
+    if (!user) {
+      return res.json({ success: false, message: 'User not found' });
+    }
+
     return res.json({ success: true, user });
   } catch (error) {
     console.log(error.message);
@@ -98,14 +111,16 @@ export const isAuth = async (req, res) => {
 };
 
 // Logout User : /api/user/logout
-
 export const logout = async (req, res) => {
   try {
-    res.clearCookie('token', {
+    const cookieOptions = {
       httpOnly: true,
-      secure: true,
-      sameSite: 'None',
-    });
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      // domain: process.env.NODE_ENV === 'production' ? '.elitesurfing.pt' : undefined,
+    };
+
+    res.clearCookie('token', cookieOptions);
 
     return res.json({ success: true, message: 'Logged Out' });
   } catch (error) {
