@@ -17,6 +17,7 @@ const Navbar = () => {
     searchQuery,
     getCartCount,
     axios,
+    setCartItems,
   } = useAppContext();
 
   // Sync with global search query
@@ -37,15 +38,40 @@ const Navbar = () => {
     try {
       const { data } = await axios.get('/api/user/logout');
       if (data.success) {
-        toast.success(data.message);
+        // Limpar todos os dados do usuário imediatamente
         setUser(null);
-        navigate('/');
+        setCartItems({});
+
+        // Marcar logout no sessionStorage para controle adicional
+        sessionStorage.setItem('userLoggedOut', 'true');
+
+        // Limpar qualquer cache do axios
+        delete axios.defaults.headers.common['Authorization'];
+
+        toast.success(data.message);
+        navigate('/', { replace: true }); // Use replace para evitar voltar ao estado anterior
         setOpen(false);
+
+        // Forçar reload para garantir limpeza total do estado
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error('Logout error:', error);
+      // Mesmo se houver erro, limpe o estado local
+      setUser(null);
+      setCartItems({});
+      sessionStorage.setItem('userLoggedOut', 'true');
+      navigate('/', { replace: true });
+      toast.error('Erro ao fazer logout');
+
+      // Reload mesmo em caso de erro
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     }
   };
 
