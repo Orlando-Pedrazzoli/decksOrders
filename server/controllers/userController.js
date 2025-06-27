@@ -24,15 +24,21 @@ export const register = async (req, res) => {
       expiresIn: '7d',
     });
 
-    // Configuração consistente de cookies
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      // Adicione domain se necessário para subdomínios
       // domain: process.env.NODE_ENV === 'production' ? '.elitesurfing.pt' : undefined,
     };
+
+    // 🔍 LOGS DE DEBUG - REGISTER
+    console.log('=== REGISTER DEBUG ===');
+    console.log('Request origin:', req.headers.origin);
+    console.log('User-Agent:', req.headers['user-agent']);
+    console.log('Cookie options:', cookieOptions);
+    console.log('Token being set:', token.substring(0, 20) + '...');
+    console.log('=======================');
 
     res.cookie('token', token, cookieOptions);
 
@@ -41,7 +47,7 @@ export const register = async (req, res) => {
       user: { email: user.email, name: user.name, id: user._id },
     });
   } catch (error) {
-    console.log(error.message);
+    console.log('Register error:', error.message);
     res.json({ success: false, message: error.message });
   }
 };
@@ -72,7 +78,6 @@ export const login = async (req, res) => {
       expiresIn: '7d',
     });
 
-    // Mesma configuração de cookies do register
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -81,6 +86,15 @@ export const login = async (req, res) => {
       // domain: process.env.NODE_ENV === 'production' ? '.elitesurfing.pt' : undefined,
     };
 
+    // 🔍 LOGS DE DEBUG - LOGIN
+    console.log('=== LOGIN DEBUG ===');
+    console.log('Request origin:', req.headers.origin);
+    console.log('User-Agent:', req.headers['user-agent']);
+    console.log('Cookie options:', cookieOptions);
+    console.log('Token being set:', token.substring(0, 20) + '...');
+    console.log('Existing cookies:', req.cookies);
+    console.log('====================');
+
     res.cookie('token', token, cookieOptions);
 
     return res.json({
@@ -88,7 +102,7 @@ export const login = async (req, res) => {
       user: { email: user.email, name: user.name, id: user._id },
     });
   } catch (error) {
-    console.log(error.message);
+    console.log('Login error:', error.message);
     res.json({ success: false, message: error.message });
   }
 };
@@ -120,11 +134,21 @@ export const logout = async (req, res) => {
       // domain: process.env.NODE_ENV === 'production' ? '.elitesurfing.pt' : undefined,
     };
 
-    res.clearCookie('token', cookieOptions);
+    // 🔍 LOGS DE DEBUG - LOGOUT
+    console.log('=== LOGOUT DEBUG ===');
+    console.log('Request origin:', req.headers.origin);
+    console.log('Cookies before logout:', req.cookies);
+    console.log('Cookie clear options:', cookieOptions);
+    console.log('=====================');
+
+    res.clearCookie('token', {
+      ...cookieOptions,
+      expires: new Date(0), // força a remoção
+    });
 
     return res.json({ success: true, message: 'Logged Out' });
   } catch (error) {
-    console.log(error.message);
+    console.log('Logout error:', error.message);
     res.json({ success: false, message: error.message });
   }
 };
