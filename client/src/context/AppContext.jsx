@@ -25,14 +25,23 @@ export const AppContextProvider = ({ children }) => {
     const interceptor = axios.interceptors.response.use(
       response => response,
       error => {
+        console.log('=== AXIOS INTERCEPTOR DEBUG ===');
+        console.log('Error status:', error.response?.status);
+        console.log('Error message:', error.message);
+        console.log('Current URL:', window.location.href);
+        console.log('===============================');
+
         if (error.response?.status === 401) {
-          // Se receber 401, limpar o estado do usuário
-          console.log('401 recebido, limpando estado do usuário');
+          console.log('🔐 401 recebido, limpando estado do usuário');
           setUser(null);
           setCartItems({});
-          // Redirecionar para home se não estiver lá
-          if (window.location.pathname !== '/') {
-            navigate('/');
+
+          // Não redirecionar automaticamente, apenas limpar estado
+          // Deixar o usuário decidir quando fazer login novamente
+
+          // Mostrar toast apenas se não for uma verificação de auth silenciosa
+          if (!error.config?.url?.includes('is-auth')) {
+            toast.error('Sessão expirada. Faça login novamente.');
           }
         }
         return Promise.reject(error);
@@ -55,6 +64,7 @@ export const AppContextProvider = ({ children }) => {
         setIsSeller(false);
       }
     } catch (error) {
+      console.log('Seller auth check failed:', error.message);
       setIsSeller(false);
     }
   };
@@ -62,26 +72,38 @@ export const AppContextProvider = ({ children }) => {
   // Fetch User Auth Status , User Data and Cart Items
   const fetchUser = async () => {
     try {
+      console.log('🔍 Verificando autenticação do usuário...');
+
       // Verificar se o usuário fez logout recentemente
       if (sessionStorage.getItem('userLoggedOut') === 'true') {
-        console.log('Usuário fez logout recentemente, limpando estado');
+        console.log('👋 Usuário fez logout recentemente, limpando estado');
         sessionStorage.removeItem('userLoggedOut');
         setUser(null);
         setCartItems({});
         return;
       }
 
-      const { data } = await axios.get('api/user/is-auth');
+      const { data } = await axios.get('/api/user/is-auth');
+
+      console.log('📊 Resposta do servidor:', data);
+
       if (data.success && data.user) {
+        console.log('✅ Usuário autenticado:', data.user);
         setUser(data.user);
         setCartItems(data.user.cartItems || {});
       } else {
-        // Se não há usuário autenticado, garantir que o estado está limpo
+        console.log('❌ Usuário não autenticado');
         setUser(null);
         setCartItems({});
       }
     } catch (error) {
-      console.error('Auth check error:', error);
+      console.log('🚨 Erro na verificação de autenticação:', error.message);
+
+      // Se for erro 401, já foi tratado pelo interceptor
+      if (error.response?.status !== 401) {
+        console.error('Erro inesperado na verificação de auth:', error);
+      }
+
       // Em caso de erro, assumir que não há usuário logado
       setUser(null);
       setCartItems({});
@@ -98,12 +120,19 @@ export const AppContextProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error('Erro ao buscar produtos:', error);
+      toast.error('Erro ao carregar produtos');
     }
   };
 
   // Add Product to Cart
   const addToCart = itemId => {
+    if (!user) {
+      toast.error('Faça login para adicionar itens ao carrinho');
+      setShowUserLogin(true);
+      return;
+    }
+
     let cartData = structuredClone(cartItems);
 
     if (cartData[itemId]) {
@@ -112,19 +141,29 @@ export const AppContextProvider = ({ children }) => {
       cartData[itemId] = 1;
     }
     setCartItems(cartData);
-    toast.success('Added to Cart');
+    toast.success('Adicionado ao carrinho');
   };
 
   // Update Cart Item Quantity
   const updateCartItem = (itemId, quantity) => {
+    if (!user) {
+      toast.error('Faça login para atualizar o carrinho');
+      return;
+    }
+
     let cartData = structuredClone(cartItems);
     cartData[itemId] = quantity;
     setCartItems(cartData);
-    toast.success('Cart Updated');
+    toast.success('Carrinho atualizado');
   };
 
   // Remove Product from Cart
   const removeFromCart = itemId => {
+    if (!user) {
+      toast.error('Faça login para remover itens do carrinho');
+      return;
+    }
+
     let cartData = structuredClone(cartItems);
     if (cartData[itemId]) {
       cartData[itemId] -= 1;
@@ -132,7 +171,7 @@ export const AppContextProvider = ({ children }) => {
         delete cartData[itemId];
       }
     }
-    toast.success('Removed from Cart');
+    toast.success('Removido do carrinho');
     setCartItems(cartData);
   };
 
@@ -150,7 +189,7 @@ export const AppContextProvider = ({ children }) => {
     let totalAmount = 0;
     for (const items in cartItems) {
       let itemInfo = products.find(product => product._id === items);
-      if (cartItems[items] > 0) {
+      if (itemInfo && cartItems[items] > 0) {
         totalAmount += itemInfo.offerPrice * cartItems[items];
       }
     }
@@ -165,13 +204,13 @@ export const AppContextProvider = ({ children }) => {
   // Verificar autenticação quando a aba ganha foco
   useEffect(() => {
     const handleFocus = () => {
-      console.log('Aba ganhou foco, verificando autenticação');
+      console.log('👁️ Aba ganhou foco, verificando autenticação');
       fetchUser();
     };
 
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('Página ficou visível, verificando autenticação');
+        console.log('👁️ Página ficou visível, verificando autenticação');
         fetchUser();
       }
     };
@@ -185,7 +224,9 @@ export const AppContextProvider = ({ children }) => {
     };
   }, []);
 
+  // Verificação inicial de autenticação
   useEffect(() => {
+    console.log('🚀 Inicializando aplicação...');
     fetchUser();
     fetchSeller();
     fetchProducts();
@@ -194,19 +235,27 @@ export const AppContextProvider = ({ children }) => {
   // Update Database Cart Items
   useEffect(() => {
     const updateCart = async () => {
+      if (!user) {
+        console.log('👤 Usuário não logado, não atualizando carrinho');
+        return;
+      }
+
       try {
+        console.log('🛒 Atualizando carrinho no servidor...');
         const { data } = await axios.post('/api/cart/update', { cartItems });
         if (!data.success) {
           toast.error(data.message);
         }
       } catch (error) {
-        // Se receber erro 401, não mostrar toast de erro
+        console.log('Erro ao atualizar carrinho:', error.message);
+        // Se receber erro 401, não mostrar toast de erro (já tratado pelo interceptor)
         if (error.response?.status !== 401) {
-          toast.error(error.message);
+          toast.error('Erro ao atualizar carrinho');
         }
       }
     };
 
+    // Só atualizar se houver usuário e carrinho não estiver vazio
     if (user && Object.keys(cartItems).length >= 0) {
       updateCart();
     }
@@ -234,7 +283,7 @@ export const AppContextProvider = ({ children }) => {
     axios,
     fetchProducts,
     setCartItems,
-    fetchUser, // Adicionar fetchUser ao contexto para poder ser chamado externamente
+    fetchUser,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
