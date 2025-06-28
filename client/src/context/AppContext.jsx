@@ -6,6 +6,19 @@ import axios from 'axios';
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL;
 
+// Add mobile token interceptor (THIS WAS MISSING IN YOUR PROVIDED AppContext.jsx)
+axios.interceptors.request.use(config => {
+  // Check if it's an iOS device (or broadly, a mobile device where local storage token might be needed)
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent); // Added this logic back
+  if (isIOS && typeof window !== 'undefined') {
+    const mobileToken = localStorage.getItem('mobile_auth_token');
+    if (mobileToken) {
+      config.headers['Authorization'] = `Bearer ${mobileToken}`;
+    }
+  }
+  return config;
+});
+
 export const AppContext = createContext();
 
 export const AppContextProvider = ({ children }) => {
@@ -19,6 +32,12 @@ export const AppContextProvider = ({ children }) => {
 
   const [cartItems, setCartItems] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMobile, setIsMobile] = useState(false); // <--- NEW: State to detect mobile
+
+  // Detect mobile
+  useEffect(() => {
+    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+  }, []);
 
   // Interceptor para lidar com respostas 401 (não autorizado)
   useEffect(() => {
@@ -33,11 +52,14 @@ export const AppContextProvider = ({ children }) => {
 
         if (error.response?.status === 401) {
           console.log('🔐 401 recebido, limpando estado do usuário');
+          // Clear user state and cart
           setUser(null);
           setCartItems({});
-
-          // Não redirecionar automaticamente, apenas limpar estado
-          // Deixar o usuário decidir quando fazer login novamente
+          // <--- NEW: Clear mobile_auth_token on 401 for mobile devices
+          if (isMobile) {
+            localStorage.removeItem('mobile_auth_token');
+            console.log('🗑️ mobile_auth_token removido do localStorage (401)');
+          }
 
           // Mostrar toast apenas se não for uma verificação de auth silenciosa
           if (!error.config?.url?.includes('is-auth')) {
@@ -52,7 +74,7 @@ export const AppContextProvider = ({ children }) => {
     return () => {
       axios.interceptors.response.eject(interceptor);
     };
-  }, [navigate]);
+  }, [navigate, isMobile]); // <--- Added isMobile to dependencies
 
   // Fetch Seller Status
   const fetchSeller = async () => {
@@ -66,6 +88,7 @@ export const AppContextProvider = ({ children }) => {
     } catch (error) {
       console.log('Seller auth check failed:', error.message);
       setIsSeller(false);
+      // No need to explicitly handle 401 here; the global interceptor does it.
     }
   };
 
@@ -80,26 +103,42 @@ export const AppContextProvider = ({ children }) => {
         sessionStorage.removeItem('userLoggedOut');
         setUser(null);
         setCartItems({});
+        // <--- NEW: Also clear mobile token if logout was recent
+        if (isMobile) {
+          localStorage.removeItem('mobile_auth_token');
+          console.log('🗑️ mobile_auth_token removido (userLoggedOut)');
+        }
         return;
       }
 
       const { data } = await axios.get('/api/user/is-auth');
 
-      console.log('📊 Resposta do servidor:', data);
+      console.log('📊 Resposta do servidor is-auth:', data);
 
       if (data.success && data.user) {
         console.log('✅ Usuário autenticado:', data.user);
         setUser(data.user);
         setCartItems(data.user.cartItems || {});
+
+        // <--- NEW: Store token for iOS Safari if provided by server
+        if (isMobile && data.token) {
+          localStorage.setItem('mobile_auth_token', data.token);
+          console.log('🔄 mobile_auth_token atualizado no localStorage');
+        }
       } else {
         console.log('❌ Usuário não autenticado');
         setUser(null);
         setCartItems({});
+        // <--- NEW: Clear mobile_auth_token if authentication fails
+        if (isMobile) {
+          localStorage.removeItem('mobile_auth_token');
+          console.log('🗑️ mobile_auth_token removido do localStorage');
+        }
       }
     } catch (error) {
       console.log('🚨 Erro na verificação de autenticação:', error.message);
 
-      // Se for erro 401, já foi tratado pelo interceptor
+      // Se for erro 401, já foi tratado pelo interceptor (it clears user, cart, mobile_auth_token)
       if (error.response?.status !== 401) {
         console.error('Erro inesperado na verificação de auth:', error);
       }
@@ -107,6 +146,43 @@ export const AppContextProvider = ({ children }) => {
       // Em caso de erro, assumir que não há usuário logado
       setUser(null);
       setCartItems({});
+      // <--- NEW: Ensure mobile token is cleared on general fetchUser error too
+      if (isMobile) {
+        localStorage.removeItem('mobile_auth_token');
+      }
+    }
+  };
+
+  // <--- NEW: Logout Function (THIS WAS THE MAIN MISSING PIECE)
+  const logoutUser = async () => {
+    try {
+      console.log('🚪 Tentando fazer logout...');
+      const { data } = await axios.get('/api/user/logout'); // Call the server logout endpoint
+      if (data.success) {
+        console.log('✅ Logout bem-sucedido no servidor');
+        setUser(null);
+        setCartItems({});
+        if (isMobile) {
+          localStorage.removeItem('mobile_auth_token'); // Clear mobile token on client-initiated logout
+          console.log('🗑️ mobile_auth_token removido após logout');
+        }
+        sessionStorage.setItem('userLoggedOut', 'true'); // Flag for next fetchUser
+        toast.success(data.message);
+        navigate('/', { replace: true }); // Redirect to home page
+      } else {
+        console.log('❌ Erro no logout do servidor:', data.message);
+        toast.error(data.message || 'Erro ao fazer logout');
+      }
+    } catch (error) {
+      console.error('🚨 Erro ao chamar endpoint de logout:', error);
+      toast.error('Erro ao fazer logout. Tente novamente.');
+      // Even if API call fails, attempt to clear client state
+      setUser(null);
+      setCartItems({});
+      if (isMobile) {
+        localStorage.removeItem('mobile_auth_token');
+      }
+      navigate('/', { replace: true }); // Still navigate home
     }
   };
 
@@ -222,7 +298,7 @@ export const AppContextProvider = ({ children }) => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [fetchUser]); // <--- Added fetchUser to dependencies
 
   // Verificação inicial de autenticação
   useEffect(() => {
@@ -230,7 +306,7 @@ export const AppContextProvider = ({ children }) => {
     fetchUser();
     fetchSeller();
     fetchProducts();
-  }, []);
+  }, []); // <--- Empty dependency array for initial load only
 
   // Update Database Cart Items
   useEffect(() => {
@@ -275,6 +351,7 @@ export const AppContextProvider = ({ children }) => {
     updateCartItem,
     removeFromCart,
     cartItems,
+    setCartItems,
     searchQuery,
     setSearchQuery,
     clearSearchQuery,
@@ -282,8 +359,9 @@ export const AppContextProvider = ({ children }) => {
     getCartCount,
     axios,
     fetchProducts,
-    setCartItems,
     fetchUser,
+    logoutUser, // <--- EXPOSED THE NEW logoutUser FUNCTION HERE
+    isMobile, // <--- EXPOSED isMobile here
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

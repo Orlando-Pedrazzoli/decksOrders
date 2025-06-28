@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
-import toast from 'react-hot-toast';
+import toast from 'react-hot-toast'; // Keep toast for local error messages if needed, but AppContext handles most.
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -10,15 +10,13 @@ const Navbar = () => {
 
   const {
     user,
-    setUser,
     setShowUserLogin,
     navigate,
     setSearchQuery,
     searchQuery,
     getCartCount,
-    axios,
-    setCartItems,
-  } = useAppContext();
+    logoutUser, // <--- Import the new logoutUser from AppContext
+  } = useAppContext(); // Removed setUser, setCartItems, axios as they are now handled by logoutUser
 
   // Sync with global search query
   useEffect(() => {
@@ -29,50 +27,26 @@ const Navbar = () => {
 
   // Navigate to products when search query changes
   useEffect(() => {
+    // Only navigate if search query is not empty to avoid navigating on initial load
     if (searchQuery && searchQuery.length > 0) {
       navigate('/products');
     }
   }, [searchQuery, navigate]);
 
-  const logout = async () => {
-    try {
-      const { data } = await axios.get('/api/user/logout');
-      if (data.success) {
-        // Limpar todos os dados do usuário imediatamente
-        setUser(null);
-        setCartItems({});
-
-        // Marcar logout no sessionStorage para controle adicional
-        sessionStorage.setItem('userLoggedOut', 'true');
-
-        // Limpar qualquer cache do axios
-        delete axios.defaults.headers.common['Authorization'];
-
-        toast.success(data.message);
-        navigate('/', { replace: true }); // Use replace para evitar voltar ao estado anterior
-        setOpen(false);
-
-        // Forçar reload para garantir limpeza total do estado
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
-      } else {
-        toast.error(data.message);
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Mesmo se houver erro, limpe o estado local
-      setUser(null);
-      setCartItems({});
-      sessionStorage.setItem('userLoggedOut', 'true');
-      navigate('/', { replace: true });
-      toast.error('Erro ao fazer logout');
-
-      // Reload mesmo em caso de erro
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
-    }
+  // Handle logout: This function now just calls the context's logoutUser
+  const handleLogout = async () => {
+    setOpen(false); // Close mobile menu first
+    await logoutUser(); // Call the centralized logout function from context
+    // The context's logoutUser handles:
+    // - API call to /api/user/logout
+    // - Clearing user state (setUser(null))
+    // - Clearing cart items (setCartItems({}))
+    // - Clearing mobile_auth_token from localStorage
+    // - Showing success/error toasts
+    // - Navigating to '/'
+    // - Setting sessionStorage.setItem('userLoggedOut', 'true');
+    // - Potentially forcing a reload if necessary (though the context function should be robust enough without it)
+    // No need for window.location.reload() or explicit setUser/setCartItems here.
   };
 
   const handleSearch = e => {
@@ -82,7 +56,7 @@ const Navbar = () => {
   };
 
   const handleNavLinkClick = path => {
-    setOpen(false);
+    setOpen(false); // Close mobile menu when navigating
     navigate(path);
   };
 
@@ -114,9 +88,24 @@ const Navbar = () => {
 
       {/* Desktop Navigation */}
       <div className='hidden sm:flex items-center gap-8'>
-        <NavLink to='/'>Home</NavLink>
-        <NavLink to='/products'>Produtos</NavLink>
-        <NavLink to='/contact'>Contacto</NavLink>
+        <NavLink
+          to='/'
+          className={({ isActive }) => (isActive ? 'text-primary' : '')}
+        >
+          Home
+        </NavLink>
+        <NavLink
+          to='/products'
+          className={({ isActive }) => (isActive ? 'text-primary' : '')}
+        >
+          Produtos
+        </NavLink>
+        <NavLink
+          to='/contact'
+          className={({ isActive }) => (isActive ? 'text-primary' : '')}
+        >
+          Contacto
+        </NavLink>
 
         {/* Desktop Search */}
         <div className='hidden lg:flex items-center'>{renderSearchInput()}</div>
@@ -155,7 +144,7 @@ const Navbar = () => {
                 Os meus Pedidos
               </li>
               <li
-                onClick={logout}
+                onClick={handleLogout} // <--- Use handleLogout here
                 className='p-2 pl-4 hover:bg-primary/10 cursor-pointer'
               >
                 Sair
@@ -194,8 +183,14 @@ const Navbar = () => {
 
       {/* Mobile Menu Panel */}
       {open && (
-        <div className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden transition-opacity duration-300'>
-          <div className='absolute top-0 right-0 h-full w-3/4 sm:w-1/2 bg-white shadow-lg p-6 flex flex-col items-start gap-6 transition-transform duration-300 ease-out transform translate-x-0'>
+        <div
+          className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden transition-opacity duration-300'
+          onClick={() => setOpen(false)} // Close menu when clicking outside
+        >
+          <div
+            className='absolute top-0 right-0 h-full w-3/4 sm:w-1/2 bg-white shadow-lg p-6 flex flex-col items-start gap-6 transition-transform duration-300 ease-out transform translate-x-0'
+            onClick={e => e.stopPropagation()} // Prevent closing when clicking inside the panel
+          >
             <button
               onClick={() => setOpen(false)}
               className='self-end text-gray-500 hover:text-gray-800 transition-colors duration-200'
@@ -215,41 +210,58 @@ const Navbar = () => {
                 />
               </svg>
             </button>
-
+            {/* Mobile Search Input */}
+            <div className='w-full mb-4'>{renderSearchInput(true)}</div>{' '}
+            {/* Added mobile search here */}
             <NavLink
               to='/'
-              className='block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
+              className={({ isActive }) =>
+                `block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100 ${
+                  isActive ? 'text-primary' : ''
+                }`
+              }
               onClick={() => handleNavLinkClick('/')}
             >
               Home
             </NavLink>
             <NavLink
               to='/products'
-              className='block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
+              className={({ isActive }) =>
+                `block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100 ${
+                  isActive ? 'text-primary' : ''
+                }`
+              }
               onClick={() => handleNavLinkClick('/products')}
             >
               Produtos
             </NavLink>
             <NavLink
               to='/contact'
-              className='block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
+              className={({ isActive }) =>
+                `block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100 ${
+                  isActive ? 'text-primary' : ''
+                }`
+              }
               onClick={() => handleNavLinkClick('/contact')}
             >
               Contacto
             </NavLink>
-
             {/* Mobile User Profile / Login / Logout */}
             {user ? (
               <>
                 <NavLink
                   to='/my-orders'
-                  className='block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
+                  className={({ isActive }) =>
+                    `block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100 ${
+                      isActive ? 'text-primary' : ''
+                    }`
+                  }
                   onClick={() => handleNavLinkClick('/my-orders')}
                 >
                   Os meus Pedidos
                 </NavLink>
                 <button
-                  onClick={logout}
+                  onClick={handleLogout} // <--- Use handleLogout here
                   className='w-full cursor-pointer px-6 py-3 mt-4 bg-primary hover:bg-primary-dull transition text-white rounded-lg text-base font-semibold'
                 >
                   Sair
