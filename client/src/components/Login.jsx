@@ -21,8 +21,6 @@ const Login = () => {
   const [password, setPassword] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // No arquivo Login.jsx, substitua o onSubmitHandler por esta versão melhorada:
-
   const onSubmitHandler = async event => {
     event.preventDefault();
     setIsSubmitting(true);
@@ -35,27 +33,28 @@ const Login = () => {
       });
 
       if (data.success) {
-        // Set user data
+        // ✅ 1. FECHAR MODAL IMEDIATAMENTE
+        setShowUserLogin(false);
+
+        // ✅ 2. Set user data
         setUser(data.user);
 
-        // Store token for persistence
+        // ✅ 3. Store token for persistence
         if (data.token) {
           setAuthToken(data.token);
         }
 
-        // Save user data to localStorage
+        // ✅ 4. Save user data to localStorage
         saveUserToStorage(data.user);
 
-        // Merge server cart with local cart
+        // ✅ 5. Merge server cart with local cart
         const localCart = loadCartFromStorage();
         const serverCart = data.user.cartItems || {};
-
-        // Merge carts (local cart takes precedence)
         const mergedCart = { ...serverCart, ...localCart };
         setCartItems(mergedCart);
         saveCartToStorage(mergedCart);
 
-        // Sync merged cart with server
+        // ✅ 6. Sync merged cart with server
         if (Object.keys(mergedCart).length > 0) {
           try {
             await axios.post('/api/cart/update', { cartItems: mergedCart });
@@ -64,28 +63,60 @@ const Login = () => {
           }
         }
 
-        // ✅ Fechar modal de login ANTES de mostrar toast e navegar
-        setShowUserLogin(false);
+        // ✅ 7. MENSAGEM DE BOAS-VINDAS PERSONALIZADA
+        const userName = data.user.name.split(' ')[0]; // Primeiro nome apenas
 
-        // Usar setTimeout para garantir que o estado seja atualizado
-        setTimeout(() => {
+        if (state === 'login') {
+          toast.success(`🎉 Bem-vindo de volta, ${userName}!`, {
+            duration: 4000,
+            style: {
+              background: '#10B981',
+              color: '#fff',
+              fontSize: '16px',
+              fontWeight: '500',
+            },
+            iconTheme: {
+              primary: '#fff',
+              secondary: '#10B981',
+            },
+          });
+        } else {
           toast.success(
-            `${state === 'login' ? 'Login' : 'Registration'} successful!`
+            `🎊 Conta criada com sucesso! Bem-vindo, ${userName}!`,
+            {
+              duration: 5000,
+              style: {
+                background: '#3B82F6',
+                color: '#fff',
+                fontSize: '16px',
+                fontWeight: '500',
+              },
+              iconTheme: {
+                primary: '#fff',
+                secondary: '#3B82F6',
+              },
+            }
           );
-          navigate('/');
-        }, 100);
+        }
 
-        // Clear form
+        // ✅ 8. Clear form
         setName('');
         setEmail('');
         setPassword('');
+
+        // ✅ 9. Navegar após um pequeno delay (opcional)
+        setTimeout(() => {
+          navigate('/');
+        }, 1500);
       } else {
         toast.error(data.message);
       }
     } catch (error) {
       console.error('Auth error:', error);
       toast.error(
-        error.response?.data?.message || error.message || 'Something went wrong'
+        error.response?.data?.message ||
+          error.message ||
+          'Algo deu errado. Tente novamente.'
       );
     } finally {
       setIsSubmitting(false);
@@ -109,11 +140,11 @@ const Login = () => {
 
         {state === 'register' && (
           <div className='w-full'>
-            <p>Name</p>
+            <p>Nome</p>
             <input
               onChange={e => setName(e.target.value)}
               value={name}
-              placeholder='type here'
+              placeholder='Digite seu nome'
               className='border border-gray-200 rounded w-full p-2 mt-1 outline-primary'
               type='text'
               required
@@ -127,7 +158,7 @@ const Login = () => {
           <input
             onChange={e => setEmail(e.target.value)}
             value={email}
-            placeholder='type here'
+            placeholder='Digite seu email'
             className='border border-gray-200 rounded w-full p-2 mt-1 outline-primary'
             type='email'
             required
@@ -140,7 +171,7 @@ const Login = () => {
           <input
             onChange={e => setPassword(e.target.value)}
             value={password}
-            placeholder='type here'
+            placeholder='Digite sua senha'
             className='border border-gray-200 rounded w-full p-2 mt-1 outline-primary'
             type='password'
             required
@@ -150,26 +181,26 @@ const Login = () => {
 
         {state === 'register' ? (
           <p>
-            Already have account?{' '}
+            Já tem uma conta?{' '}
             <span
               onClick={() => !isSubmitting && setState('login')}
               className={`text-primary ${
-                isSubmitting ? 'opacity-50' : 'cursor-pointer'
+                isSubmitting ? 'opacity-50' : 'cursor-pointer hover:underline'
               }`}
             >
-              click here
+              Fazer login
             </span>
           </p>
         ) : (
           <p>
-            Create an account?{' '}
+            Criar uma conta?{' '}
             <span
               onClick={() => !isSubmitting && setState('register')}
               className={`text-primary ${
-                isSubmitting ? 'opacity-50' : 'cursor-pointer'
+                isSubmitting ? 'opacity-50' : 'cursor-pointer hover:underline'
               }`}
             >
-              click here
+              Cadastrar-se
             </span>
           </p>
         )}
@@ -183,11 +214,11 @@ const Login = () => {
         >
           {isSubmitting
             ? state === 'register'
-              ? 'Creating Account...'
-              : 'Logging In...'
+              ? 'Criando conta...'
+              : 'Entrando...'
             : state === 'register'
-            ? 'Create Account'
-            : 'Login'}
+            ? 'Criar Conta'
+            : 'Entrar'}
         </button>
       </form>
     </div>
