@@ -82,6 +82,10 @@ const Cart = () => {
     }
   };
 
+  // No arquivo Cart.jsx, substitua o handlePlaceOrder por esta versão corrigida:
+
+  // No arquivo Cart.jsx, substitua o handlePlaceOrder por esta versão corrigida:
+
   const handlePlaceOrder = async () => {
     if (!requireLogin('place order')) return;
     if (!selectedAddress) {
@@ -100,29 +104,39 @@ const Cart = () => {
         items: cartArray.map(item => ({
           product: item._id,
           quantity: item.quantity,
-          priceAtOrder: item.offerPrice, // Capture price at the time of order
+          priceAtOrder: item.offerPrice,
         })),
         address: selectedAddress._id,
         promoCode: discountApplied ? promoCode : undefined,
-        totalAmount: parseFloat(calculateTotal()), // Ensure total is sent
-        paymentMethod: paymentOption, // Send payment method
+        totalAmount: parseFloat(calculateTotal()),
+        paymentMethod: paymentOption,
       };
 
       let response;
       if (paymentOption === 'COD') {
         response = await axios.post('/api/order/cod', orderData);
       } else {
-        // Assume Stripe for 'Online' payment
         response = await axios.post('/api/order/stripe', orderData);
       }
 
       if (response.data.success) {
         if (paymentOption === 'COD') {
+          // ✅ Limpar carrinho tanto localmente quanto no servidor
+          const emptyCart = {};
+          setCartItems(emptyCart);
+          saveCartToStorage(emptyCart);
+
+          // Sincronizar carrinho vazio com o servidor
+          try {
+            await axios.post('/api/cart/update', { cartItems: emptyCart });
+          } catch (syncError) {
+            console.error('Error syncing empty cart:', syncError);
+          }
+
           toast.success('Order placed successfully!');
-          setCartItems({}); // Clear cart after successful COD order
           navigate('/my-orders');
         } else {
-          // Redirect for Stripe payment
+          // Para pagamentos Stripe, o carrinho será limpo pelo webhook
           window.location.href = response.data.url;
         }
       } else {
@@ -135,13 +149,9 @@ const Cart = () => {
           'Failed to place order. Please try again.'
       );
 
-      // Handle token expiration for mobile (already good)
       if (error.response?.status === 401 && isMobile) {
-        localStorage.removeItem('mobile_auth_token'); // Clear token
-        // Assuming setUser and navigate are available from context if needed
-        // setUser(null);
-        // navigate('/');
-        setShowUserLogin(true); // Prompt login
+        localStorage.removeItem('mobile_auth_token');
+        setShowUserLogin(true);
       }
     } finally {
       setIsProcessing(false);

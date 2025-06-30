@@ -3,6 +3,8 @@ import Product from '../models/Product.js';
 import stripe from 'stripe';
 import User from '../models/User.js';
 
+// No arquivo server/controllers/orderController.js, substitua placeOrderCOD por:
+
 // Place Order COD : /api/order/cod
 export const placeOrderCOD = async (req, res) => {
   try {
@@ -10,6 +12,7 @@ export const placeOrderCOD = async (req, res) => {
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
     }
+
     // Calculate Amount Using Items
     let amount = await items.reduce(async (acc, item) => {
       const product = await Product.findById(item.product);
@@ -19,6 +22,7 @@ export const placeOrderCOD = async (req, res) => {
     // Add Tax Charge (2%)
     amount += Math.floor(amount * 0.02);
 
+    // Create order
     await Order.create({
       userId,
       items,
@@ -26,6 +30,9 @@ export const placeOrderCOD = async (req, res) => {
       address,
       paymentType: 'COD',
     });
+
+    // ✅ Limpar carrinho do usuário após criar o pedido COD
+    await User.findByIdAndUpdate(userId, { cartItems: {} });
 
     return res.json({ success: true, message: 'Order Placed Successfully' });
   } catch (error) {

@@ -21,6 +21,8 @@ const Login = () => {
   const [password, setPassword] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  // No arquivo Login.jsx, substitua o onSubmitHandler por esta versão melhorada:
+
   const onSubmitHandler = async event => {
     event.preventDefault();
     setIsSubmitting(true);
@@ -62,11 +64,16 @@ const Login = () => {
           }
         }
 
+        // ✅ Fechar modal de login ANTES de mostrar toast e navegar
         setShowUserLogin(false);
-        navigate('/');
-        toast.success(
-          `${state === 'login' ? 'Login' : 'Registration'} successful!`
-        );
+
+        // Usar setTimeout para garantir que o estado seja atualizado
+        setTimeout(() => {
+          toast.success(
+            `${state === 'login' ? 'Login' : 'Registration'} successful!`
+          );
+          navigate('/');
+        }, 100);
 
         // Clear form
         setName('');
