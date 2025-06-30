@@ -17,34 +17,184 @@ export const AppContextProvider = ({ children }) => {
   const [isSeller, setIsSeller] = useState(false);
   const [showUserLogin, setShowUserLogin] = useState(false);
   const [products, setProducts] = useState([]);
-
   const [cartItems, setCartItems] = useState({});
-  const [searchQuery, setSearchQuery] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Token management functions
+  const setAuthToken = token => {
+    if (token) {
+      localStorage.setItem('auth_token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      localStorage.removeItem('auth_token');
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  };
+
+  const getStoredToken = () => {
+    return localStorage.getItem('auth_token');
+  };
+
+  // Save cart to localStorage
+  const saveCartToStorage = cartData => {
+    try {
+      localStorage.setItem('cart_items', JSON.stringify(cartData));
+    } catch (error) {
+      console.error('Error saving cart to localStorage:', error);
+    }
+  };
+
+  // Load cart from localStorage
+  const loadCartFromStorage = () => {
+    try {
+      const savedCart = localStorage.getItem('cart_items');
+      return savedCart ? JSON.parse(savedCart) : {};
+    } catch (error) {
+      console.error('Error loading cart from localStorage:', error);
+      return {};
+    }
+  };
+
+  // Clear all stored data
+  const clearStoredData = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('cart_items');
+    localStorage.removeItem('user_data');
+    delete axios.defaults.headers.common['Authorization'];
+  };
+
+  // Save user data to localStorage
+  const saveUserToStorage = userData => {
+    try {
+      if (userData) {
+        localStorage.setItem('user_data', JSON.stringify(userData));
+      } else {
+        localStorage.removeItem('user_data');
+      }
+    } catch (error) {
+      console.error('Error saving user to localStorage:', error);
+    }
+  };
+
+  // Load user data from localStorage
+  const loadUserFromStorage = () => {
+    try {
+      const savedUser = localStorage.getItem('user_data');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (error) {
+      console.error('Error loading user from localStorage:', error);
+      return null;
+    }
+  };
+
+  // Enhanced fetch user function with token validation
+  const fetchUser = async () => {
+    try {
+      setIsLoading(true);
+
+      // First, try to get user with existing session/cookie
+      let response = await axios.get('api/user/is-auth');
+
+      if (response.data.success) {
+        setUser(response.data.user);
+        setCartItems(response.data.user.cartItems || {});
+        saveUserToStorage(response.data.user);
+        saveCartToStorage(response.data.user.cartItems || {});
+
+        // If we have a token but no auth header, set it
+        const token = getStoredToken();
+        if (token && !axios.defaults.headers.common['Authorization']) {
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        }
+
+        return;
+      }
+
+      // If cookie auth failed, try with stored token
+      const storedToken = getStoredToken();
+      if (storedToken) {
+        axios.defaults.headers.common[
+          'Authorization'
+        ] = `Bearer ${storedToken}`;
+
+        try {
+          response = await axios.get('api/user/is-auth');
+
+          if (response.data.success) {
+            setUser(response.data.user);
+            setCartItems(response.data.user.cartItems || {});
+            saveUserToStorage(response.data.user);
+            saveCartToStorage(response.data.user.cartItems || {});
+            return;
+          }
+        } catch (tokenError) {
+          console.log('Token validation failed:', tokenError);
+        }
+      }
+
+      // If both methods failed, try to load from localStorage as fallback
+      const savedUser = loadUserFromStorage();
+      const savedCart = loadCartFromStorage();
+
+      if (savedUser) {
+        setUser(savedUser);
+        setCartItems(savedCart);
+
+        // Try to refresh the session in background
+        setTimeout(() => {
+          fetchUser();
+        }, 2000);
+      } else {
+        // No user found anywhere, clear everything
+        setUser(null);
+        setCartItems({});
+        clearStoredData();
+      }
+    } catch (error) {
+      console.error('Error fetching user:', error);
+
+      // Try to use stored data as fallback
+      const savedUser = loadUserFromStorage();
+      const savedCart = loadCartFromStorage();
+
+      if (savedUser) {
+        setUser(savedUser);
+        setCartItems(savedCart);
+      } else {
+        setUser(null);
+        setCartItems({});
+        clearStoredData();
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Enhanced logout function
+  const logoutUser = async () => {
+    try {
+      // Try to logout from server
+      await axios.get('/api/user/logout');
+    } catch (error) {
+      console.log('Server logout failed:', error);
+    } finally {
+      // Always clear local data
+      setUser(null);
+      setCartItems({});
+      clearStoredData();
+      navigate('/');
+      toast.success('Logged out successfully');
+    }
+  };
 
   // Fetch Seller Status
   const fetchSeller = async () => {
     try {
       const { data } = await axios.get('/api/seller/is-auth');
-      if (data.success) {
-        setIsSeller(true);
-      } else {
-        setIsSeller(false);
-      }
+      setIsSeller(data.success);
     } catch (error) {
       setIsSeller(false);
-    }
-  };
-
-  // Fetch User Auth Status , User Data and Cart Items
-  const fetchUser = async () => {
-    try {
-      const { data } = await axios.get('api/user/is-auth');
-      if (data.success) {
-        setUser(data.user);
-        setCartItems(data.user.cartItems);
-      }
-    } catch (error) {
-      setUser(null);
     }
   };
 
@@ -62,38 +212,75 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Add Product to Cart
-  const addToCart = itemId => {
-    let cartData = structuredClone(cartItems);
+  // Enhanced cart operations with localStorage backup
+  const addToCart = async itemId => {
+    const newCartItems = { ...cartItems };
 
-    if (cartData[itemId]) {
-      cartData[itemId] += 1;
+    if (newCartItems[itemId]) {
+      newCartItems[itemId] += 1;
     } else {
-      cartData[itemId] = 1;
+      newCartItems[itemId] = 1;
     }
-    setCartItems(cartData);
+
+    setCartItems(newCartItems);
+    saveCartToStorage(newCartItems);
     toast.success('Added to Cart');
-  };
 
-  // Update Cart Item Quantity
-  const updateCartItem = (itemId, quantity) => {
-    let cartData = structuredClone(cartItems);
-    cartData[itemId] = quantity;
-    setCartItems(cartData);
-    toast.success('Cart Updated');
-  };
-
-  // Remove Product from Cart
-  const removeFromCart = itemId => {
-    let cartData = structuredClone(cartItems);
-    if (cartData[itemId]) {
-      cartData[itemId] -= 1;
-      if (cartData[itemId] === 0) {
-        delete cartData[itemId];
+    // Sync with server if user is logged in
+    if (user) {
+      try {
+        await axios.post('/api/cart/update', { cartItems: newCartItems });
+      } catch (error) {
+        console.error('Error syncing cart with server:', error);
       }
     }
+  };
+
+  const updateCartItem = async (itemId, quantity) => {
+    const newCartItems = { ...cartItems };
+    newCartItems[itemId] = quantity;
+
+    setCartItems(newCartItems);
+    saveCartToStorage(newCartItems);
+    toast.success('Cart Updated');
+
+    // Sync with server if user is logged in
+    if (user) {
+      try {
+        await axios.post('/api/cart/update', { cartItems: newCartItems });
+      } catch (error) {
+        console.error('Error syncing cart with server:', error);
+      }
+    }
+  };
+
+  const removeFromCart = async itemId => {
+    const newCartItems = { ...cartItems };
+
+    if (newCartItems[itemId]) {
+      newCartItems[itemId] -= 1;
+      if (newCartItems[itemId] === 0) {
+        delete newCartItems[itemId];
+      }
+    }
+
+    setCartItems(newCartItems);
+    saveCartToStorage(newCartItems);
     toast.success('Removed from Cart');
-    setCartItems(cartData);
+
+    // Sync with server if user is logged in
+    if (user) {
+      try {
+        await axios.post('/api/cart/update', { cartItems: newCartItems });
+      } catch (error) {
+        console.error('Error syncing cart with server:', error);
+      }
+    }
+  };
+
+  // Clear search query
+  const clearSearchQuery = () => {
+    setSearchQuery('');
   };
 
   // Get Cart Item Count
@@ -110,36 +297,82 @@ export const AppContextProvider = ({ children }) => {
     let totalAmount = 0;
     for (const items in cartItems) {
       let itemInfo = products.find(product => product._id === items);
-      if (cartItems[items] > 0) {
+      if (itemInfo && cartItems[items] > 0) {
         totalAmount += itemInfo.offerPrice * cartItems[items];
       }
     }
     return Math.floor(totalAmount * 100) / 100;
   };
 
+  // Enhanced axios interceptor for token refresh
   useEffect(() => {
-    fetchUser();
-    fetchSeller();
-    fetchProducts();
+    const requestInterceptor = axios.interceptors.request.use(
+      config => {
+        const token = getStoredToken();
+        if (token && !config.headers.Authorization) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      error => {
+        return Promise.reject(error);
+      }
+    );
+
+    const responseInterceptor = axios.interceptors.response.use(
+      response => response,
+      async error => {
+        if (error.response?.status === 401) {
+          // Token expired or invalid
+          console.log('Authentication failed, clearing stored data');
+          setUser(null);
+          setCartItems(loadCartFromStorage()); // Keep cart but clear user
+          clearStoredData();
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      axios.interceptors.request.eject(requestInterceptor);
+      axios.interceptors.response.eject(responseInterceptor);
+    };
   }, []);
 
-  // Update Database Cart Items
+  // Initialize app
   useEffect(() => {
-    const updateCart = async () => {
-      try {
-        const { data } = await axios.post('/api/cart/update', { cartItems });
-        if (!data.success) {
-          toast.error(data.message);
+    const initializeApp = async () => {
+      // Set token if available
+      const token = getStoredToken();
+      if (token) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      }
+
+      // Load cart from storage immediately
+      const savedCart = loadCartFromStorage();
+      setCartItems(savedCart);
+
+      // Fetch data
+      await Promise.all([fetchUser(), fetchSeller(), fetchProducts()]);
+    };
+
+    initializeApp();
+  }, []);
+
+  // Auto-sync cart with server when user changes
+  useEffect(() => {
+    const syncCartWithServer = async () => {
+      if (user && Object.keys(cartItems).length > 0) {
+        try {
+          await axios.post('/api/cart/update', { cartItems });
+        } catch (error) {
+          console.error('Error syncing cart with server:', error);
         }
-      } catch (error) {
-        toast.error(error.message);
       }
     };
 
-    if (user) {
-      updateCart();
-    }
-  }, [cartItems]);
+    syncCartWithServer();
+  }, [user]); // Only when user changes
 
   const value = {
     navigate,
@@ -157,11 +390,17 @@ export const AppContextProvider = ({ children }) => {
     cartItems,
     searchQuery,
     setSearchQuery,
+    clearSearchQuery,
     getCartAmount,
     getCartCount,
     axios,
     fetchProducts,
     setCartItems,
+    logoutUser,
+    setAuthToken,
+    isLoading,
+    saveCartToStorage,
+    loadCartFromStorage,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

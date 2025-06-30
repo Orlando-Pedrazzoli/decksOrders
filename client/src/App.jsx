@@ -20,17 +20,53 @@ import Orders from './pages/seller/Orders';
 import Loading from './components/Loading';
 import Contact from './pages/Contact';
 import ScrollToTop from './components/ScrollToTop';
+import HealthCheck from './components/HealthCheck';
 
 const App = () => {
   const isSellerPath = useLocation().pathname.includes('seller');
-  const { showUserLogin, isSeller } = useAppContext();
+  const { showUserLogin, isSeller, isLoading } = useAppContext();
+
+  // Show loading spinner while authentication is being verified
+  if (isLoading) {
+    return (
+      <div className='flex justify-center items-center h-screen bg-white'>
+        <div className='text-center'>
+          <div className='animate-spin rounded-full h-24 w-24 border-4 border-gray-300 border-t-primary mx-auto'></div>
+          <p className='mt-4 text-gray-600'>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className='text-default min-h-screen text-gray-700 bg-white'>
       {isSellerPath ? null : <Navbar />}
       {showUserLogin ? <Login /> : null}
 
-      <Toaster />
+      <Toaster
+        position='top-center'
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#358f61',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#f87171',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
       <ScrollToTop />
       <div
         className={`${isSellerPath ? '' : 'px-4 md:px-16 lg:px-24 xl:px-32'}`}
@@ -57,6 +93,7 @@ const App = () => {
         </Routes>
       </div>
       {!isSellerPath && <Footer />}
+      <HealthCheck />
     </div>
   );
 };

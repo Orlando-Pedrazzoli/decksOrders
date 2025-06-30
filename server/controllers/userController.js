@@ -24,16 +24,23 @@ export const register = async (req, res) => {
       expiresIn: '7d',
     });
 
+    // Set HTTP-only cookie
     res.cookie('token', token, {
-      httpOnly: true, // Prevent JavaScript to access cookie
-      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict', // CSRF protection
-      maxAge: 7 * 24 * 60 * 60 * 1000, // Cookie expiration time
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return res.json({
       success: true,
-      user: { email: user.email, name: user.name },
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        cartItems: user.cartItems || {},
+      },
+      token, // Also send token for localStorage storage
     });
   } catch (error) {
     console.log(error.message);
@@ -42,7 +49,6 @@ export const register = async (req, res) => {
 };
 
 // Login User : /api/user/login
-
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -52,6 +58,7 @@ export const login = async (req, res) => {
         success: false,
         message: 'Email and password are required',
       });
+
     const user = await User.findOne({ email });
 
     if (!user) {
@@ -67,6 +74,7 @@ export const login = async (req, res) => {
       expiresIn: '7d',
     });
 
+    // Set HTTP-only cookie
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -76,7 +84,13 @@ export const login = async (req, res) => {
 
     return res.json({
       success: true,
-      user: { email: user.email, name: user.name },
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        cartItems: user.cartItems || {},
+      },
+      token, // Also send token for localStorage storage
     });
   } catch (error) {
     console.log(error.message);
@@ -89,7 +103,20 @@ export const isAuth = async (req, res) => {
   try {
     const { userId } = req.body;
     const user = await User.findById(userId).select('-password');
-    return res.json({ success: true, user });
+
+    if (!user) {
+      return res.json({ success: false, message: 'User not found' });
+    }
+
+    return res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        cartItems: user.cartItems || {},
+      },
+    });
   } catch (error) {
     console.log(error.message);
     res.json({ success: false, message: error.message });
@@ -97,7 +124,6 @@ export const isAuth = async (req, res) => {
 };
 
 // Logout User : /api/user/logout
-
 export const logout = async (req, res) => {
   try {
     res.clearCookie('token', {

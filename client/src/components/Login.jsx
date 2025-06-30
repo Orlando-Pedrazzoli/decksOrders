@@ -3,31 +3,85 @@ import { useAppContext } from '../context/AppContext';
 import toast from 'react-hot-toast';
 
 const Login = () => {
-  const { setShowUserLogin, setUser, axios, navigate } = useAppContext();
+  const {
+    setShowUserLogin,
+    setUser,
+    axios,
+    navigate,
+    setAuthToken,
+    setCartItems,
+    saveCartToStorage,
+    loadCartFromStorage,
+    saveUserToStorage,
+  } = useAppContext();
 
   const [state, setState] = React.useState('login');
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const onSubmitHandler = async event => {
-    try {
-      event.preventDefault();
+    event.preventDefault();
+    setIsSubmitting(true);
 
+    try {
       const { data } = await axios.post(`/api/user/${state}`, {
         name,
         email,
         password,
       });
+
       if (data.success) {
-        navigate('/');
+        // Set user data
         setUser(data.user);
+
+        // Store token for persistence
+        if (data.token) {
+          setAuthToken(data.token);
+        }
+
+        // Save user data to localStorage
+        saveUserToStorage(data.user);
+
+        // Merge server cart with local cart
+        const localCart = loadCartFromStorage();
+        const serverCart = data.user.cartItems || {};
+
+        // Merge carts (local cart takes precedence)
+        const mergedCart = { ...serverCart, ...localCart };
+        setCartItems(mergedCart);
+        saveCartToStorage(mergedCart);
+
+        // Sync merged cart with server
+        if (Object.keys(mergedCart).length > 0) {
+          try {
+            await axios.post('/api/cart/update', { cartItems: mergedCart });
+          } catch (error) {
+            console.error('Error syncing cart:', error);
+          }
+        }
+
         setShowUserLogin(false);
+        navigate('/');
+        toast.success(
+          `${state === 'login' ? 'Login' : 'Registration'} successful!`
+        );
+
+        // Clear form
+        setName('');
+        setEmail('');
+        setPassword('');
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error('Auth error:', error);
+      toast.error(
+        error.response?.data?.message || error.message || 'Something went wrong'
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -45,6 +99,7 @@ const Login = () => {
           <span className='text-primary'>User</span>{' '}
           {state === 'login' ? 'Login' : 'Sign Up'}
         </p>
+
         {state === 'register' && (
           <div className='w-full'>
             <p>Name</p>
@@ -55,9 +110,11 @@ const Login = () => {
               className='border border-gray-200 rounded w-full p-2 mt-1 outline-primary'
               type='text'
               required
+              disabled={isSubmitting}
             />
           </div>
         )}
+
         <div className='w-full '>
           <p>Email</p>
           <input
@@ -67,8 +124,10 @@ const Login = () => {
             className='border border-gray-200 rounded w-full p-2 mt-1 outline-primary'
             type='email'
             required
+            disabled={isSubmitting}
           />
         </div>
+
         <div className='w-full '>
           <p>Password</p>
           <input
@@ -78,14 +137,18 @@ const Login = () => {
             className='border border-gray-200 rounded w-full p-2 mt-1 outline-primary'
             type='password'
             required
+            disabled={isSubmitting}
           />
         </div>
+
         {state === 'register' ? (
           <p>
             Already have account?{' '}
             <span
-              onClick={() => setState('login')}
-              className='text-primary cursor-pointer'
+              onClick={() => !isSubmitting && setState('login')}
+              className={`text-primary ${
+                isSubmitting ? 'opacity-50' : 'cursor-pointer'
+              }`}
             >
               click here
             </span>
@@ -94,15 +157,30 @@ const Login = () => {
           <p>
             Create an account?{' '}
             <span
-              onClick={() => setState('register')}
-              className='text-primary cursor-pointer'
+              onClick={() => !isSubmitting && setState('register')}
+              className={`text-primary ${
+                isSubmitting ? 'opacity-50' : 'cursor-pointer'
+              }`}
             >
               click here
             </span>
           </p>
         )}
-        <button className='bg-primary hover:bg-primary-dull transition-all text-white w-full py-2 rounded-md cursor-pointer'>
-          {state === 'register' ? 'Create Account' : 'Login'}
+
+        <button
+          type='submit'
+          disabled={isSubmitting}
+          className={`bg-primary hover:bg-primary-dull transition-all text-white w-full py-2 rounded-md cursor-pointer ${
+            isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+          }`}
+        >
+          {isSubmitting
+            ? state === 'register'
+              ? 'Creating Account...'
+              : 'Logging In...'
+            : state === 'register'
+            ? 'Create Account'
+            : 'Login'}
         </button>
       </form>
     </div>
