@@ -24,7 +24,7 @@ const getCookieOptions = req => {
       ...baseOptions,
       secure: true,
       sameSite: 'none',
-      domain: '.elitesurfing.pt', // Permite cookies em subdomínios
+      // REMOVIDO: domain: '.elitesurfing.pt', // Esta linha foi removida para permitir cookies em domínios diferentes
     };
   } else {
     // Em desenvolvimento
@@ -74,12 +74,17 @@ export const register = async (req, res) => {
     });
     console.log('=======================');
 
+    // Define o cookie no cabeçalho da resposta
     res.cookie('token', token, cookieOptions);
 
+    // Retorna a resposta JSON com o usuário e o token
     return res.json({
       success: true,
-      user: { email: user.email, name: user.name, id: user._id },
+      user: { email: user.email, name: user.name, id: user._id }, // Retornando apenas dados essenciais
+      token: token, // Enviando o token no corpo para a lógica de mobile_auth_token
+      message: 'Logged In',
     });
+    // A linha "return res.json({ success: true, user: { email: user.email, name: user.name, id: user._id }, });" duplicada foi removida.
   } catch (error) {
     console.log('Register error:', error.message);
     res.json({ success: false, message: error.message });
@@ -129,12 +134,17 @@ export const login = async (req, res) => {
     });
     console.log('====================');
 
+    // Define o cookie no cabeçalho da resposta
     res.cookie('token', token, cookieOptions);
 
+    // Retorna a resposta JSON com o usuário e o token
     return res.json({
       success: true,
-      user: { email: user.email, name: user.name, id: user._id },
+      user: { email: user.email, name: user.name, id: user._id }, // Retornando apenas dados essenciais
+      token: token, // Enviando o token no corpo para a lógica de mobile_auth_token
+      message: 'Logged In',
     });
+    // A linha "return res.json({ success: true, user: { email: user.email, name: user.name, id: user._id }, });" duplicada foi removida.
   } catch (error) {
     console.log('Login error:', error.message);
     res.json({ success: false, message: error.message });
@@ -165,7 +175,10 @@ export const isAuth = async (req, res) => {
       name: user.name,
     });
 
-    return res.json({ success: true, user });
+    return res.json({
+      success: true,
+      user: { email: user.email, name: user.name, id: user._id },
+    }); // Retornando apenas dados essenciais
   } catch (error) {
     console.log('IsAuth error:', error.message);
     res.json({ success: false, message: error.message });
@@ -187,7 +200,7 @@ export const logout = async (req, res) => {
     // Limpar o cookie com as mesmas opções usadas para definir
     res.clearCookie('token', {
       ...cookieOptions,
-      expires: new Date(0), // força a remoção
+      expires: new Date(0), // força a remoção imediata
     });
 
     return res.json({ success: true, message: 'Logged Out' });

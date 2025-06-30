@@ -29,8 +29,6 @@ const allowedOrigins = [
   'http://localhost:4000',
   'https://elitesurfing.pt',
   'https://www.elitesurfing.pt',
-  'http://elitesurfing.pt',
-  'http://www.elitesurfing.pt',
   'https://elitesurfingeu-backend.vercel.app',
 ];
 
