@@ -16,10 +16,9 @@ export const sellerLogin = async (req, res) => {
 
       res.cookie('sellerToken', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // This means secure is only true in production. Good.
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict', // This is also good.
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000,
-        // domain: '.elitesurfing.pt', // Consider adding this here too
       });
 
       return res.json({ success: true, message: 'Logged In' });
