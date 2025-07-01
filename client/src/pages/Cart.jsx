@@ -82,6 +82,8 @@ const Cart = () => {
     }
   };
 
+  // No arquivo Cart.jsx, substitua a função handlePlaceOrder por esta versão:
+
   const handlePlaceOrder = async () => {
     if (!requireLogin('fazer a encomenda')) return;
     if (!selectedAddress) {
@@ -126,7 +128,9 @@ const Cart = () => {
           }
 
           toast.success('Encomenda efetuada com sucesso!');
-          navigate('/my-orders');
+
+          // NOVO: Redirecionar para página de agradecimento
+          navigate(`/order-success/${response.data.orderId}`);
         } else {
           window.location.href = response.data.url;
         }
@@ -148,7 +152,6 @@ const Cart = () => {
       setIsProcessing(false);
     }
   };
-
   const calculateTotal = () => {
     const subtotal = parseFloat(getCartAmount());
     let totalBeforeDiscount = subtotal;

@@ -1,9 +1,8 @@
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
-import stripe from 'stripe';
 import User from '../models/User.js';
-
-// No arquivo server/controllers/orderController.js, substitua placeOrderCOD por:
+import Address from '../models/Address.js';
+import { sendOrderConfirmationEmail } from '../services/emailService.js';
 
 // Place Order COD : /api/order/cod
 export const placeOrderCOD = async (req, res) => {
@@ -20,7 +19,6 @@ export const placeOrderCOD = async (req, res) => {
 
     // Create order
     const newOrder = await Order.create({
-      // <-- Guardar a nova encomenda numa variável
       userId,
       items,
       amount,
@@ -28,16 +26,49 @@ export const placeOrderCOD = async (req, res) => {
       paymentType: 'COD',
     });
 
-    // ✅ Limpar carrinho do usuário após criar o pedido COD
+    // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // --- NOVO: Retornar o ID da encomenda ---
+    // Send confirmation email in background
+    try {
+      // Get user data
+      const user = await User.findById(userId).select('name email');
+
+      // Get address data
+      const addressData = await Address.findById(address);
+
+      // Get products data
+      const productIds = items.map(item => item.product);
+      const products = await Product.find({ _id: { $in: productIds } });
+
+      // Populate order with address for email
+      const orderWithAddress = {
+        ...newOrder.toObject(),
+        address: addressData,
+      };
+
+      // Send email (non-blocking)
+      sendOrderConfirmationEmail(orderWithAddress, user, products)
+        .then(result => {
+          if (result.success) {
+            console.log(`Email de confirmação enviado para ${user.email}`);
+          } else {
+            console.error('Falha ao enviar email:', result.error);
+          }
+        })
+        .catch(err => {
+          console.error('Erro no envio de email:', err);
+        });
+    } catch (emailError) {
+      console.error('Erro ao preparar envio de email:', emailError);
+      // Não falhar a order por causa do email
+    }
+
     return res.json({
       success: true,
       message: 'Order Placed Successfully',
       orderId: newOrder._id,
     });
-    // --- FIM NOVO ---
   } catch (error) {
     return res.json({ success: false, message: error.message });
   }

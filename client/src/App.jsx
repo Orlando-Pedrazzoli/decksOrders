@@ -12,6 +12,7 @@ import ProductDetails from './pages/ProductDetails';
 import Cart from './pages/Cart';
 import AddAddress from './pages/AddAddress';
 import MyOrders from './pages/MyOrders';
+import OrderSuccess from './pages/OrderSuccess';
 import SellerLogin from './components/seller/SellerLogin';
 import SellerLayout from './pages/seller/SellerLayout';
 import AddProduct from './pages/seller/AddProduct';
@@ -78,6 +79,7 @@ const App = () => {
           <Route path='/products/:category/:id' element={<ProductDetails />} />
           <Route path='/cart' element={<Cart />} />
           <Route path='/add-address' element={<AddAddress />} />
+          <Route path='/order-success/:orderId' element={<OrderSuccess />} />
           <Route path='/my-orders' element={<MyOrders />} />
           <Route path='/contact' element={<Contact />} />
 
