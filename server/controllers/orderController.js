@@ -13,17 +13,14 @@ export const placeOrderCOD = async (req, res) => {
       return res.json({ success: false, message: 'Invalid data' });
     }
 
-    // Calculate Amount Using Items
     let amount = await items.reduce(async (acc, item) => {
       const product = await Product.findById(item.product);
       return (await acc) + product.offerPrice * item.quantity;
     }, 0);
 
-    // Add Tax Charge (2%)
-    amount += Math.floor(amount * 0.02);
-
     // Create order
-    await Order.create({
+    const newOrder = await Order.create({
+      // <-- Guardar a nova encomenda numa variável
       userId,
       items,
       amount,
@@ -34,12 +31,17 @@ export const placeOrderCOD = async (req, res) => {
     // ✅ Limpar carrinho do usuário após criar o pedido COD
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    return res.json({ success: true, message: 'Order Placed Successfully' });
+    // --- NOVO: Retornar o ID da encomenda ---
+    return res.json({
+      success: true,
+      message: 'Order Placed Successfully',
+      orderId: newOrder._id,
+    });
+    // --- FIM NOVO ---
   } catch (error) {
     return res.json({ success: false, message: error.message });
   }
 };
-
 // Place Order Stripe : /api/order/stripe
 export const placeOrderStripe = async (req, res) => {
   try {
@@ -63,9 +65,6 @@ export const placeOrderStripe = async (req, res) => {
       return (await acc) + product.offerPrice * item.quantity;
     }, 0);
 
-    // Add Tax Charge (2%)
-    amount += Math.floor(amount * 0.02);
-
     const order = await Order.create({
       userId,
       items,
@@ -86,7 +85,6 @@ export const placeOrderStripe = async (req, res) => {
           product_data: {
             name: item.name,
           },
-          unit_amount: Math.floor(item.price + item.price * 0.02) * 100,
         },
         quantity: item.quantity,
       };

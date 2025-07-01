@@ -17,7 +17,7 @@ const Cart = () => {
     user,
     setCartItems,
     setShowUserLogin,
-    isMobile, // You're already using this, great!
+    isMobile,
   } = useAppContext();
 
   const [cartArray, setCartArray] = useState([]);
@@ -39,12 +39,12 @@ const Cart = () => {
     if (user) {
       loadUserAddresses();
     }
-  }, [products, cartItems, user]); // Added user as dependency for loadUserAddresses
+  }, [products, cartItems, user]);
 
   const requireLogin = action => {
     if (!user) {
       setShowUserLogin(true);
-      toast.error(`Please login to ${action}`);
+      toast.error(`Por favor, inicie sessão para ${action}.`);
       return false;
     }
     return true;
@@ -56,7 +56,7 @@ const Cart = () => {
         const product = products.find(item => item._id === key);
         return product ? { ...product, quantity: cartItems[key] } : null;
       })
-      .filter(Boolean); // Remove any nulls if product not found
+      .filter(Boolean);
     setCartArray(tempArray);
   };
 
@@ -77,23 +77,19 @@ const Cart = () => {
         }
       }
     } catch (error) {
-      console.error('Failed to load addresses:', error);
-      toast.error('Failed to load addresses.');
+      console.error('Falha ao carregar as moradas:', error);
+      toast.error('Falha ao carregar as moradas.');
     }
   };
 
-  // No arquivo Cart.jsx, substitua o handlePlaceOrder por esta versão corrigida:
-
-  // No arquivo Cart.jsx, substitua o handlePlaceOrder por esta versão corrigida:
-
   const handlePlaceOrder = async () => {
-    if (!requireLogin('place order')) return;
+    if (!requireLogin('fazer a encomenda')) return;
     if (!selectedAddress) {
-      return toast.error('Please select a delivery address.');
+      return toast.error('Por favor, selecione uma morada de entrega.');
     }
     if (cartArray.length === 0) {
       return toast.error(
-        'Your cart is empty. Add items before placing an order.'
+        'O seu carrinho está vazio. Adicione artigos antes de fazer uma encomenda.'
       );
     }
 
@@ -121,32 +117,27 @@ const Cart = () => {
 
       if (response.data.success) {
         if (paymentOption === 'COD') {
-          // ✅ Limpar carrinho tanto localmente quanto no servidor
           const emptyCart = {};
           setCartItems(emptyCart);
-          saveCartToStorage(emptyCart);
-
-          // Sincronizar carrinho vazio com o servidor
           try {
             await axios.post('/api/cart/update', { cartItems: emptyCart });
           } catch (syncError) {
-            console.error('Error syncing empty cart:', syncError);
+            console.error('Erro ao sincronizar o carrinho vazio:', syncError);
           }
 
-          toast.success('Order placed successfully!');
+          toast.success('Encomenda efetuada com sucesso!');
           navigate('/my-orders');
         } else {
-          // Para pagamentos Stripe, o carrinho será limpo pelo webhook
           window.location.href = response.data.url;
         }
       } else {
-        toast.error(response.data.message || 'Failed to place order.');
+        toast.error(response.data.message || 'Falha ao fazer a encomenda.');
       }
     } catch (error) {
-      console.error('Order error:', error);
+      console.error('Erro na encomenda:', error);
       toast.error(
         error.response?.data?.message ||
-          'Failed to place order. Please try again.'
+          'Falha ao fazer a encomenda. Por favor, tente novamente.'
       );
 
       if (error.response?.status === 401 && isMobile) {
@@ -160,32 +151,30 @@ const Cart = () => {
 
   const calculateTotal = () => {
     const subtotal = parseFloat(getCartAmount());
-    const tax = subtotal * 0.02; // 2% tax
-    let totalBeforeDiscount = subtotal + tax;
+    let totalBeforeDiscount = subtotal;
 
     if (discountApplied) {
-      const discount = subtotal * 0.3; // 30% discount on subtotal
+      const discount = subtotal * 0.3;
       totalBeforeDiscount -= discount;
     }
-    // Ensure total is not negative
     return Math.max(0, totalBeforeDiscount).toFixed(2);
   };
 
   const handlePromoCode = () => {
-    if (!requireLogin('apply promo code')) return;
+    if (!requireLogin('aplicar o código promocional')) return;
 
     if (promoCode.trim().toUpperCase() === validPromoCode) {
       setDiscountApplied(true);
-      toast.success('30% discount applied!');
+      toast.success('Desconto de 30% aplicado!');
     } else {
-      toast.error('Invalid promo code. Try "BROTHER"'); // Hint for testing
+      toast.error('Código promocional inválido. Experimente "BROTHER".');
     }
   };
 
   const handleRemovePromo = () => {
     setPromoCode('');
     setDiscountApplied(false);
-    toast('Promo code removed.');
+    toast('Código promocional removido.');
   };
 
   // If cart is empty
@@ -194,7 +183,7 @@ const Cart = () => {
       <div className='flex flex-col items-center justify-center min-h-[70vh] px-4 text-center bg-gray-50'>
         <img
           src={assets.empty_cart}
-          alt='Empty cart'
+          alt='Carrinho vazio'
           className='w-56 sm:w-64 md:w-72 mb-6 max-w-full'
         />
         <h3 className='text-xl sm:text-2xl font-semibold mb-3 text-gray-700'>
@@ -221,13 +210,13 @@ const Cart = () => {
         <div className='lg:w-2/3'>
           <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6'>
             <h1 className='text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-0'>
-              Shopping Cart ({getCartCount()} items)
+              Carrinho de Compras ({getCartCount()} artigos)
             </h1>
             <button
               onClick={() => navigate('/products')}
               className='flex items-center text-primary-dark hover:underline text-sm sm:text-base font-medium'
             >
-              Continue Shopping
+              Continuar a Comprar
               <img
                 src={assets.arrow_right_icon_colored}
                 alt='>'
@@ -260,7 +249,7 @@ const Cart = () => {
                       {product.name}
                     </h3>
                     <p className='text-sm text-gray-500 mt-1'>
-                      Weight: {product.weight || 'N/A'}
+                      Peso: {product.weight || 'N/A'}
                     </p>
                     <p className='font-medium text-gray-700 mt-2 text-base sm:hidden'>
                       {currency}{' '}
@@ -271,7 +260,7 @@ const Cart = () => {
 
                 <div className='flex justify-between items-center w-full sm:w-1/3 sm:justify-end sm:gap-8'>
                   <div className='flex items-center'>
-                    <span className='mr-2 text-gray-600'>Qty:</span>
+                    <span className='mr-2 text-gray-600'>Qtd:</span>
                     <select
                       value={cartItems[product._id]}
                       onChange={e =>
@@ -288,7 +277,6 @@ const Cart = () => {
                   </div>
 
                   <div className='text-right hidden sm:block'>
-                    {/* Currency alignment fix: added flex and items-baseline */}
                     <p className='font-bold text-lg text-gray-800 flex items-baseline justify-end'>
                       <span className='mr-0.5'>{currency}</span>
                       <span>
@@ -300,7 +288,7 @@ const Cart = () => {
                     onClick={() => removeFromCart(product._id)}
                     className='text-red-500 hover:text-red-700 text-sm font-medium transition-colors duration-200 ml-4 cursor-pointer'
                   >
-                    Remove
+                    Remover
                   </button>
                 </div>
               </div>
@@ -312,23 +300,23 @@ const Cart = () => {
         <div className='lg:w-1/3'>
           <div className='bg-white rounded-xl shadow-lg p-6 sticky lg:top-8'>
             <h2 className='text-2xl font-bold mb-5 text-gray-800'>
-              Order Summary
+              Resumo da Encomenda
             </h2>
 
             {/* Address Selection */}
             <div className='mb-6 border-b pb-6 border-gray-200'>
               <div className='flex justify-between items-center mb-3'>
                 <h3 className='font-semibold text-gray-700'>
-                  Delivery Address
+                  Morada de Entrega
                 </h3>
                 <button
                   onClick={() =>
-                    requireLogin('select address') &&
+                    requireLogin('selecionar morada') &&
                     setShowAddress(!showAddress)
                   }
                   className='text-primary-dark text-sm hover:underline font-medium'
                 >
-                  {showAddress ? 'Close' : 'Change'}
+                  {showAddress ? 'Fechar' : 'Alterar'}
                 </button>
               </div>
 
@@ -343,7 +331,8 @@ const Cart = () => {
                 </div>
               ) : (
                 <p className='text-sm text-gray-500 italic p-4 bg-gray-50 rounded-lg border border-gray-200'>
-                  No address selected. Please add or select one.
+                  Nenhuma morada selecionada. Por favor, adicione ou selecione
+                  uma.
                 </p>
               )}
 
@@ -371,18 +360,18 @@ const Cart = () => {
                     ))
                   ) : (
                     <p className='p-3 text-gray-600 text-sm text-center'>
-                      No saved addresses.
+                      Nenhuma morada guardada.
                     </p>
                   )}
                   <div
                     onClick={() => {
-                      if (requireLogin('add a new address')) {
+                      if (requireLogin('adicionar uma nova morada')) {
                         navigate('/add-address');
                       }
                     }}
                     className='p-3 text-primary-dark hover:bg-primary-light/20 cursor-pointer text-center font-medium transition-colors duration-200 border-t border-gray-200'
                   >
-                    + Add New Address
+                    + Adicionar Nova Morada
                   </div>
                 </div>
               )}
@@ -390,16 +379,16 @@ const Cart = () => {
 
             {/* Promo Code */}
             <div className='mb-6 border-b pb-6 border-gray-200'>
-              <h3 className='font-semibold text-gray-700 mb-3'>Promo Code</h3>
+              <h3 className='font-semibold text-gray-700 mb-3'>
+                Código Promocional
+              </h3>
               <div className='flex w-full'>
                 <input
                   type='text'
                   value={promoCode}
                   onChange={e => setPromoCode(e.target.value)}
-                  placeholder='Enter promo code'
+                  placeholder='Introduza o código promocional'
                   disabled={discountApplied}
-                  // Added text-center for mobile placeholder alignment
-                  // min-w-0 and flex-shrink-0 for responsiveness
                   className='flex-1 min-w-0 border border-gray-300 rounded-l-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-gray-700 disabled:bg-gray-100 placeholder:text-center sm:placeholder:text-left'
                 />
                 {discountApplied ? (
@@ -407,42 +396,42 @@ const Cart = () => {
                     onClick={handleRemovePromo}
                     className='bg-red-500 text-white px-5 py-2.5 rounded-r-lg hover:bg-red-600 transition-all duration-300 font-medium active:scale-95 flex-shrink-0'
                   >
-                    Remove
+                    Remover
                   </button>
                 ) : (
                   <button
                     onClick={handlePromoCode}
                     className='bg-primary text-white px-5 py-2.5 rounded-r-lg hover:bg-primary-dull transition-all duration-300 font-medium active:scale-95 flex-shrink-0'
                   >
-                    Apply
+                    Aplicar
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Payment Method */}
+            {/* Payment Method - CORRIGIDO AQUI */}
             <div className='mb-6 border-b pb-6 border-gray-200'>
               <h3 className='font-semibold text-gray-700 mb-3'>
-                Payment Method
+                Método de Pagamento
               </h3>
               <select
                 value={paymentOption}
                 onChange={e =>
-                  requireLogin('change payment') &&
+                  requireLogin('alterar o método de pagamento') &&
                   setPaymentOption(e.target.value)
                 }
                 className='w-full border border-gray-300 rounded-lg p-2.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 cursor-pointer'
               >
-                <option value='COD'>Cash on Delivery</option>
-                <option value='Online'>Online Payment (Stripe)</option>
+                <option value='COD'>Pagamento na Entrega</option>{' '}
+                {/* Corrigido */}
+                <option value='Online'>Stripe</option>
               </select>
             </div>
 
             {/* Order Total */}
             <div className='pt-4'>
               <div className='flex justify-between items-center mb-3 text-gray-700'>
-                <span>Subtotal ({getCartCount()} items):</span>
-                {/* Currency alignment fix: added flex and items-baseline */}
+                <span>Subtotal ({getCartCount()} artigos):</span>
                 <span className='font-medium text-lg flex items-baseline'>
                   <span className='mr-0.5'>{currency}</span>
                   <span>{parseFloat(getCartAmount()).toFixed(2)}</span>
@@ -450,8 +439,7 @@ const Cart = () => {
               </div>
               {discountApplied && (
                 <div className='flex justify-between items-center text-green-600 mb-3'>
-                  <span>Discount (30%):</span>
-                  {/* Currency alignment fix: added flex and items-baseline */}
+                  <span>Desconto (30%):</span>
                   <span className='font-medium text-lg flex items-baseline'>
                     <span className='mr-0.5'>-{currency}</span>
                     <span>
@@ -460,17 +448,8 @@ const Cart = () => {
                   </span>
                 </div>
               )}
-              <div className='flex justify-between items-center mb-3 text-gray-700'>
-                <span>Tax (2%):</span>
-                {/* Currency alignment fix: added flex and items-baseline */}
-                <span className='font-medium text-lg flex items-baseline'>
-                  <span className='mr-0.5'>{currency}</span>
-                  <span>{(parseFloat(getCartAmount()) * 0.02).toFixed(2)}</span>
-                </span>
-              </div>
               <div className='flex justify-between font-bold text-xl mt-5 pt-3 border-t border-gray-200'>
                 <span>Total:</span>
-                {/* Currency alignment fix: added flex and items-baseline */}
                 <span className='text-primary-dark flex items-baseline'>
                   <span className='mr-0.5'>{currency}</span>
                   <span>{calculateTotal()}</span>
@@ -492,10 +471,10 @@ const Cart = () => {
                 }`}
             >
               {isProcessing
-                ? 'Processing...'
+                ? 'A Processar...'
                 : paymentOption === 'COD'
-                ? 'Place Order'
-                : 'Pay Now'}
+                ? 'Efetuar Encomenda'
+                : 'Pagar Agora'}
             </button>
           </div>
         </div>

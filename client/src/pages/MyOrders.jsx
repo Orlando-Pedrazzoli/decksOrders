@@ -8,26 +8,22 @@ const MyOrders = () => {
 
   const fetchMyOrders = async () => {
     try {
-      // Show loading state if you have one
       const { data } = await axios.get('/api/order/user');
       if (data.success) {
         setMyOrders(data.orders);
       }
     } catch (error) {
-      console.error('Error fetching orders:', error); // Use console.error for errors
-      // Optionally show a toast error here
+      console.error('Erro ao buscar encomendas:', error);
     }
   };
 
   useEffect(() => {
-    // Only fetch orders if the user is logged in
     if (user) {
       fetchMyOrders();
     } else {
-      // Clear orders if user logs out or isn't available
       setMyOrders([]);
     }
-  }, [user]); // Re-fetch when user object changes
+  }, [user]);
 
   return (
     <div className='container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-60px)] bg-gray-50'>
@@ -52,93 +48,118 @@ const MyOrders = () => {
             </p>
           </div>
         ) : (
-          myOrders.map((order, orderIndex) => (
-            <div key={order._id || orderIndex} className='...'>
-              <div className='bg-primary-light/50 p-4 sm:p-5 border-b border-gray-200'>
-                <p className='flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm sm:text-base text-gray-700 font-medium'>
-                  <span className='mb-2 sm:mb-0'>
-                    <span className='font-semibold'>ID da Encomenda:</span>{' '}
-                    {order._id}
-                  </span>
-                  <span className='mb-2 sm:mb-0'>
-                    <span className='font-semibold'>Pagamento:</span>{' '}
-                    {order.paymentMethod}
-                  </span>
-                  <span className='flex items-baseline'>
-                    <span className='font-semibold mr-1'>Total:</span>
-                    <span className='mr-0.5'>{currency}</span>
-                    <span>
-                      {order.totalAmount ? order.totalAmount.toFixed(2) : 'N/D'}
+          <div className='space-y-8'>
+            {myOrders.map((order, orderIndex) => (
+              <div
+                key={order._id || orderIndex}
+                className='bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200'
+              >
+                {/* Order Header */}
+                <div className='bg-primary-light/30 p-4 sm:p-5 border-b border-gray-200'>
+                  <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2'>
+                    <h3 className='text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-0'>
+                      Encomenda ID: {order._id}
+                    </h3>
+                    <p className='text-sm sm:text-base text-gray-700'>
+                      Data:{' '}
+                      {new Date(order.createdAt).toLocaleDateString('pt-PT')}
+                    </p>
+                  </div>
+                  <p className='text-sm sm:text-base text-gray-700 font-medium'>
+                    Método de Pagamento:{' '}
+                    <span className='font-semibold'>
+                      {/* CORRIGIDO: Usando order.paymentType */}
+                      {order.paymentType === 'COD'
+                        ? 'Pagamento na Entrega'
+                        : 'Pagamento Online (Stripe)'}
                     </span>
-                  </span>
-                </p>
-                <p className='text-sm text-gray-600 mt-2 sm:mt-0'>
-                  <span className='font-semibold'>Data da Encomenda:</span>{' '}
-                  {new Date(order.createdAt).toLocaleDateString()}
-                </p>
+                  </p>
+                  <p className='text-sm sm:text-base text-gray-700 font-medium mt-1'>
+                    Total da Encomenda:{' '}
+                    <span className='font-semibold text-primary-dark'>
+                      {currency} {/* CORRIGIDO: Usando order.amount */}
+                      {order.amount ? order.amount.toFixed(2) : '0.00'}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Items in the Order */}
+                <div className='divide-y divide-gray-100'>
+                  {order.items
+                    .filter(item => item?.product) // Ensure product data exists
+                    .map((item, itemIndex) => (
+                      <div
+                        key={item?.product?._id || itemIndex}
+                        className='flex flex-col sm:flex-row items-center p-4 sm:p-5 gap-4'
+                      >
+                        {/* Product Image */}
+                        <div className='flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 rounded-lg overflow-hidden border border-gray-200'>
+                          <img
+                            src={
+                              item?.product?.image?.[0] ||
+                              assets.placeholder_image // Fallback image
+                            }
+                            alt={item?.product?.name || 'Imagem do Produto'}
+                            className='w-full h-full object-contain'
+                          />
+                        </div>
+
+                        {/* Product Details */}
+                        <div className='flex-grow text-center sm:text-left'>
+                          <h2 className='text-lg sm:text-xl font-bold text-gray-800 mb-1'>
+                            {item?.product?.name || 'Produto Indisponível'}
+                          </h2>
+                          <p className='text-sm text-gray-600'>
+                            Categoria: {item?.product?.category || 'N/D'}
+                          </p>
+                          <p className='text-sm text-gray-600 mt-1'>
+                            Quantidade:{' '}
+                            <span className='font-semibold'>
+                              {item.quantity || '1'}
+                            </span>
+                          </p>
+                          <p className='text-primary-dark font-bold text-lg sm:text-xl flex items-baseline justify-center sm:justify-start mt-2'>
+                            <span className='mr-0.5'>{currency}</span>
+                            <span>
+                              {(
+                                item?.product?.offerPrice * item.quantity
+                              ).toFixed(2)}
+                            </span>
+                          </p>
+                        </div>
+
+                        {/* Order Status */}
+                        <div className='flex-shrink-0 text-center sm:text-right mt-3 sm:mt-0'>
+                          <p className='text-sm text-gray-600'>
+                            Estado:{' '}
+                            <span
+                              className={`font-semibold ${
+                                order.status === 'Delivered'
+                                  ? 'text-green-600' // Cor para entregue
+                                  : order.status === 'Cancelled' // Se tiver estado 'Cancelled'
+                                  ? 'text-red-500' // Cor para cancelada
+                                  : 'text-orange-500' // Cor para outros estados (em processamento, aguardar envio, enviado)
+                              }`}
+                            >
+                              {order.status === 'Processing'
+                                ? 'A Processar'
+                                : order.status === 'Shipped'
+                                ? 'Enviado'
+                                : order.status === 'Delivered'
+                                ? 'Entregue'
+                                : order.status === 'Pending' // Um novo estado se desejar, para recém-criadas
+                                ? 'Pendente'
+                                : 'A Aguardar Envio'}{' '}
+                              {/* <--- Este será o estado padrão para 'desconhecido' */}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
               </div>
-
-              <div className='divide-y divide-gray-100'>
-                {order.items
-                  .filter(item => item?.product)
-                  .map((item, itemIndex) => (
-                    <div key={item?.product?._id || itemIndex} className='...'>
-                      <div className='flex-grow order-1 sm:order-none'>
-                        <h2 className='text-lg sm:text-xl font-semibold text-gray-800 mb-1'>
-                          {item?.product?.name || 'Produto Indisponível'}
-                        </h2>
-                        <p className='text-sm text-gray-600'>
-                          Categoria: {item?.product?.category || 'N/D'}
-                        </p>
-                      </div>
-
-                      <div className='flex flex-col items-start sm:items-end flex-shrink-0 order-2 sm:order-none'>
-                        <p className='text-sm text-gray-600'>
-                          Quantidade:{' '}
-                          <span className='font-medium'>
-                            {item.quantity || '1'}
-                          </span>
-                        </p>
-                        <p className='text-sm text-gray-600'>
-                          Estado:{' '}
-                          <span
-                            className={`font-semibold ${
-                              order.status === 'Delivered'
-                                ? 'text-green-600'
-                                : 'text-orange-500'
-                            }`}
-                          >
-                            {order.status}
-                          </span>
-                        </p>
-                      </div>
-
-                      <div className='bg-gray-100 p-2 rounded-lg flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 order-3 sm:order-none'>
-                        <img
-                          src={
-                            item?.product?.image?.[0] ||
-                            assets.placeholder_image
-                          }
-                          alt={item?.product?.name || 'Imagem do Produto'}
-                          className='w-full h-full object-contain rounded-md'
-                        />
-                      </div>
-
-                      <div className='flex flex-col items-start sm:items-end flex-shrink-0 order-4 sm:order-none'>
-                        <p className='text-primary-dark font-bold text-lg sm:text-xl flex items-baseline'>
-                          <span className='mr-0.5'>{currency}</span>
-                          <span>
-                            {(
-                              item?.product?.offerPrice * item.quantity
-                            ).toFixed(2)}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </div>
