@@ -29,47 +29,61 @@ export const placeOrderCOD = async (req, res) => {
     // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // Send confirmation email in background
-    try {
-      // Get user data
-      const user = await User.findById(userId).select('name email');
+    // Send confirmation email in background (não bloqueia a resposta)
+    setTimeout(async () => {
+      try {
+        console.log('🚀 Iniciando envio de email de confirmação...');
 
-      // Get address data
-      const addressData = await Address.findById(address);
+        // Get user data
+        const user = await User.findById(userId).select('name email');
+        if (!user) {
+          console.error('❌ Usuário não encontrado para email');
+          return;
+        }
 
-      // Get products data
-      const productIds = items.map(item => item.product);
-      const products = await Product.find({ _id: { $in: productIds } });
+        // Get address data
+        const addressData = await Address.findById(address);
+        if (!addressData) {
+          console.error('❌ Endereço não encontrado para email');
+          return;
+        }
 
-      // Populate order with address for email
-      const orderWithAddress = {
-        ...newOrder.toObject(),
-        address: addressData,
-      };
+        // Get products data
+        const productIds = items.map(item => item.product);
+        const products = await Product.find({ _id: { $in: productIds } });
+        if (!products.length) {
+          console.error('❌ Produtos não encontrados para email');
+          return;
+        }
 
-      // Send email (non-blocking)
-      sendOrderConfirmationEmail(orderWithAddress, user, products)
-        .then(result => {
-          if (result.success) {
-            console.log(`Email de confirmação enviado para ${user.email}`);
-          } else {
-            console.error('Falha ao enviar email:', result.error);
-          }
-        })
-        .catch(err => {
-          console.error('Erro no envio de email:', err);
-        });
-    } catch (emailError) {
-      console.error('Erro ao preparar envio de email:', emailError);
-      // Não falhar a order por causa do email
-    }
+        // Send email
+        const emailResult = await sendOrderConfirmationEmail(
+          newOrder.toObject(),
+          user,
+          products,
+          addressData
+        );
 
+        if (emailResult.success) {
+          console.log(
+            `✅ Email enviado com sucesso para ${user.email} - ID: ${emailResult.id}`
+          );
+        } else {
+          console.error('❌ Falha ao enviar email:', emailResult.error);
+        }
+      } catch (emailError) {
+        console.error('❌ Erro no processo de email:', emailError.message);
+      }
+    }, 1000); // Delay de 1 segundo para não afetar a resposta
+
+    // Resposta imediata para o cliente
     return res.json({
       success: true,
       message: 'Order Placed Successfully',
       orderId: newOrder._id,
     });
   } catch (error) {
+    console.error('❌ Erro na criação da encomenda:', error);
     return res.json({ success: false, message: error.message });
   }
 };
