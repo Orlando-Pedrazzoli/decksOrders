@@ -81,7 +81,7 @@ const Navbar = () => {
   );
 
   return (
-    <nav className='flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b border-gray-300 bg-white relative shadow-sm z-50'>
+    <nav className='sticky top-0 flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b border-gray-300 bg-white/95 backdrop-blur-md relative shadow-sm z-50'>
       <NavLink to='/' onClick={() => setOpen(false)}>
         <img className='h-9' src={assets.logo_es} alt='logo' />
       </NavLink>

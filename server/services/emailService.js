@@ -1,9 +1,18 @@
-// server/services/emailService.js - VERSÃO SIMPLIFICADA
-import { Resend } from 'resend';
+// server/services/emailService.js - VERSÃO CORRIGIDA
+import nodemailer from 'nodemailer';
 import { createOrderEmailTemplate } from '../emails/OrderConfirmationEmail.js';
 
-// Inicializar Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Configurar transporter do Gmail
+const createGmailTransporter = () => {
+  return nodemailer.createTransport({
+    // ← SEM "er" no final!
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+};
 
 // Função para enviar email de confirmação de encomenda
 export const sendOrderConfirmationEmail = async (
@@ -13,15 +22,17 @@ export const sendOrderConfirmationEmail = async (
   address
 ) => {
   try {
-    console.log('📧 Tentando enviar email para:', user.email);
+    console.log('📧 Enviando email via Gmail para:', user.email);
+
+    const transporter = createGmailTransporter();
 
     // Gerar HTML do email
     const emailHtml = createOrderEmailTemplate(order, user, products, address);
 
-    // Enviar email usando Resend
-    const { data, error } = await resend.emails.send({
-      from: 'Elite Surfing <onboarding@resend.dev>', // Domínio de teste
-      to: [user.email],
+    // Enviar email usando Gmail SMTP
+    const result = await transporter.sendMail({
+      from: 'Elite Surfing <pedrazzoliorlando@gmail.com>',
+      to: user.email,
       subject: `Confirmação de Encomenda #${order._id} - Elite Surfing`,
       html: emailHtml,
       // Versão texto simples
@@ -33,26 +44,19 @@ export const sendOrderConfirmationEmail = async (
         Total: €${order.amount.toFixed(2)}
         Data: ${new Date(order.createdAt).toLocaleDateString('pt-PT')}
         
-        Um email detalhado foi enviado para ${user.email}.
-        
         Obrigado por escolher a Elite Surfing!
         www.elitesurfing.pt
       `,
     });
 
-    if (error) {
-      console.error('❌ Erro Resend:', error);
-      return { success: false, error: error.message };
-    }
-
-    console.log('✅ Email enviado via Resend. ID:', data.id);
+    console.log('✅ Email enviado via Gmail. ID:', result.messageId);
     return {
       success: true,
-      id: data.id,
+      messageId: result.messageId,
       message: `Email enviado para ${user.email}`,
     };
   } catch (error) {
-    console.error('❌ Erro ao enviar email via Resend:', error);
+    console.error('❌ Erro ao enviar email via Gmail:', error);
     return {
       success: false,
       error: error.message || 'Erro desconhecido no envio de email',
@@ -63,19 +67,17 @@ export const sendOrderConfirmationEmail = async (
 // Função auxiliar para emails simples
 export const sendSimpleEmail = async (to, subject, html, text = null) => {
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'Elite Surfing <onboarding@resend.dev>',
+    const transporter = createGmailTransporter();
+
+    const result = await transporter.sendMail({
+      from: 'Elite Surfing <pedrazzoliorlando@gmail.com>',
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
       text,
     });
 
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    return { success: true, id: data.id };
+    return { success: true, messageId: result.messageId };
   } catch (error) {
     return { success: false, error: error.message };
   }

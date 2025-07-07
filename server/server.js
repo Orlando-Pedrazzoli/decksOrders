@@ -14,7 +14,7 @@ import { stripeWebhooks } from './controllers/orderController.js';
 
 // App Config
 const app = express();
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 4001;
 
 await connectDB();
 await connectCloudinary();
@@ -32,6 +32,7 @@ app.use(
   cors({
     origin: [
       'http://localhost:5173',
+      'http://localhost:4001', // ← Adicione esta linha
       'http://localhost:3000',
       'https://elitesurfing.pt',
       'https://www.elitesurfing.pt',
