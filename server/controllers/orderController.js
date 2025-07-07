@@ -4,16 +4,10 @@ import User from '../models/User.js';
 import Address from '../models/Address.js';
 import { sendOrderConfirmationEmail } from '../services/emailService.js';
 
-// server/controllers/orderController.js - DEBUG PROFUNDO
-
+// Place Order COD : /api/order/cod
 export const placeOrderCOD = async (req, res) => {
   try {
     const { userId, items, address } = req.body;
-
-    // ✅ DEBUG: Log do userId recebido
-    console.log('🔍 DEBUG - UserID recebido:', userId);
-    console.log('🔍 DEBUG - Tipo do userId:', typeof userId);
-
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
     }
@@ -35,90 +29,37 @@ export const placeOrderCOD = async (req, res) => {
     // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // ✅ DEBUG PROFUNDO DO EMAIL
+    // ✅ SOLUÇÃO DEFINITIVA: Email simples e direto
     setTimeout(async () => {
       try {
         console.log('🚀 Iniciando envio de email de confirmação...');
-        console.log('📧 User ID para busca:', userId);
 
-        // ✅ DEBUG: Buscar user com mais detalhes
-        const user = await User.findById(userId);
-
-        console.log('🔍 DEBUG - Usuário encontrado (RAW):', user);
-        console.log('🔍 DEBUG - user._id:', user?._id);
-        console.log('🔍 DEBUG - user.name:', user?.name);
-        console.log('🔍 DEBUG - user.email:', user?.email);
-        console.log(
-          '🔍 DEBUG - user object keys:',
-          user ? Object.keys(user.toObject()) : 'NULL'
-        );
-
-        if (!user) {
-          console.error('❌ Usuário não encontrado para email. ID:', userId);
-          return;
-        }
-
-        // ✅ DEBUG: Verificar se email existe
-        if (!user.email || user.email === '') {
-          console.error('❌ Email do usuário está vazio ou undefined');
-          console.error(
-            '❌ Usuário completo:',
-            JSON.stringify(user.toObject(), null, 2)
-          );
-          return;
-        }
-
-        // ✅ VERIFICAÇÃO EXTRA: Buscar todos os usuários para comparar
-        const allUsers = await User.find({}).select('name email').limit(5);
-        console.log(
-          '🔍 DEBUG - Todos os usuários no DB (primeiros 5):',
-          allUsers.map(u => ({ id: u._id, name: u.name, email: u.email }))
-        );
-
-        // Get address data
+        // Buscar dados necessários
+        const user = await User.findById(userId).select('name email');
         const addressData = await Address.findById(address);
-        if (!addressData) {
-          console.error('❌ Endereço não encontrado para email');
-          return;
-        }
-
-        console.log('✅ Endereço encontrado:', {
-          firstName: addressData.firstName,
-          email: addressData.email,
-        });
-
-        // ✅ DECISÃO: Usar email do address se user.email estiver errado
-        let emailToSend = user.email;
-
-        // Se o email do usuário for o seu email (erro), use o email do endereço
-        if (user.email === 'pedrazzoliorlando@gmail.com') {
-          console.log(
-            '⚠️ DETECTADO: Email do usuário é o email do admin, usando email do endereço'
-          );
-          emailToSend = addressData.email;
-        }
-
-        console.log('📧 Email final que será usado:', emailToSend);
-
-        // Get products data
         const productIds = items.map(item => item.product);
         const products = await Product.find({ _id: { $in: productIds } });
 
-        // Send email com o email correto
+        if (!user || !addressData || !products.length) {
+          console.error('❌ Dados incompletos para envio de email');
+          return;
+        }
+
+        console.log('📧 Enviando email para:', addressData.email);
+
+        // ✅ USAR SEMPRE O EMAIL DO ENDEREÇO (é o email real do cliente)
         const emailResult = await sendOrderConfirmationEmail(
           newOrder.toObject(),
           {
-            ...user.toObject(),
-            email: emailToSend, // ← Usar o email correto
+            name: user.name,
+            email: addressData.email, // ← EMAIL DO ENDEREÇO (sempre correto)
           },
           products,
           addressData
         );
 
         if (emailResult.success) {
-          console.log(
-            `✅ Email enviado com sucesso para ${emailToSend} - ID: ${emailResult.messageId}`
-          );
+          console.log(`✅ Email enviado com sucesso para ${addressData.email}`);
         } else {
           console.error('❌ Falha ao enviar email:', emailResult.error);
         }
@@ -137,6 +78,7 @@ export const placeOrderCOD = async (req, res) => {
     return res.json({ success: false, message: error.message });
   }
 };
+
 // Place Order Stripe : /api/order/stripe
 export const placeOrderStripe = async (req, res) => {
   try {
@@ -172,7 +114,6 @@ export const placeOrderStripe = async (req, res) => {
     const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
 
     // create line items for stripe
-
     const line_items = productData.map(item => {
       return {
         price_data: {
@@ -202,6 +143,7 @@ export const placeOrderStripe = async (req, res) => {
     return res.json({ success: false, message: error.message });
   }
 };
+
 // Stripe Webhooks to Verify Payments Action : /stripe
 export const stripeWebhooks = async (request, response) => {
   // Stripe Gateway Initialize
