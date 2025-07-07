@@ -1,4 +1,4 @@
-// server/services/emailService.js - VERSÃO CORRIGIDA COMPLETA
+// server/services/emailService.js - COM FALLBACK PARA EMAIL DO ENDEREÇO
 
 import nodemailer from 'nodemailer';
 import { createOrderEmailTemplate } from '../emails/OrderConfirmationEmail.js';
@@ -20,34 +20,45 @@ export const sendOrderConfirmationEmail = async (
   address
 ) => {
   try {
-    // ✅ VALIDAÇÃO: Verificar se o email do usuário existe
-    if (!user.email || user.email === '') {
-      console.error('❌ Email do usuário não fornecido:', user);
+    // ✅ SOLUÇÃO: Determinar qual email usar
+    let emailToSend = user.email;
+
+    // Se o email do usuário for inválido ou for o seu email, use o do endereço
+    if (
+      !user.email ||
+      user.email === '' ||
+      user.email === 'pedrazzoliorlando@gmail.com'
+    ) {
+      console.log('⚠️ Email do usuário inválido, usando email do endereço');
+      emailToSend = address.email;
+    }
+
+    // ✅ VALIDAÇÃO FINAL: Verificar se temos um email válido
+    if (!emailToSend || emailToSend === '') {
+      console.error('❌ Nenhum email válido encontrado');
+      console.error('❌ user.email:', user.email);
+      console.error('❌ address.email:', address.email);
       return {
         success: false,
-        error: 'Email do usuário não encontrado',
+        error: 'Nenhum email válido encontrado para envio',
       };
     }
 
-    console.log('📧 Enviando email via Gmail para:', user.email);
-    console.log('📧 Dados do usuário:', {
-      name: user.name,
-      email: user.email,
-      id: user._id,
-    });
+    console.log('📧 Enviando email via Gmail para:', emailToSend);
+    console.log(
+      '📧 Fonte do email:',
+      user.email === emailToSend ? 'usuário' : 'endereço'
+    );
 
     const transporter = createGmailTransporter();
-
-    // Gerar HTML do email
     const emailHtml = createOrderEmailTemplate(order, user, products, address);
 
-    // ✅ CORREÇÃO: Configuração de email corrigida
     const mailOptions = {
       from: {
         name: 'Elite Surfing',
-        address: process.env.GMAIL_USER, // ← Usar a variável de ambiente
+        address: process.env.GMAIL_USER,
       },
-      to: user.email, // ← Este deve ser o email do cliente
+      to: emailToSend, // ← Email correto (usuário ou endereço)
       subject: `Confirmação de Encomenda #${order._id} - Elite Surfing`,
       html: emailHtml,
       text: `
@@ -63,27 +74,19 @@ export const sendOrderConfirmationEmail = async (
       `,
     };
 
-    console.log('📧 Configuração do email:', {
-      from: mailOptions.from,
-      to: mailOptions.to,
-      subject: mailOptions.subject,
-    });
-
-    // Enviar email
     const result = await transporter.sendMail(mailOptions);
 
     console.log('✅ Email enviado via Gmail. ID:', result.messageId);
-    console.log('✅ Email enviado para:', user.email);
+    console.log('✅ Email enviado para:', emailToSend);
 
     return {
       success: true,
       messageId: result.messageId,
-      message: `Email enviado para ${user.email}`,
-      recipient: user.email, // ← Para debug
+      message: `Email enviado para ${emailToSend}`,
+      recipient: emailToSend,
     };
   } catch (error) {
     console.error('❌ Erro ao enviar email via Gmail:', error);
-    console.error('❌ Email que tentou enviar para:', user?.email);
     return {
       success: false,
       error: error.message || 'Erro desconhecido no envio de email',
@@ -91,7 +94,6 @@ export const sendOrderConfirmationEmail = async (
   }
 };
 
-// ✅ FUNÇÃO AUXILIAR: Função para emails simples (necessária para o export)
 export const sendSimpleEmail = async (to, subject, html, text = null) => {
   try {
     const transporter = createGmailTransporter();
@@ -113,5 +115,4 @@ export const sendSimpleEmail = async (to, subject, html, text = null) => {
   }
 };
 
-// ✅ EXPORT DEFAULT: Agora ambas as funções estão definidas
 export default { sendOrderConfirmationEmail, sendSimpleEmail };

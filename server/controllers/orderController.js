@@ -4,9 +4,16 @@ import User from '../models/User.js';
 import Address from '../models/Address.js';
 import { sendOrderConfirmationEmail } from '../services/emailService.js';
 
+// server/controllers/orderController.js - DEBUG PROFUNDO
+
 export const placeOrderCOD = async (req, res) => {
   try {
     const { userId, items, address } = req.body;
+
+    // ✅ DEBUG: Log do userId recebido
+    console.log('🔍 DEBUG - UserID recebido:', userId);
+    console.log('🔍 DEBUG - Tipo do userId:', typeof userId);
+
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
     }
@@ -28,30 +35,45 @@ export const placeOrderCOD = async (req, res) => {
     // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // ✅ CORREÇÃO: Melhor handling do envio de email
+    // ✅ DEBUG PROFUNDO DO EMAIL
     setTimeout(async () => {
       try {
         console.log('🚀 Iniciando envio de email de confirmação...');
-        console.log('📧 User ID:', userId);
+        console.log('📧 User ID para busca:', userId);
 
-        // ✅ CORREÇÃO: Buscar user com .select() para garantir que o email vem
-        const user = await User.findById(userId).select('name email');
+        // ✅ DEBUG: Buscar user com mais detalhes
+        const user = await User.findById(userId);
+
+        console.log('🔍 DEBUG - Usuário encontrado (RAW):', user);
+        console.log('🔍 DEBUG - user._id:', user?._id);
+        console.log('🔍 DEBUG - user.name:', user?.name);
+        console.log('🔍 DEBUG - user.email:', user?.email);
+        console.log(
+          '🔍 DEBUG - user object keys:',
+          user ? Object.keys(user.toObject()) : 'NULL'
+        );
+
         if (!user) {
           console.error('❌ Usuário não encontrado para email. ID:', userId);
           return;
         }
 
-        console.log('✅ Usuário encontrado:', {
-          id: user._id,
-          name: user.name,
-          email: user.email, // ← Verificar se este campo existe
-        });
-
-        // ✅ VALIDAÇÃO: Verificar se email existe
+        // ✅ DEBUG: Verificar se email existe
         if (!user.email || user.email === '') {
           console.error('❌ Email do usuário está vazio ou undefined');
+          console.error(
+            '❌ Usuário completo:',
+            JSON.stringify(user.toObject(), null, 2)
+          );
           return;
         }
+
+        // ✅ VERIFICAÇÃO EXTRA: Buscar todos os usuários para comparar
+        const allUsers = await User.find({}).select('name email').limit(5);
+        console.log(
+          '🔍 DEBUG - Todos os usuários no DB (primeiros 5):',
+          allUsers.map(u => ({ id: u._id, name: u.name, email: u.email }))
+        );
 
         // Get address data
         const addressData = await Address.findById(address);
@@ -62,29 +84,32 @@ export const placeOrderCOD = async (req, res) => {
 
         console.log('✅ Endereço encontrado:', {
           firstName: addressData.firstName,
-          email: addressData.email, // ← Este também tem email
+          email: addressData.email,
         });
+
+        // ✅ DECISÃO: Usar email do address se user.email estiver errado
+        let emailToSend = user.email;
+
+        // Se o email do usuário for o seu email (erro), use o email do endereço
+        if (user.email === 'pedrazzoliorlando@gmail.com') {
+          console.log(
+            '⚠️ DETECTADO: Email do usuário é o email do admin, usando email do endereço'
+          );
+          emailToSend = addressData.email;
+        }
+
+        console.log('📧 Email final que será usado:', emailToSend);
 
         // Get products data
         const productIds = items.map(item => item.product);
         const products = await Product.find({ _id: { $in: productIds } });
-        if (!products.length) {
-          console.error('❌ Produtos não encontrados para email');
-          return;
-        }
 
-        console.log('✅ Produtos encontrados:', products.length);
-
-        // ✅ DECISÃO: Usar email do usuário OU do endereço?
-        const emailToSend = user.email || addressData.email;
-        console.log('📧 Email que será usado:', emailToSend);
-
-        // Send email
+        // Send email com o email correto
         const emailResult = await sendOrderConfirmationEmail(
           newOrder.toObject(),
           {
             ...user.toObject(),
-            email: emailToSend, // ← Garantir que o email correto é usado
+            email: emailToSend, // ← Usar o email correto
           },
           products,
           addressData
@@ -96,15 +121,12 @@ export const placeOrderCOD = async (req, res) => {
           );
         } else {
           console.error('❌ Falha ao enviar email:', emailResult.error);
-          console.error('❌ Email tentado:', emailToSend);
         }
       } catch (emailError) {
         console.error('❌ Erro no processo de email:', emailError.message);
-        console.error('❌ Stack:', emailError.stack);
       }
     }, 1000);
 
-    // Resposta imediata para o cliente
     return res.json({
       success: true,
       message: 'Order Placed Successfully',
