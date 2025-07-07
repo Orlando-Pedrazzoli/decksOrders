@@ -29,7 +29,7 @@ export const placeOrderCOD = async (req, res) => {
     // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // Send confirmation email in background
+    // Send confirmation email in background (não bloqueia a resposta)
     setTimeout(async () => {
       try {
         console.log('🚀 Iniciando envio de email de confirmação...');
@@ -56,92 +56,27 @@ export const placeOrderCOD = async (req, res) => {
           return;
         }
 
-        console.log('📧 Enviando email para:', addressData.email);
-
-        // ✅ OPÇÃO 1: Usar o emailService existente (RECOMENDADO)
+        // Send email
         const emailResult = await sendOrderConfirmationEmail(
           newOrder.toObject(),
-          {
-            name: user.name,
-            email: addressData.email, // ← USAR EMAIL DO ENDEREÇO
-          },
+          user,
           products,
           addressData
         );
 
         if (emailResult.success) {
-          console.log(`✅ Email enviado com sucesso para ${addressData.email}`);
+          console.log(
+            `✅ Email enviado com sucesso para ${user.email} - ID: ${emailResult.id}`
+          );
         } else {
           console.error('❌ Falha ao enviar email:', emailResult.error);
-
-          // ✅ OPÇÃO 2: Fallback com nodemailer direto
-          try {
-            console.log('🔄 Tentando envio direto com nodemailer...');
-
-            // Import dinâmico para evitar crash do servidor
-            const nodemailer = await import('nodemailer');
-
-            const transporter = nodemailer.default.createTransporter({
-              service: 'gmail',
-              auth: {
-                user: process.env.GMAIL_USER,
-                pass: process.env.GMAIL_APP_PASSWORD,
-              },
-            });
-
-            const result = await transporter.sendMail({
-              from: {
-                name: 'Elite Surfing',
-                address: process.env.GMAIL_USER,
-              },
-              to: addressData.email,
-              subject: `Confirmação de Encomenda #${newOrder._id} - Elite Surfing`,
-              html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h2 style="color: #358f61;">Obrigado pela sua compra!</h2>
-                  <p>Olá <strong>${user.name}</strong>,</p>
-                  <p>A sua encomenda foi processada com sucesso.</p>
-                  
-                  <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                    <h3>Detalhes da Encomenda</h3>
-                    <p><strong>Número:</strong> #${newOrder._id}</p>
-                    <p><strong>Total:</strong> €${amount.toFixed(2)}</p>
-                    <p><strong>Data:</strong> ${new Date().toLocaleDateString('pt-PT')}</p>
-                    <p><strong>Método de Pagamento:</strong> Pagamento na Entrega</p>
-                  </div>
-                  
-                  <p>Obrigado por escolher a Elite Surfing!</p>
-                  <p><a href="https://elitesurfing.pt" style="color: #358f61;">www.elitesurfing.pt</a></p>
-                </div>
-              `,
-              text: `
-                Olá ${user.name},
-                
-                Obrigado pela sua compra! A sua encomenda #${newOrder._id} foi processada com sucesso.
-                
-                Total: €${amount.toFixed(2)}
-                Data: ${new Date().toLocaleDateString('pt-PT')}
-                
-                Obrigado por escolher a Elite Surfing!
-                www.elitesurfing.pt
-              `,
-            });
-
-            console.log('✅ EMAIL ENVIADO COM FALLBACK!');
-            console.log('📧 Para:', addressData.email);
-            console.log('📧 ID da mensagem:', result.messageId);
-          } catch (fallbackError) {
-            console.error('❌ ERRO NO FALLBACK:', fallbackError.message);
-          }
         }
       } catch (emailError) {
-        console.error(
-          '❌ Erro geral no processo de email:',
-          emailError.message
-        );
+        console.error('❌ Erro no processo de email:', emailError.message);
       }
-    }, 1000);
+    }, 1000); // Delay de 1 segundo para não afetar a resposta
 
+    // Resposta imediata para o cliente
     return res.json({
       success: true,
       message: 'Order Placed Successfully',
@@ -152,7 +87,6 @@ export const placeOrderCOD = async (req, res) => {
     return res.json({ success: false, message: error.message });
   }
 };
-
 // Place Order Stripe : /api/order/stripe
 export const placeOrderStripe = async (req, res) => {
   try {
@@ -164,6 +98,8 @@ export const placeOrderStripe = async (req, res) => {
     }
 
     let productData = [];
+
+    // Calculate Amount Using Items
     let amount = await items.reduce(async (acc, item) => {
       const product = await Product.findById(item.product);
       productData.push({
@@ -182,11 +118,95 @@ export const placeOrderStripe = async (req, res) => {
       paymentType: 'Online',
     });
 
-    // Stripe implementation...
-    return res.json({ success: true, url: 'stripe-url' });
+    // Stripe Gateway Initialize
+    const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
+
+    // create line items for stripe
+
+    const line_items = productData.map(item => {
+      return {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: item.name,
+          },
+        },
+        quantity: item.quantity,
+      };
+    });
+
+    // create session
+    const session = await stripeInstance.checkout.sessions.create({
+      line_items,
+      mode: 'payment',
+      success_url: `${origin}/loader?next=my-orders`,
+      cancel_url: `${origin}/cart`,
+      metadata: {
+        orderId: order._id.toString(),
+        userId,
+      },
+    });
+
+    return res.json({ success: true, url: session.url });
   } catch (error) {
     return res.json({ success: false, message: error.message });
   }
+};
+// Stripe Webhooks to Verify Payments Action : /stripe
+export const stripeWebhooks = async (request, response) => {
+  // Stripe Gateway Initialize
+  const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
+
+  const sig = request.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripeInstance.webhooks.constructEvent(
+      request.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (error) {
+    response.status(400).send(`Webhook Error: ${error.message}`);
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'payment_intent.succeeded': {
+      const paymentIntent = event.data.object;
+      const paymentIntentId = paymentIntent.id;
+
+      // Getting Session Metadata
+      const session = await stripeInstance.checkout.sessions.list({
+        payment_intent: paymentIntentId,
+      });
+
+      const { orderId, userId } = session.data[0].metadata;
+      // Mark Payment as Paid
+      await Order.findByIdAndUpdate(orderId, { isPaid: true });
+      // Clear user cart
+      await User.findByIdAndUpdate(userId, { cartItems: {} });
+      break;
+    }
+    case 'payment_intent.payment_failed': {
+      const paymentIntent = event.data.object;
+      const paymentIntentId = paymentIntent.id;
+
+      // Getting Session Metadata
+      const session = await stripeInstance.checkout.sessions.list({
+        payment_intent: paymentIntentId,
+      });
+
+      const { orderId } = session.data[0].metadata;
+      await Order.findByIdAndDelete(orderId);
+      break;
+    }
+
+    default:
+      console.error(`Unhandled event type ${event.type}`);
+      break;
+  }
+  response.json({ received: true });
 };
 
 // Get Orders by User ID : /api/order/user
