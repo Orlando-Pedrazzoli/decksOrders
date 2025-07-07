@@ -1,15 +1,24 @@
-// server/services/emailService.js - VERSÃO CORRIGIDA
+// server/services/emailService.js - VERSÃO TESTE HARDCODED
 import nodemailer from 'nodemailer';
 import { createOrderEmailTemplate } from '../emails/OrderConfirmationEmail.js';
 
 // Configurar transporter do Gmail
 const createGmailTransporter = () => {
+  // TEMPORÁRIO: Valores hardcoded para teste
+  const gmailUser = process.env.GMAIL_USER || 'pedrazzoliorlando@gmail.com';
+  const gmailPassword = process.env.GMAIL_APP_PASSWORD || 'euisyrtbqwftnavv';
+
+  console.log('🔍 Gmail Config:');
+  console.log('User from env:', process.env.GMAIL_USER);
+  console.log('User final:', gmailUser);
+  console.log('Password from env exists:', !!process.env.GMAIL_APP_PASSWORD);
+  console.log('Password final exists:', !!gmailPassword);
+
   return nodemailer.createTransport({
-    // ← SEM "er" no final!
     service: 'gmail',
     auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+      user: gmailUser,
+      pass: gmailPassword,
     },
   });
 };
@@ -35,7 +44,6 @@ export const sendOrderConfirmationEmail = async (
       to: user.email,
       subject: `Confirmação de Encomenda #${order._id} - Elite Surfing`,
       html: emailHtml,
-      // Versão texto simples
       text: `
         Olá ${user.name},
         
@@ -64,7 +72,6 @@ export const sendOrderConfirmationEmail = async (
   }
 };
 
-// Função auxiliar para emails simples
 export const sendSimpleEmail = async (to, subject, html, text = null) => {
   try {
     const transporter = createGmailTransporter();
