@@ -2,9 +2,7 @@ import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
 import Address from '../models/Address.js';
-import { sendOrderConfirmationEmail } from '../services/emailService.js';
 
-// Place Order COD : /api/order/cod
 export const placeOrderCOD = async (req, res) => {
   try {
     const { userId, items, address } = req.body;
@@ -17,7 +15,6 @@ export const placeOrderCOD = async (req, res) => {
       return (await acc) + product.offerPrice * item.quantity;
     }, 0);
 
-    // Create order
     const newOrder = await Order.create({
       userId,
       items,
@@ -26,64 +23,43 @@ export const placeOrderCOD = async (req, res) => {
       paymentType: 'COD',
     });
 
-    // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // Send confirmation email in background (não bloqueia a resposta)
+    // EMAIL SUPER SIMPLES com fetch
     setTimeout(async () => {
       try {
-        console.log('🚀 Iniciando envio de email de confirmação...');
-
-        // Get user data
-        const user = await User.findById(userId).select('name email');
-        if (!user) {
-          console.error('❌ Usuário não encontrado para email');
-          return;
-        }
-
-        // Get address data
+        const user = await User.findById(userId).select('name');
         const addressData = await Address.findById(address);
-        if (!addressData) {
-          console.error('❌ Endereço não encontrado para email');
-          return;
-        }
 
-        // Get products data
-        const productIds = items.map(item => item.product);
-        const products = await Product.find({ _id: { $in: productIds } });
-        if (!products.length) {
-          console.error('❌ Produtos não encontrados para email');
-          return;
-        }
+        await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            service_id: 'service_54ayi2f',
+            template_id: 'template_bdu3h2q',
+            user_id: 'QKLVuc9mYAm3WeqrR',
+            template_params: {
+              to_email: addressData.email,
+              to_name: user.name,
+              order_id: newOrder._id,
+              total: `€${amount.toFixed(2)}`,
+              date: new Date().toLocaleDateString('pt-PT'),
+            },
+          }),
+        });
 
-        // Send email
-        const emailResult = await sendOrderConfirmationEmail(
-          newOrder.toObject(),
-          user,
-          products,
-          addressData
-        );
-
-        if (emailResult.success) {
-          console.log(
-            `✅ Email enviado com sucesso para ${user.email} - ID: ${emailResult.id}`
-          );
-        } else {
-          console.error('❌ Falha ao enviar email:', emailResult.error);
-        }
-      } catch (emailError) {
-        console.error('❌ Erro no processo de email:', emailError.message);
+        console.log('✅ Email enviado para:', addressData.email);
+      } catch (error) {
+        console.error('❌ Erro no email:', error);
       }
-    }, 1000); // Delay de 1 segundo para não afetar a resposta
+    }, 1000);
 
-    // Resposta imediata para o cliente
     return res.json({
       success: true,
       message: 'Order Placed Successfully',
       orderId: newOrder._id,
     });
   } catch (error) {
-    console.error('❌ Erro na criação da encomenda:', error);
     return res.json({ success: false, message: error.message });
   }
 };
