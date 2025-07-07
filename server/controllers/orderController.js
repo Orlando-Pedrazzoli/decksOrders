@@ -1,11 +1,9 @@
-import stripe from 'stripe';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
 import Address from '../models/Address.js';
 import { sendOrderConfirmationEmail } from '../services/emailService.js';
 
-// Place Order COD : /api/order/cod
 // Place Order COD : /api/order/cod
 export const placeOrderCOD = async (req, res) => {
   try {
@@ -31,36 +29,10 @@ export const placeOrderCOD = async (req, res) => {
     // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // DEBUGGING: Verificar variáveis de ambiente
-    console.log('🔍 DEBUG - Environment Variables:');
-    console.log('NODE_ENV:', process.env.NODE_ENV);
-    console.log('GMAIL_USER:', process.env.GMAIL_USER);
-    console.log('GMAIL_APP_PASSWORD exists:', !!process.env.GMAIL_APP_PASSWORD);
-    console.log(
-      'GMAIL_APP_PASSWORD length:',
-      process.env.GMAIL_APP_PASSWORD?.length
-    );
-
     // Send confirmation email in background (não bloqueia a resposta)
     setTimeout(async () => {
       try {
         console.log('🚀 Iniciando envio de email de confirmação...');
-        console.log('🔍 GMAIL_USER in setTimeout:', process.env.GMAIL_USER);
-        console.log(
-          '🔍 GMAIL_APP_PASSWORD exists in setTimeout:',
-          !!process.env.GMAIL_APP_PASSWORD
-        );
-
-        // Check if variables exist
-        if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-          console.error('❌ ERRO CRÍTICO: Variáveis de email não encontradas!');
-          console.error('GMAIL_USER:', process.env.GMAIL_USER);
-          console.error(
-            'GMAIL_APP_PASSWORD:',
-            process.env.GMAIL_APP_PASSWORD ? 'EXISTS' : 'MISSING'
-          );
-          return;
-        }
 
         // Get user data
         const user = await User.findById(userId).select('name email');
@@ -68,7 +40,6 @@ export const placeOrderCOD = async (req, res) => {
           console.error('❌ Usuário não encontrado para email');
           return;
         }
-        console.log('✅ Usuário encontrado:', user.email);
 
         // Get address data
         const addressData = await Address.findById(address);
@@ -76,7 +47,6 @@ export const placeOrderCOD = async (req, res) => {
           console.error('❌ Endereço não encontrado para email');
           return;
         }
-        console.log('✅ Endereço encontrado');
 
         // Get products data
         const productIds = items.map(item => item.product);
@@ -85,10 +55,8 @@ export const placeOrderCOD = async (req, res) => {
           console.error('❌ Produtos não encontrados para email');
           return;
         }
-        console.log('✅ Produtos encontrados:', products.length);
 
         // Send email
-        console.log('📧 Tentando enviar email...');
         const emailResult = await sendOrderConfirmationEmail(
           newOrder.toObject(),
           user,
@@ -98,14 +66,13 @@ export const placeOrderCOD = async (req, res) => {
 
         if (emailResult.success) {
           console.log(
-            `✅ Email enviado com sucesso para ${user.email} - ID: ${emailResult.messageId}`
+            `✅ Email enviado com sucesso para ${user.email} - ID: ${emailResult.id}`
           );
         } else {
           console.error('❌ Falha ao enviar email:', emailResult.error);
         }
       } catch (emailError) {
         console.error('❌ Erro no processo de email:', emailError.message);
-        console.error('❌ Stack trace:', emailError.stack);
       }
     }, 1000); // Delay de 1 segundo para não afetar a resposta
 
