@@ -32,13 +32,15 @@ app.use(
   cors({
     origin: [
       'http://localhost:5173',
-      'http://localhost:4001', // ← Adicione esta linha
+      'http://localhost:4001',
       'http://localhost:3000',
-      'https://elitesurfing.pt',
-      'https://www.elitesurfing.pt',
+      'https://elitesurfing.pt', // ✅ Já tem
+      'https://www.elitesurfing.pt', // ✅ Já tem
+      'https://elitesurfingeu-backend.vercel.app/',
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 

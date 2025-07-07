@@ -1,11 +1,17 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dummyProducts } from '../assets/assets';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL;
+
+// ⭐ DEBUG - Mas apenas em desenvolvimento
+if (import.meta.env.DEV) {
+  console.log('🔧 Backend URL:', import.meta.env.VITE_BACKEND_URL);
+  console.log('🔧 Environment:', import.meta.env.MODE);
+  console.log('🔧 All env vars:', import.meta.env);
+}
 
 export const AppContext = createContext();
 
@@ -88,13 +94,17 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Enhanced fetch user function with token validation
+  // ✅ CORREÇÃO: Enhanced fetch user function with better error handling
   const fetchUser = async () => {
     try {
+      console.log(
+        '🔍 Fazendo request para:',
+        axios.defaults.baseURL + '/api/user/is-auth'
+      );
       setIsLoading(true);
 
       // First, try to get user with existing session/cookie
-      let response = await axios.get('api/user/is-auth');
+      let response = await axios.get('/api/user/is-auth'); // ✅ CORRIGIDO: Adicionada barra inicial
 
       if (response.data.success) {
         setUser(response.data.user);
@@ -119,7 +129,7 @@ export const AppContextProvider = ({ children }) => {
         ] = `Bearer ${storedToken}`;
 
         try {
-          response = await axios.get('api/user/is-auth');
+          response = await axios.get('/api/user/is-auth'); // ✅ CORRIGIDO: Adicionada barra inicial
 
           if (response.data.success) {
             setUser(response.data.user);
@@ -152,7 +162,8 @@ export const AppContextProvider = ({ children }) => {
         clearStoredData();
       }
     } catch (error) {
-      console.error('Error fetching user:', error);
+      console.error('❌ Erro no fetchUser:', error);
+      console.error('❌ URL tentada:', axios.defaults.baseURL);
 
       // Try to use stored data as fallback
       const savedUser = loadUserFromStorage();
@@ -208,7 +219,8 @@ export const AppContextProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error('Error fetching products:', error);
+      toast.error('Erro ao carregar produtos');
     }
   };
 
@@ -401,6 +413,7 @@ export const AppContextProvider = ({ children }) => {
     isLoading,
     saveCartToStorage,
     loadCartFromStorage,
+    saveUserToStorage, // ✅ ADICIONADO: Exporte esta função também
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
