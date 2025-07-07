@@ -4,7 +4,6 @@ import User from '../models/User.js';
 import Address from '../models/Address.js';
 import { sendOrderConfirmationEmail } from '../services/emailService.js';
 
-// Place Order COD : /api/order/cod
 export const placeOrderCOD = async (req, res) => {
   try {
     const { userId, items, address } = req.body;
@@ -29,15 +28,28 @@ export const placeOrderCOD = async (req, res) => {
     // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // Send confirmation email in background (não bloqueia a resposta)
+    // ✅ CORREÇÃO: Melhor handling do envio de email
     setTimeout(async () => {
       try {
         console.log('🚀 Iniciando envio de email de confirmação...');
+        console.log('📧 User ID:', userId);
 
-        // Get user data
+        // ✅ CORREÇÃO: Buscar user com .select() para garantir que o email vem
         const user = await User.findById(userId).select('name email');
         if (!user) {
-          console.error('❌ Usuário não encontrado para email');
+          console.error('❌ Usuário não encontrado para email. ID:', userId);
+          return;
+        }
+
+        console.log('✅ Usuário encontrado:', {
+          id: user._id,
+          name: user.name,
+          email: user.email, // ← Verificar se este campo existe
+        });
+
+        // ✅ VALIDAÇÃO: Verificar se email existe
+        if (!user.email || user.email === '') {
+          console.error('❌ Email do usuário está vazio ou undefined');
           return;
         }
 
@@ -48,6 +60,11 @@ export const placeOrderCOD = async (req, res) => {
           return;
         }
 
+        console.log('✅ Endereço encontrado:', {
+          firstName: addressData.firstName,
+          email: addressData.email, // ← Este também tem email
+        });
+
         // Get products data
         const productIds = items.map(item => item.product);
         const products = await Product.find({ _id: { $in: productIds } });
@@ -56,25 +73,36 @@ export const placeOrderCOD = async (req, res) => {
           return;
         }
 
+        console.log('✅ Produtos encontrados:', products.length);
+
+        // ✅ DECISÃO: Usar email do usuário OU do endereço?
+        const emailToSend = user.email || addressData.email;
+        console.log('📧 Email que será usado:', emailToSend);
+
         // Send email
         const emailResult = await sendOrderConfirmationEmail(
           newOrder.toObject(),
-          user,
+          {
+            ...user.toObject(),
+            email: emailToSend, // ← Garantir que o email correto é usado
+          },
           products,
           addressData
         );
 
         if (emailResult.success) {
           console.log(
-            `✅ Email enviado com sucesso para ${user.email} - ID: ${emailResult.id}`
+            `✅ Email enviado com sucesso para ${emailToSend} - ID: ${emailResult.messageId}`
           );
         } else {
           console.error('❌ Falha ao enviar email:', emailResult.error);
+          console.error('❌ Email tentado:', emailToSend);
         }
       } catch (emailError) {
         console.error('❌ Erro no processo de email:', emailError.message);
+        console.error('❌ Stack:', emailError.stack);
       }
-    }, 1000); // Delay de 1 segundo para não afetar a resposta
+    }, 1000);
 
     // Resposta imediata para o cliente
     return res.json({
