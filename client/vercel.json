@@ -19,13 +19,18 @@
       "headers": { "Cache-Control": "no-cache" }
     },
     {
+      "src": "/favicon.ico",
+      "dest": "/favicon.ico",
+      "headers": { "Cache-Control": "public, max-age=86400" }
+    },
+    {
       "src": "/logo.png",
       "dest": "/logo.png",
       "headers": { "Cache-Control": "public, max-age=86400" }
     },
     {
-      "src": "/favicon.ico",
-      "dest": "/favicon.ico",
+      "src": "/ES_Icon.svg",
+      "dest": "/ES_Icon.svg",
       "headers": { "Cache-Control": "public, max-age=86400" }
     },
     {
