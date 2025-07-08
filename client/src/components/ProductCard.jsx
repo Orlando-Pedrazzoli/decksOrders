@@ -142,7 +142,7 @@ const ProductCard = ({ product }) => {
           >
             {!cartItems[product._id] ? (
               <button
-                className='flex items-center justify-center gap-1 bg-primary/10 border border-primary/40 w-16 md:w-20 h-8 md:h-9 rounded hover:bg-primary/20 transition-colors text-sm md:text-base'
+                className='flex items-center justify-center gap-1 bg-primary/10 border border-primary/40 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 rounded-lg hover:bg-primary/20 transition-colors text-sm sm:text-base md:text-lg font-medium shadow-sm active:scale-95'
                 onClick={e => {
                   e.stopPropagation();
                   addToCart(product._id);
@@ -151,22 +151,22 @@ const ProductCard = ({ product }) => {
                 <img
                   src={assets.cart_icon}
                   alt='cart_icon'
-                  className='w-3 md:w-4'
+                  className='w-4 sm:w-5 md:w-6'
                 />
                 Add
               </button>
             ) : (
-              <div className='flex items-center justify-center gap-2 w-16 md:w-20 h-8 md:h-9 bg-primary/10 border border-primary/20 rounded select-none'>
+              <div className='flex items-center justify-center gap-2 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 bg-primary/10 border border-primary/20 rounded-lg select-none shadow-sm'>
                 <button
                   onClick={e => {
                     e.stopPropagation();
                     removeFromCart(product._id);
                   }}
-                  className='cursor-pointer text-md px-1 md:px-2 h-full flex items-center hover:bg-primary/20 rounded-l'
+                  className='cursor-pointer text-lg sm:text-xl md:text-2xl px-2 sm:px-3 md:px-4 h-full flex items-center justify-center hover:bg-primary/20 rounded-l-lg transition-colors active:scale-95 font-bold'
                 >
                   -
                 </button>
-                <span className='w-4 md:w-5 text-center text-sm md:text-base'>
+                <span className='w-6 sm:w-8 md:w-10 text-center text-sm sm:text-base md:text-lg font-semibold'>
                   {cartItems[product._id]}
                 </span>
                 <button
@@ -174,7 +174,7 @@ const ProductCard = ({ product }) => {
                     e.stopPropagation();
                     addToCart(product._id);
                   }}
-                  className='cursor-pointer text-md px-1 md:px-2 h-full flex items-center hover:bg-primary/20 rounded-r'
+                  className='cursor-pointer text-lg sm:text-xl md:text-2xl px-2 sm:px-3 md:px-4 h-full flex items-center justify-center hover:bg-primary/20 rounded-r-lg transition-colors active:scale-95 font-bold'
                 >
                   +
                 </button>
