@@ -12,31 +12,26 @@ import addressRouter from './routes/addressRoute.js';
 import orderRouter from './routes/orderRoute.js';
 import { stripeWebhooks } from './controllers/orderController.js';
 
-// App Config
 const app = express();
 const port = process.env.PORT || 4001;
 
+// 🔗 Conectar ao banco e cloudinary
 await connectDB();
 await connectCloudinary();
 
-// Stripe webhook - must be before express.json()
+// 🟡 Webhook do Stripe precisa vir antes de qualquer parser!
 app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
 
-// Middlewares
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(cookieParser());
-
-// Simplified CORS configuration - based on your working project
+// 🟢 CORS deve vir antes de express.json()
 app.use(
   cors({
     origin: [
       'http://localhost:5173',
       'http://localhost:4001',
       'http://localhost:3000',
-      'https://elitesurfing.pt', // ✅ Já tem
-      'https://www.elitesurfing.pt', // ✅ Já tem
-      'https://elitesurfingeu-backend.vercel.app/',
+      'https://elitesurfing.pt',
+      'https://www.elitesurfing.pt',
+      'https://elitesurfingeu-backend.vercel.app',
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
@@ -44,7 +39,12 @@ app.use(
   })
 );
 
-// Health check endpoint
+// 🔧 Middlewares de parsing e cookies
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
+
+// ✅ Health check
 app.get('/', (req, res) => {
   res.json({
     message: 'Elite Surfing API is Working',
@@ -53,7 +53,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// API Routes
+// 📦 Rotas principais
 app.use('/api/user', userRouter);
 app.use('/api/seller', sellerRouter);
 app.use('/api/product', productRouter);
@@ -61,7 +61,7 @@ app.use('/api/cart', cartRouter);
 app.use('/api/address', addressRouter);
 app.use('/api/order', orderRouter);
 
-// Error handling middleware
+// 🚨 Middleware de erro
 app.use((error, req, res, next) => {
   console.error('Server Error:', error);
   res.status(500).json({
@@ -73,7 +73,7 @@ app.use((error, req, res, next) => {
   });
 });
 
-// 404 handler
+// ❌ Rota não encontrada
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -82,6 +82,7 @@ app.use('*', (req, res) => {
   });
 });
 
+// 🚀 Iniciar servidor
 app.listen(port, () => {
   console.log(`🚀 Server started on PORT: ${port}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
