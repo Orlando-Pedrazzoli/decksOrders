@@ -94,7 +94,7 @@ const Cart = () => {
     return Math.max(0, totalBeforeDiscount).toFixed(2);
   };
 
-  // ✅ FUNÇÃO handlePlaceOrder CORRIGIDA
+  // ✅ FUNÇÃO handlePlaceOrder CORRIGIDA - Substitua no Cart.jsx
   const handlePlaceOrder = async () => {
     if (!requireLogin('fazer a encomenda')) return;
     if (!selectedAddress) {
@@ -108,7 +108,11 @@ const Cart = () => {
 
     setIsProcessing(true);
     try {
-      // ✅ FORMATO CORRETO que o backend espera
+      // ✅ CALCULAR VALORES NO FRONTEND PARA ENVIAR CORRETOS
+      const subtotal = parseFloat(getCartAmount());
+      const discountAmount = discountApplied ? subtotal * 0.3 : 0;
+      const finalAmount = subtotal - discountAmount;
+
       const orderData = {
         userId: user._id,
         items: cartArray.map(item => ({
@@ -116,11 +120,22 @@ const Cart = () => {
           quantity: item.quantity,
         })),
         address: selectedAddress._id,
-        promoCode: discountApplied ? promoCode : null,
+        // ✅ ENVIAR DADOS COMPLETOS DO DESCONTO
+        promoCode: discountApplied ? promoCode.toUpperCase() : null,
         discountApplied: discountApplied,
+        originalAmount: subtotal, // Valor original
+        discountAmount: discountAmount, // Valor do desconto
+        finalAmount: finalAmount, // Valor final
+        discountPercentage: discountApplied ? 30 : 0, // Percentagem
       };
 
       console.log('📦 Dados da encomenda sendo enviados:', orderData);
+      console.log('💰 Valores calculados:', {
+        subtotal,
+        discountAmount,
+        finalAmount,
+        discountApplied,
+      });
 
       let response;
       if (paymentOption === 'COD') {

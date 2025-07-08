@@ -5,75 +5,109 @@ import Product from '../models/Product.js';
 import User from '../models/User.js';
 import Address from '../models/Address.js';
 
+// Substitua a função placeOrderCOD no orderController.js por esta:
+
 export const placeOrderCOD = async (req, res) => {
   try {
     console.log('📧 Recebendo dados da encomenda:', req.body);
 
-    const { userId, items, address, promoCode, discountApplied } = req.body;
+    const {
+      userId,
+      items,
+      address,
+      promoCode,
+      discountApplied,
+      originalAmount,
+      discountAmount,
+      finalAmount,
+      discountPercentage,
+    } = req.body;
 
-    console.log('📧 userId:', userId);
-    console.log('📧 items:', items);
-    console.log('📧 address:', address);
-    console.log('📧 promoCode:', promoCode);
-    console.log('📧 discountApplied:', discountApplied);
+    console.log('📧 Dados detalhados:', {
+      userId,
+      itemsCount: items?.length,
+      address,
+      promoCode,
+      discountApplied,
+      originalAmount,
+      discountAmount,
+      finalAmount,
+      discountPercentage,
+    });
 
     if (!address || items.length === 0) {
       console.log('❌ Dados inválidos - address ou items vazios');
       return res.json({ success: false, message: 'Invalid data' });
     }
 
-    // Calcular valor original (antes do desconto)
-    let originalAmount = await items.reduce(async (acc, item) => {
-      const product = await Product.findById(item.product);
-      return (await acc) + product.offerPrice * item.quantity;
-    }, 0);
-
-    console.log('💰 Valor original calculado:', originalAmount);
-
-    // ✅ NOVA LÓGICA DO PROMO CODE
-    let finalAmount = originalAmount;
-    let discountAmount = 0;
-    let discountPercentage = 0;
+    // ✅ USAR VALORES DO FRONTEND (já calculados corretamente)
+    let orderOriginalAmount = originalAmount;
+    let orderFinalAmount = finalAmount || originalAmount;
+    let orderDiscountAmount = discountAmount || 0;
+    let orderDiscountPercentage = discountPercentage || 0;
     let validPromoCode = null;
 
-    // Verificar e aplicar desconto se válido
+    // Se não vieram do frontend, calcular aqui como backup
+    if (!originalAmount) {
+      orderOriginalAmount = await items.reduce(async (acc, item) => {
+        const product = await Product.findById(item.product);
+        return (await acc) + product.offerPrice * item.quantity;
+      }, 0);
+
+      orderFinalAmount = orderOriginalAmount;
+      console.log('💰 Valor calculado no backend:', orderOriginalAmount);
+    }
+
+    // Validar promo code se aplicado
     if (promoCode && discountApplied) {
       if (promoCode.toUpperCase() === 'BROTHER') {
-        discountPercentage = 30;
-        discountAmount = Math.round(originalAmount * 0.3 * 100) / 100; // Arredondar para 2 casas decimais
-        finalAmount = originalAmount - discountAmount;
         validPromoCode = promoCode.toUpperCase();
 
-        console.log('🎯 Promo code aplicado:', {
+        // Usar valores do frontend se vieram, senão calcular
+        if (!discountAmount) {
+          orderDiscountPercentage = 30;
+          orderDiscountAmount =
+            Math.round(orderOriginalAmount * 0.3 * 100) / 100;
+          orderFinalAmount = orderOriginalAmount - orderDiscountAmount;
+        }
+
+        console.log('🎯 Promo code válido aplicado:', {
           code: validPromoCode,
-          discountPercentage,
-          discountAmount,
-          finalAmount,
+          originalAmount: orderOriginalAmount,
+          discountPercentage: orderDiscountPercentage,
+          discountAmount: orderDiscountAmount,
+          finalAmount: orderFinalAmount,
         });
       } else {
         console.log('❌ Promo code inválido:', promoCode);
       }
     }
 
-    // Criar pedido com todos os dados
+    // Criar pedido com valores corretos
     const newOrder = await Order.create({
       userId,
       items,
-      amount: finalAmount, // Valor final com desconto aplicado
-      originalAmount, // Valor original antes do desconto
+      amount: orderFinalAmount, // ✅ Valor final correto
+      originalAmount: orderOriginalAmount, // ✅ Valor original correto
       address,
       paymentType: 'COD',
       promoCode: validPromoCode,
-      discountAmount,
-      discountPercentage,
+      discountAmount: orderDiscountAmount, // ✅ Desconto correto
+      discountPercentage: orderDiscountPercentage, // ✅ Percentagem correta
     });
 
-    console.log('✅ Pedido criado com sucesso:', newOrder._id);
+    console.log('✅ Pedido criado com valores:', {
+      orderId: newOrder._id,
+      amount: newOrder.amount,
+      originalAmount: newOrder.originalAmount,
+      discountAmount: newOrder.discountAmount,
+      promoCode: newOrder.promoCode,
+    });
 
     // Limpar carrinho
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // Enviar email de confirmação com dados completos
+    // Enviar email de confirmação
     const user = await User.findById(userId).select('name email');
     const addressData = await Address.findById(address);
     const products = await Promise.all(
