@@ -82,7 +82,7 @@ const Cart = () => {
     }
   };
 
-  // No arquivo Cart.jsx, substitua a função handlePlaceOrder por esta versão:
+  // Substitua a função handlePlaceOrder no Cart.jsx por esta versão corrigida:
 
   const handlePlaceOrder = async () => {
     if (!requireLogin('fazer a encomenda')) return;
@@ -97,18 +97,17 @@ const Cart = () => {
 
     setIsProcessing(true);
     try {
+      // ✅ FORMATO CORRETO que o backend espera
       const orderData = {
         userId: user._id,
         items: cartArray.map(item => ({
           product: item._id,
           quantity: item.quantity,
-          priceAtOrder: item.offerPrice,
         })),
         address: selectedAddress._id,
-        promoCode: discountApplied ? promoCode : undefined,
-        totalAmount: parseFloat(calculateTotal()),
-        paymentMethod: paymentOption,
       };
+
+      console.log('📦 Dados da encomenda sendo enviados:', orderData);
 
       let response;
       if (paymentOption === 'COD') {
@@ -116,6 +115,8 @@ const Cart = () => {
       } else {
         response = await axios.post('/api/order/stripe', orderData);
       }
+
+      console.log('✅ Resposta do servidor:', response.data);
 
       if (response.data.success) {
         if (paymentOption === 'COD') {
@@ -128,8 +129,6 @@ const Cart = () => {
           }
 
           toast.success('Encomenda efetuada com sucesso!');
-
-          // NOVO: Redirecionar para página de agradecimento
           navigate(`/order-success/${response.data.orderId}`);
         } else {
           window.location.href = response.data.url;
@@ -138,7 +137,7 @@ const Cart = () => {
         toast.error(response.data.message || 'Falha ao fazer a encomenda.');
       }
     } catch (error) {
-      console.error('Erro na encomenda:', error);
+      console.error('❌ Erro na encomenda:', error);
       toast.error(
         error.response?.data?.message ||
           'Falha ao fazer a encomenda. Por favor, tente novamente.'
@@ -151,16 +150,6 @@ const Cart = () => {
     } finally {
       setIsProcessing(false);
     }
-  };
-  const calculateTotal = () => {
-    const subtotal = parseFloat(getCartAmount());
-    let totalBeforeDiscount = subtotal;
-
-    if (discountApplied) {
-      const discount = subtotal * 0.3;
-      totalBeforeDiscount -= discount;
-    }
-    return Math.max(0, totalBeforeDiscount).toFixed(2);
   };
 
   const handlePromoCode = () => {
