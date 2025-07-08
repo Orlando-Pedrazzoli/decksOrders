@@ -1,10 +1,10 @@
-// server/services/emailService.js - COM FALLBACK PARA EMAIL DO ENDEREÇO
-
+// server/services/emailService.js - CORRIGIDO
 import nodemailer from 'nodemailer';
 import { createOrderEmailTemplate } from '../emails/OrderConfirmationEmail.js';
 
 const createGmailTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
+    // ← CORRIGIDO: createTransport (sem 'er')
     service: 'gmail',
     auth: {
       user: process.env.GMAIL_USER,
@@ -111,6 +111,7 @@ export const sendSimpleEmail = async (to, subject, html, text = null) => {
 
     return { success: true, messageId: result.messageId };
   } catch (error) {
+    console.error('❌ Erro no sendSimpleEmail:', error);
     return { success: false, error: error.message };
   }
 };
