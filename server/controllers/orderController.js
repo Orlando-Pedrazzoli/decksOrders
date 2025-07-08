@@ -167,3 +167,9 @@ export const getAllOrders = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+export const placeOrderStripe = async (req, res) => {
+  return res.status(503).json({
+    success: false,
+    message: 'Pagamento via Stripe temporariamente desativado.',
+  });
+};
