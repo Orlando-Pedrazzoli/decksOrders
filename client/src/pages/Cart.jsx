@@ -82,8 +82,19 @@ const Cart = () => {
     }
   };
 
-  // Substitua a função handlePlaceOrder no Cart.jsx por esta versão corrigida:
+  // ✅ FUNÇÃO calculateTotal CORRIGIDA
+  const calculateTotal = () => {
+    const subtotal = parseFloat(getCartAmount());
+    let totalBeforeDiscount = subtotal;
 
+    if (discountApplied) {
+      const discount = subtotal * 0.3;
+      totalBeforeDiscount -= discount;
+    }
+    return Math.max(0, totalBeforeDiscount).toFixed(2);
+  };
+
+  // ✅ FUNÇÃO handlePlaceOrder CORRIGIDA
   const handlePlaceOrder = async () => {
     if (!requireLogin('fazer a encomenda')) return;
     if (!selectedAddress) {
@@ -401,7 +412,7 @@ const Cart = () => {
               </div>
             </div>
 
-            {/* Payment Method - CORRIGIDO AQUI */}
+            {/* Payment Method */}
             <div className='mb-6 border-b pb-6 border-gray-200'>
               <h3 className='font-semibold text-gray-700 mb-3'>
                 Método de Pagamento
@@ -414,8 +425,7 @@ const Cart = () => {
                 }
                 className='w-full border border-gray-300 rounded-lg p-2.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 cursor-pointer'
               >
-                <option value='COD'>Pagamento na Entrega</option>{' '}
-                {/* Corrigido */}
+                <option value='COD'>Pagamento na Entrega</option>
                 <option value='Online'>Stripe</option>
               </select>
             </div>
