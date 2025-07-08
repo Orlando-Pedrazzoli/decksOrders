@@ -23,6 +23,20 @@ export const createOrderEmailTemplate = (order, user, products, address) => {
     .filter(Boolean)
     .join('');
 
+  // ✅ NOVO: Seção de desconto se aplicável
+  const discountHTML = order.promoCode
+    ? `
+    <tr style="background: #f0f8ff; border-bottom: 1px solid #ddd;">
+      <td colspan="3" style="padding: 15px; text-align: right; color: #2196f3; font-weight: bold;">
+        Desconto (${order.promoCode} - ${order.discountPercentage}%):
+      </td>
+      <td style="padding: 15px; text-align: right; color: #2196f3; font-weight: bold; font-size: 16px;">
+        -€${order.discountAmount.toFixed(2)}
+      </td>
+    </tr>
+  `
+    : '';
+
   // Template HTML completo
   return `
     <!DOCTYPE html>
@@ -57,6 +71,7 @@ export const createOrderEmailTemplate = (order, user, products, address) => {
           <p style="margin: 5px 0;"><strong>Data:</strong> ${new Date(order.createdAt).toLocaleDateString('pt-PT')}</p>
           <p style="margin: 5px 0;"><strong>Método de Pagamento:</strong> ${order.paymentType === 'COD' ? 'Pagamento na Entrega' : 'Pagamento Online'}</p>
           <p style="margin: 5px 0;"><strong>Estado:</strong> ${order.status === 'Order Placed' ? 'Encomenda Efetuada' : order.status}</p>
+          ${order.promoCode ? `<p style="margin: 5px 0; color: #2196f3;"><strong>Código Promocional:</strong> ${order.promoCode} (${order.discountPercentage}% de desconto)</p>` : ''}
         </div>
 
         <!-- Items Table -->
@@ -74,6 +89,28 @@ export const createOrderEmailTemplate = (order, user, products, address) => {
             ${itemsHTML}
           </tbody>
           <tfoot>
+            ${
+              order.promoCode
+                ? `
+            <tr style="background: #f8f9fa;">
+              <td colspan="3" style="padding: 15px; text-align: right; border-top: 1px solid #dee2e6;">
+                <strong>Subtotal:</strong>
+              </td>
+              <td style="padding: 15px; text-align: right; border-top: 1px solid #dee2e6; font-size: 16px;">
+                €${order.originalAmount.toFixed(2)}
+              </td>
+            </tr>
+            <tr style="background: #e3f2fd;">
+              <td colspan="3" style="padding: 15px; text-align: right; color: #1976d2;">
+                <strong>Desconto (${order.promoCode} - ${order.discountPercentage}%):</strong>
+              </td>
+              <td style="padding: 15px; text-align: right; color: #1976d2; font-size: 16px; font-weight: bold;">
+                -€${order.discountAmount.toFixed(2)}
+              </td>
+            </tr>
+            `
+                : ''
+            }
             <tr style="background: #f8f9fa; font-weight: bold;">
               <td colspan="3" style="padding: 15px; text-align: right; border-top: 2px solid #dee2e6;">
                 <strong>Total da Encomenda:</strong>
@@ -114,6 +151,20 @@ export const createOrderEmailTemplate = (order, user, products, address) => {
             <li style="margin-bottom: 8px;">O tempo estimado de entrega é de 2-5 dias úteis</li>
           </ul>
         </div>
+
+        <!-- Promo Code Success Message -->
+        ${
+          order.promoCode
+            ? `
+        <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; border-left: 4px solid #4caf50; margin-bottom: 25px;">
+          <h3 style="margin: 0 0 15px 0; color: #2e7d32;">🎉 Desconto Aplicado</h3>
+          <p style="margin: 0; color: #2e7d32;">
+            Parabéns! Poupou <strong>€${order.discountAmount.toFixed(2)}</strong> com o código <strong>${order.promoCode}</strong>!
+          </p>
+        </div>
+        `
+            : ''
+        }
 
         <!-- Contact Info -->
         <div style="text-align: center; padding: 20px 0; border-top: 1px solid #eee;">

@@ -116,6 +116,8 @@ const Cart = () => {
           quantity: item.quantity,
         })),
         address: selectedAddress._id,
+        promoCode: discountApplied ? promoCode : null,
+        discountApplied: discountApplied,
       };
 
       console.log('📦 Dados da encomenda sendo enviados:', orderData);

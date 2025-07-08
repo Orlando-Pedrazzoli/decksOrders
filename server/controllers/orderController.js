@@ -7,32 +7,79 @@ import Address from '../models/Address.js';
 
 export const placeOrderCOD = async (req, res) => {
   try {
-    const { userId, items, address } = req.body;
+    console.log('📧 Recebendo dados da encomenda:', req.body);
+
+    const { userId, items, address, promoCode, discountApplied } = req.body;
+
+    console.log('📧 userId:', userId);
+    console.log('📧 items:', items);
+    console.log('📧 address:', address);
+    console.log('📧 promoCode:', promoCode);
+    console.log('📧 discountApplied:', discountApplied);
+
     if (!address || items.length === 0) {
+      console.log('❌ Dados inválidos - address ou items vazios');
       return res.json({ success: false, message: 'Invalid data' });
     }
 
-    let amount = await items.reduce(async (acc, item) => {
+    // Calcular valor original (antes do desconto)
+    let originalAmount = await items.reduce(async (acc, item) => {
       const product = await Product.findById(item.product);
       return (await acc) + product.offerPrice * item.quantity;
     }, 0);
 
+    console.log('💰 Valor original calculado:', originalAmount);
+
+    // ✅ NOVA LÓGICA DO PROMO CODE
+    let finalAmount = originalAmount;
+    let discountAmount = 0;
+    let discountPercentage = 0;
+    let validPromoCode = null;
+
+    // Verificar e aplicar desconto se válido
+    if (promoCode && discountApplied) {
+      if (promoCode.toUpperCase() === 'BROTHER') {
+        discountPercentage = 30;
+        discountAmount = Math.round(originalAmount * 0.3 * 100) / 100; // Arredondar para 2 casas decimais
+        finalAmount = originalAmount - discountAmount;
+        validPromoCode = promoCode.toUpperCase();
+
+        console.log('🎯 Promo code aplicado:', {
+          code: validPromoCode,
+          discountPercentage,
+          discountAmount,
+          finalAmount,
+        });
+      } else {
+        console.log('❌ Promo code inválido:', promoCode);
+      }
+    }
+
+    // Criar pedido com todos os dados
     const newOrder = await Order.create({
       userId,
       items,
-      amount,
+      amount: finalAmount, // Valor final com desconto aplicado
+      originalAmount, // Valor original antes do desconto
       address,
       paymentType: 'COD',
+      promoCode: validPromoCode,
+      discountAmount,
+      discountPercentage,
     });
 
+    console.log('✅ Pedido criado com sucesso:', newOrder._id);
+
+    // Limpar carrinho
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // EMAIL SUPER SIMPLES com fetch
+    // Enviar email de confirmação com dados completos
     const user = await User.findById(userId).select('name email');
     const addressData = await Address.findById(address);
     const products = await Promise.all(
       items.map(async item => await Product.findById(item.product))
     );
+
     await sendOrderConfirmationEmail(newOrder, user, products, addressData);
 
     return res.json({
@@ -41,10 +88,12 @@ export const placeOrderCOD = async (req, res) => {
       orderId: newOrder._id,
     });
   } catch (error) {
+    console.error('❌ Erro ao processar pedido:', error);
     return res.json({ success: false, message: error.message });
   }
 };
-// Place Order Stripe : /api/order/stripe
+
+// Manter as outras funções como estão...
 export const stripeWebhooks = async (request, response) => {
   const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
   const sig = request.headers['stripe-signature'];
@@ -73,7 +122,6 @@ export const stripeWebhooks = async (request, response) => {
 
         const { orderId, userId } = sessionList.data[0].metadata;
 
-        // Atualiza status do pedido e limpa o carrinho
         const updatedOrder = await Order.findByIdAndUpdate(
           orderId,
           { isPaid: true },
@@ -81,7 +129,6 @@ export const stripeWebhooks = async (request, response) => {
         );
         await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-        // Busca dados para envio de email
         const user = await User.findById(userId).select('name email');
         const addressData = await Address.findById(updatedOrder.address);
         const products = await Promise.all(
@@ -90,7 +137,6 @@ export const stripeWebhooks = async (request, response) => {
           )
         );
 
-        // Envia email de confirmação
         await sendOrderConfirmationEmail(
           updatedOrder,
           user,
@@ -138,7 +184,6 @@ export const stripeWebhooks = async (request, response) => {
   response.json({ received: true });
 };
 
-// Get Orders by User ID : /api/order/user
 export const getUserOrders = async (req, res) => {
   try {
     const { userId } = req.body;
@@ -154,7 +199,6 @@ export const getUserOrders = async (req, res) => {
   }
 };
 
-// Get All Orders ( for seller / admin) : /api/order/seller
 export const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find({
@@ -167,6 +211,7 @@ export const getAllOrders = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+
 export const placeOrderStripe = async (req, res) => {
   return res.status(503).json({
     success: false,
