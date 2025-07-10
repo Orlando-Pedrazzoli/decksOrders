@@ -137,6 +137,12 @@ const OrderSuccess = () => {
             Ver as Minhas Encomendas
           </button>
           <button
+            onClick={() => navigate('/write-review')}
+            className='px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl active:scale-95 text-base'
+          >
+            Escrever Review
+          </button>
+          <button
             onClick={handleContinueShopping}
             className='px-8 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-all duration-300 active:scale-95 text-base'
           >

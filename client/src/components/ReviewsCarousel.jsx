@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Navigation } from 'swiper/modules';
+import { useAppContext } from '../context/AppContext';
 import 'swiper/css';
 import 'swiper/css/navigation';
-// No need to import './ReviewsCarousel.css' as per our previous discussion, styles are in index.css
 
 // Updated ChevronLeftIcon with smaller size
 const ChevronLeftIcon = () => (
@@ -13,7 +13,7 @@ const ChevronLeftIcon = () => (
     viewBox='0 0 24 24'
     strokeWidth={2.5}
     stroke='currentColor'
-    className='w-6 h-6 md:w-8 md:h-8' // Made smaller: w-6 h-6 for mobile, w-8 h-8 for larger screens
+    className='w-6 h-6 md:w-8 md:h-8'
   >
     <path
       strokeLinecap='round'
@@ -31,7 +31,7 @@ const ChevronRightIcon = () => (
     viewBox='0 0 24 24'
     strokeWidth={2.5}
     stroke='currentColor'
-    className='w-6 h-6 md:w-8 md:h-8' // Made smaller: w-6 h-6 for mobile, w-8 h-8 for larger screens
+    className='w-6 h-6 md:w-8 md:h-8'
   >
     <path
       strokeLinecap='round'
@@ -41,81 +41,109 @@ const ChevronRightIcon = () => (
   </svg>
 );
 
-const reviews = [
+// Fallback reviews se não houver reviews reais
+const fallbackReviews = [
   {
-    name: 'João Silva',
-    location: 'Cascais, Portugal',
-    date: '10/02/2025',
+    userName: 'João Silva',
+    userLocation: 'Cascais, Portugal',
+    createdAt: '2025-02-10T10:30:00Z',
     rating: 5,
+    title: 'Produto de alta qualidade',
     comment: 'Produto de alta qualidade, superou as minhas expectativas!',
+    isVerifiedPurchase: true,
   },
   {
-    name: 'Mariana Lopes',
-    location: 'Lisboa, Portugal',
-    date: '18/02/2025',
+    userName: 'Mariana Lopes',
+    userLocation: 'Lisboa, Portugal',
+    createdAt: '2025-02-18T14:20:00Z',
     rating: 4,
+    title: 'Entrega rápida',
     comment: 'Entrega rápida e atendimento excelente. Recomendo!',
+    isVerifiedPurchase: true,
   },
   {
-    name: 'Miguel Fernandes',
-    location: 'Porto, Portugal',
-    date: '05/03/2025',
+    userName: 'Miguel Fernandes',
+    userLocation: 'Porto, Portugal',
+    createdAt: '2025-03-05T09:15:00Z',
     rating: 5,
+    title: 'Perfeito para surf',
     comment: 'Perfeito para quem ama surf, produto durável e funcional.',
+    isVerifiedPurchase: true,
   },
   {
-    name: 'Sofia Martins',
-    location: 'Ericeira, Portugal',
-    date: '12/03/2025',
+    userName: 'Sofia Martins',
+    userLocation: 'Ericeira, Portugal',
+    createdAt: '2025-03-12T16:45:00Z',
     rating: 5,
+    title: 'Equipe atenciosa',
     comment: 'Equipe muito atenciosa e produto entregue dentro do prazo.',
+    isVerifiedPurchase: true,
   },
   {
-    name: 'Pedro Costa',
-    location: 'Oeiras, Portugal',
-    date: '07/04/2025',
+    userName: 'Pedro Costa',
+    userLocation: 'Oeiras, Portugal',
+    createdAt: '2025-04-07T11:30:00Z',
     rating: 4,
+    title: 'Ótimo custo-benefício',
     comment: 'Ótimo custo-benefício e qualidade garantida.',
-  },
-  {
-    name: 'Ana Pereira',
-    location: 'Sintra, Portugal',
-    date: '19/04/2025',
-    rating: 5,
-    comment: 'Produto excelente, perfeito para as minhas necessidades no surf.',
-  },
-  {
-    name: 'Rui Gonçalves',
-    location: 'Matosinhos, Portugal',
-    date: '11/05/2025',
-    rating: 5,
-    comment: 'Recomendo a todos os amantes do mar e do surf, sensacional!',
-  },
-  {
-    name: 'Cláudia Almeida',
-    location: 'Peniche, Portugal',
-    date: '22/05/2025',
-    rating: 4,
-    comment: 'Entrega rápida, produto bem embalado e atendimento cordial.',
-  },
-  {
-    name: 'Hugo Ribeiro',
-    location: 'Albufeira, Portugal',
-    date: '10/06/2025',
-    rating: 5,
-    comment: 'Ótima experiência de compra, voltarei a comprar com certeza.',
-  },
-  {
-    name: 'Inês Silva',
-    location: 'Sagres, Portugal',
-    date: '18/06/2025',
-    rating: 5,
-    comment:
-      'Produto de alta qualidade, perfeito para as ondas aqui da região.',
+    isVerifiedPurchase: true,
   },
 ];
 
 export default function ReviewsCarousel() {
+  const { axios } = useAppContext();
+  const [reviews, setReviews] = useState(fallbackReviews);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchRecentReviews();
+  }, []);
+
+  const fetchRecentReviews = async () => {
+    try {
+      setLoading(true);
+
+      // ✅ BUSCAR REVIEWS REAIS DA API
+      const response = await axios.get('/api/reviews/recent?limit=10');
+
+      if (response.data.success && response.data.reviews.length > 0) {
+        setReviews(response.data.reviews);
+      }
+    } catch (error) {
+      console.log('Usando reviews padrão:', error);
+      // Mantém os reviews fallback se der erro
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = dateString => {
+    return new Date(dateString).toLocaleDateString('pt-PT', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  };
+
+  const renderStars = rating => {
+    return (
+      <div className='flex text-yellow-500 text-xl mb-3'>
+        {'★'.repeat(rating)}
+        {'☆'.repeat(5 - rating)}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className='relative container mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-gray-50 mt-10'>
+        <div className='flex justify-center items-center h-40'>
+          <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary'></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className='relative container mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-gray-50 mt-10'>
       <h2 className='text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-12'>
@@ -126,7 +154,7 @@ export default function ReviewsCarousel() {
         modules={[Autoplay, Navigation]}
         slidesPerView={1}
         spaceBetween={20}
-        autoplay={{ delay: 2500, disableOnInteraction: false }}
+        autoplay={{ delay: 3000, disableOnInteraction: false }}
         breakpoints={{
           640: { slidesPerView: 1.2, centeredSlides: true, spaceBetween: 15 },
           768: { slidesPerView: 2.2, centeredSlides: true, spaceBetween: 25 },
@@ -143,17 +171,32 @@ export default function ReviewsCarousel() {
           <SwiperSlide key={index}>
             <div className='bg-white border border-gray-200 rounded-xl p-6 h-full shadow-md flex flex-col justify-between'>
               <div>
-                <p className='font-semibold text-lg text-gray-800'>
-                  {review.name}
-                </p>
-                <p className='text-sm text-gray-600 mb-1'>{review.location}</p>
-                <p className='text-xs text-gray-500 mb-3'>
-                  Data: {review.date}
-                </p>
-                <div className='flex text-yellow-500 text-xl mb-3'>
-                  {'★'.repeat(review.rating)}
-                  {'☆'.repeat(5 - review.rating)}
+                <div className='flex items-center justify-between mb-2'>
+                  <p className='font-semibold text-lg text-gray-800'>
+                    {review.userName}
+                  </p>
+                  {review.isVerifiedPurchase && (
+                    <span className='text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full'>
+                      ✓ Compra verificada
+                    </span>
+                  )}
                 </div>
+
+                <p className='text-sm text-gray-600 mb-1'>
+                  {review.userLocation}
+                </p>
+                <p className='text-xs text-gray-500 mb-3'>
+                  {formatDate(review.createdAt)}
+                </p>
+
+                {renderStars(review.rating)}
+
+                {review.title && (
+                  <h4 className='font-medium text-gray-800 mb-2'>
+                    {review.title}
+                  </h4>
+                )}
+
                 <p className='text-base text-gray-700 leading-relaxed'>
                   {review.comment}
                 </p>
@@ -163,15 +206,11 @@ export default function ReviewsCarousel() {
         ))}
       </Swiper>
 
-      {/* Custom Navigation Arrows with updated sizes and mobile visibility */}
+      {/* Custom Navigation Arrows */}
       <div className='swiper-button-prev-custom absolute top-1/2 -translate-y-1/2 left-4 md:left-8 z-10 cursor-pointer bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors duration-200 hidden sm:block'>
-        {' '}
-        {/* hidden on small mobile, block on sm and up */}
         <ChevronLeftIcon />
       </div>
       <div className='swiper-button-next-custom absolute top-1/2 -translate-y-1/2 right-4 md:right-8 z-10 cursor-pointer bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors duration-200 hidden sm:block'>
-        {' '}
-        {/* hidden on small mobile, block on sm and up */}
         <ChevronRightIcon />
       </div>
     </div>

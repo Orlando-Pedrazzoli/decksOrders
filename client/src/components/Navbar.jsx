@@ -101,6 +101,12 @@ const Navbar = () => {
           Produtos
         </NavLink>
         <NavLink
+          to='/write-review'
+          className={({ isActive }) => (isActive ? 'text-primary' : '')}
+        >
+          Reviews
+        </NavLink>
+        <NavLink
           to='/contact'
           className={({ isActive }) => (isActive ? 'text-primary' : '')}
         >
