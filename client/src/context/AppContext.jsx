@@ -250,11 +250,19 @@ export const AppContextProvider = ({ children }) => {
 
   const updateCartItem = async (itemId, quantity) => {
     const newCartItems = { ...cartItems };
-    newCartItems[itemId] = quantity;
+
+    if (quantity <= 0) {
+      // ✅ REMOVE COMPLETAMENTE quando quantity é 0 ou menor
+      delete newCartItems[itemId];
+      toast.success('Produto removido do carrinho');
+    } else {
+      // ✅ ATUALIZA a quantidade quando é maior que 0
+      newCartItems[itemId] = quantity;
+      toast.success('Carrinho atualizado');
+    }
 
     setCartItems(newCartItems);
     saveCartToStorage(newCartItems);
-    toast.success('Cart Updated');
 
     // Sync with server if user is logged in
     if (user) {

@@ -25,6 +25,29 @@ const Navbar = () => {
     }
   }, [searchQuery]);
 
+  // ✅ NOVO: Limpar search quando navegar para rotas específicas
+  useEffect(() => {
+    const currentPath = window.location.pathname;
+
+    // ✅ Limpar search quando sair da página de produtos ou ir para produto específico
+    if (currentPath !== '/products' && !currentPath.startsWith('/products/')) {
+      // Limpar apenas se não estamos em páginas relacionadas a produtos
+      if (searchQuery && searchQuery.length > 0) {
+        setSearchQuery('');
+        setLocalSearchInput('');
+      }
+    } else if (
+      currentPath.includes('/products/') &&
+      currentPath.split('/').length > 2
+    ) {
+      // ✅ Se estamos numa página de produto específico, limpar search
+      if (searchQuery && searchQuery.length > 0) {
+        setSearchQuery('');
+        setLocalSearchInput('');
+      }
+    }
+  }, [window.location.pathname]); // ✅ Monitorar mudanças de rota
+
   // Navigate to products when search query changes
   useEffect(() => {
     // Only navigate if search query is not empty to avoid navigating on initial load
@@ -55,28 +78,95 @@ const Navbar = () => {
     setSearchQuery(value); // Update global search immediately
   };
 
+  // ✅ CORRIGIDO: Função específica para mobile search
+  const handleMobileSearch = e => {
+    const value = e.target.value;
+    setLocalSearchInput(value);
+    setSearchQuery(value); // Update global search immediately
+  };
+
+  // ✅ NOVO: Função para executar pesquisa (mobile)
+  const executeMobileSearch = () => {
+    if (localSearchInput.trim()) {
+      setOpen(false); // Fechar menu mobile
+      navigate('/products');
+    }
+  };
+
+  // ✅ NOVO: Função para limpar search manualmente
+  const clearSearch = () => {
+    setLocalSearchInput('');
+    setSearchQuery('');
+  };
+
   const handleNavLinkClick = path => {
     setOpen(false); // Close mobile menu when navigating
+
+    // ✅ NOVO: Limpar search quando navegar para outras páginas
+    if (path !== '/products') {
+      clearSearch();
+    }
+
     navigate(path);
   };
 
   // Render search input consistently
   const renderSearchInput = (isMobile = false) => (
     <div
-      className={`flex items-center gap-2 border border-gray-300 px-3 rounded-full ${
+      className={`flex items-center gap-2 border border-gray-300 px-3 rounded-full relative ${
         isMobile ? 'w-full px-4 py-2' : 'text-sm py-1.5'
       }`}
     >
       <input
-        onChange={handleSearch}
+        onChange={isMobile ? handleMobileSearch : handleSearch}
         value={localSearchInput}
         className={`w-full bg-transparent outline-none placeholder-gray-500 ${
           isMobile ? 'text-base' : ''
         }`}
         type='text'
         placeholder='Pesquisar produtos'
+        onKeyDown={e => {
+          // ✅ Pesquisar ao pressionar Enter
+          if (e.key === 'Enter' && localSearchInput.trim()) {
+            if (isMobile) {
+              executeMobileSearch(); // ✅ Usar função específica para mobile
+            } else {
+              navigate('/products');
+            }
+          }
+          // ✅ Limpar com Escape
+          if (e.key === 'Escape') {
+            clearSearch();
+          }
+        }}
       />
-      <img src={assets.search_icon} alt='search' className='w-4 h-4' />
+
+      {/* ✅ Ícone de pesquisa OU botão de limpar */}
+      {localSearchInput.length > 0 ? (
+        <button
+          onClick={clearSearch}
+          className='w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors'
+          aria-label='Limpar pesquisa'
+        >
+          ✕
+        </button>
+      ) : (
+        <img
+          src={assets.search_icon}
+          alt='search'
+          className='w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 transition-opacity'
+          onClick={() => {
+            // ✅ Pesquisar ao clicar no ícone
+            if (localSearchInput.trim()) {
+              if (isMobile) {
+                executeMobileSearch(); // ✅ Usar função específica para mobile
+              } else {
+                navigate('/products');
+              }
+            }
+          }}
+        />
+      )}
     </div>
   );
 
@@ -100,12 +190,7 @@ const Navbar = () => {
         >
           Produtos
         </NavLink>
-        <NavLink
-          to='/write-review'
-          className={({ isActive }) => (isActive ? 'text-primary' : '')}
-        >
-          Reviews
-        </NavLink>
+        {/* ✅ REMOVIDO: Reviews link do menu principal */}
         <NavLink
           to='/contact'
           className={({ isActive }) => (isActive ? 'text-primary' : '')}
@@ -140,19 +225,34 @@ const Navbar = () => {
             Login
           </button>
         ) : (
-          <div className='relative group'>
+          <div className='relative group flex flex-col items-center'>
             <img src={assets.profile_icon} className='w-10' alt='profile' />
-            <ul className='hidden group-hover:block absolute top-10 right-0 bg-white shadow border border-gray-200 py-2.5 w-36 rounded-md text-sm z-40 transition-all duration-200'>
+            {/* ✅ NOVO: Nome do usuário embaixo do profile */}
+            <span className='text-xs text-gray-600 mt-1 max-w-20 truncate'>
+              {user.name}
+            </span>
+            {/* ✅ EXPANDIDO: Menu do profile com Reviews */}
+            <ul className='hidden group-hover:block absolute top-12 right-0 bg-white shadow-lg border border-gray-200 py-2.5 w-44 rounded-md text-sm z-40 transition-all duration-200'>
               <li
                 onClick={() => navigate('/my-orders')}
-                className='p-2 pl-4 hover:bg-primary/10 cursor-pointer'
+                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 transition-colors duration-200'
               >
+                <span className='text-primary'>📦</span>
                 Os meus Pedidos
               </li>
+              {/* ✅ NOVO: Reviews no menu do profile */}
               <li
-                onClick={handleLogout} // <--- Use handleLogout here
-                className='p-2 pl-4 hover:bg-primary/10 cursor-pointer'
+                onClick={() => navigate('/write-review')}
+                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 transition-colors duration-200'
               >
+                <span className='text-primary'>⭐</span>
+                Escrever Reviews
+              </li>
+              <li
+                onClick={handleLogout}
+                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 transition-colors duration-200 border-t border-gray-100 mt-1'
+              >
+                <span className='text-red-500'></span>
                 Sair
               </li>
             </ul>
@@ -255,6 +355,23 @@ const Navbar = () => {
             {/* Mobile User Profile / Login / Logout */}
             {user ? (
               <>
+                {/* ✅ NOVO: Nome do usuário no menu mobile */}
+                <div className='w-full p-3 bg-primary/5 rounded-lg border border-primary/20 mb-2'>
+                  <div className='flex items-center gap-3'>
+                    <img
+                      src={assets.profile_icon}
+                      className='w-8 h-8'
+                      alt='profile'
+                    />
+                    <div>
+                      <p className='font-semibold text-gray-800 text-base'>
+                        Olá, {user.name}!
+                      </p>
+                      <p className='text-xs text-gray-500'>Usuário logado</p>
+                    </div>
+                  </div>
+                </div>
+
                 <NavLink
                   to='/my-orders'
                   className={({ isActive }) =>
@@ -264,11 +381,23 @@ const Navbar = () => {
                   }
                   onClick={() => handleNavLinkClick('/my-orders')}
                 >
-                  Os meus Pedidos
+                  📦 Os meus Pedidos
+                </NavLink>
+                {/* ✅ NOVO: Reviews no menu mobile */}
+                <NavLink
+                  to='/write-review'
+                  className={({ isActive }) =>
+                    `block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100 ${
+                      isActive ? 'text-primary' : ''
+                    }`
+                  }
+                  onClick={() => handleNavLinkClick('/write-review')}
+                >
+                  ⭐ Escrever Reviews
                 </NavLink>
                 <button
                   onClick={handleLogout} // <--- Use handleLogout here
-                  className='w-full cursor-pointer px-6 py-3 mt-4 bg-primary hover:bg-primary-dull transition text-white rounded-lg text-base font-semibold'
+                  className='w-full cursor-pointer px-6 py-3 mt-4 bg-primary hover:bg-primary-dull transition text-white rounded-lg text-base font-semibold flex items-center justify-center gap-2'
                 >
                   Sair
                 </button>
