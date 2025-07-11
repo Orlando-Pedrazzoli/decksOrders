@@ -107,7 +107,7 @@ const App = () => {
         location='bottom'
         cookieName='elitesurfingCookieConsent'
         style={{
-          background: '#121212', // fundo escuro
+          background: '#121212',
           color: '#fff',
           fontSize: '14px',
           display: 'flex',
@@ -120,7 +120,7 @@ const App = () => {
         declineButtonText='Recusar'
         enableDeclineButton
         buttonStyle={{
-          background: '#2196F3', // azul
+          background: '#4a4a4a', // cinza médio
           color: '#fff',
           fontSize: '14px',
           border: 'none',
@@ -130,7 +130,7 @@ const App = () => {
           cursor: 'pointer',
         }}
         declineButtonStyle={{
-          background: '#f44336', // vermelho
+          background: '#6e6e6e', // cinza um pouco mais claro
           color: '#fff',
           fontSize: '14px',
           border: 'none',
