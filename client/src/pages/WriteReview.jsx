@@ -260,16 +260,6 @@ const WriteReview = () => {
           Escrever Review
         </h1>
 
-        {/* ✅ DEBUG INFO (remover em produção) */}
-        <div className='mb-4 p-4 bg-gray-100 rounded-lg text-sm'>
-          <p>
-            <strong>Debug Info:</strong>
-          </p>
-          <p>• User: {user ? '✅ Logado' : '❌ Não logado'}</p>
-          <p>• Base URL: {axios.defaults.baseURL}</p>
-          <p>• Produtos encontrados: {eligibleProducts.length}</p>
-        </div>
-
         {eligibleProducts.length === 0 ? (
           <div className='text-center py-12'>
             <img
