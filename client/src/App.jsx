@@ -24,6 +24,9 @@ import Contact from './pages/Contact';
 import ScrollToTop from './components/ScrollToTop';
 import HealthCheck from './components/HealthCheck';
 
+// ✅ Importa o CookieConsent
+import CookieConsent from 'react-cookie-consent';
+
 const App = () => {
   const isSellerPath = useLocation().pathname.includes('seller');
   const { showUserLogin, isSeller, isLoading } = useAppContext();
@@ -98,6 +101,37 @@ const App = () => {
       </div>
       {!isSellerPath && <Footer />}
       <HealthCheck />
+
+      {/* ✅ Cookie Consent banner */}
+      <CookieConsent
+        location='bottom'
+        buttonText='Aceito'
+        declineButtonText='Recusar'
+        enableDeclineButton
+        cookieName='elitesurfingCookieConsent'
+        style={{ background: '#2B373B', fontSize: '14px' }}
+        buttonStyle={{
+          color: '#fff',
+          background: '#4CAF50',
+          fontSize: '13px',
+          borderRadius: '4px',
+        }}
+        declineButtonStyle={{
+          color: '#fff',
+          background: '#f44336',
+          fontSize: '13px',
+          borderRadius: '4px',
+        }}
+        expires={150}
+      >
+        Usamos cookies para melhorar sua experiência no site.{' '}
+        <a
+          href='/politica-de-cookies'
+          style={{ color: '#fff', textDecoration: 'underline' }}
+        >
+          Saiba mais
+        </a>
+      </CookieConsent>
     </div>
   );
 };
