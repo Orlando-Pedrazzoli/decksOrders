@@ -105,32 +105,47 @@ const App = () => {
       {/* ✅ Cookie Consent banner */}
       <CookieConsent
         location='bottom'
-        buttonText='Aceito'
+        cookieName='elitesurfingCookieConsent'
+        style={{
+          background: '#121212', // fundo escuro
+          color: '#fff',
+          fontSize: '14px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          padding: '10px 20px',
+        }}
+        buttonText='Aceitar'
         declineButtonText='Recusar'
         enableDeclineButton
-        cookieName='elitesurfingCookieConsent'
-        style={{ background: '#2B373B', fontSize: '14px' }}
         buttonStyle={{
+          background: '#2196F3', // azul
           color: '#fff',
-          background: '#4CAF50',
-          fontSize: '13px',
+          fontSize: '14px',
+          border: 'none',
+          padding: '10px 20px',
           borderRadius: '4px',
+          marginLeft: '10px',
+          cursor: 'pointer',
         }}
         declineButtonStyle={{
+          background: '#f44336', // vermelho
           color: '#fff',
-          background: '#f44336',
-          fontSize: '13px',
+          fontSize: '14px',
+          border: 'none',
+          padding: '10px 20px',
           borderRadius: '4px',
+          marginLeft: '10px',
+          cursor: 'pointer',
         }}
         expires={150}
       >
-        Usamos cookies para melhorar sua experiência no site.{' '}
-        <a
-          href='/politica-de-cookies'
-          style={{ color: '#fff', textDecoration: 'underline' }}
-        >
-          Saiba mais
-        </a>
+        <div style={{ maxWidth: '800px' }}>
+          <strong>Este website utiliza cookies</strong> – Utilizamos cookies
+          para personalizar conteúdo e anúncios, fornecer funcionalidades de
+          redes sociais e analisar o nosso tráfego.
+        </div>
       </CookieConsent>
     </div>
   );
