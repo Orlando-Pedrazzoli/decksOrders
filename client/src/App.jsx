@@ -120,7 +120,7 @@ const App = () => {
         declineButtonText='Recusar'
         enableDeclineButton
         buttonStyle={{
-          background: '#4a4a4a', // cinza médio
+          background: '#3B82F6', // cinza médio
           color: '#fff',
           fontSize: '14px',
           border: 'none',
