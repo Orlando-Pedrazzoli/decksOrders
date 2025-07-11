@@ -29,35 +29,29 @@ const MainBanner = () => {
       />
 
       {/* Conteúdo sobreposto */}
-      <div className='text-white absolute inset-0 flex flex-col items-center md:items-start justify-end md:justify-center pb-24 md:pb-0 px-4 md:pl-18 lg:pl-24'>
-        <h1 className='text-[20px] opacity-80 md:text-4xl lg:text-5xl font-medium text-center md:text-left max-w-72 md:max-w-80 lg:max-w-105 leading-snug md:leading-tight lg:leading-15'>
-          Construção precisa, design e performance garantida.
+      <div className='text-white absolute inset-0 flex flex-col items-start justify-end pb-16 md:pb-20 px-4 md:px-8 lg:px-12'>
+        <h1
+          className='text-[32px] md:text-4xl lg:text-5xl font-semibold italic text-left leading-tight md:leading-none mb-6 md:mb-8'
+          style={{
+            textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+          }}
+        >
+          Surf Hard, Make History
         </h1>
 
-        <div className='flex items-center mt-5 font-medium'>
+        <div className='flex items-center font-medium'>
           <Link
             to={'/products'}
             className='group flex items-center gap-2 px-6 md:px-9 py-2.5 bg-primary hover:bg-primary-dull transition rounded text-white text-sm md:text-base cursor-pointer'
           >
             Ver produtos
-            <img
-              className='w-4 h-4 transition md:hidden group-focus:translate-x-1'
-              src={assets.white_arrow_icon}
-              alt='arrow'
-            />
           </Link>
 
           {/* Desktop arrow */}
           <Link
             to={'/products'}
             className='group hidden md:flex items-center gap-2 px-9 py-3 cursor-pointer'
-          >
-            <img
-              className='transition group-hover:translate-x-1'
-              src={assets.black_arrow_icon}
-              alt='arrow'
-            />
-          </Link>
+          ></Link>
         </div>
       </div>
     </div>
