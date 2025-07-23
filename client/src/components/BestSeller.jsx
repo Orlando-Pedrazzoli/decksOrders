@@ -172,44 +172,31 @@ const BestSeller = () => {
             )}
           </div>
 
-          {/* Navigation Arrows */}
-          <div className='flex justify-center mt-6 gap-4'>
-            {/* Previous Arrow */}
-            <button
-              onClick={prevSlide}
-              className='w-12 h-12 rounded-full border-2 border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white flex items-center justify-center transition-all duration-200'
-              aria-label='Produto anterior'
-            >
-              <svg
-                width='20'
-                height='20'
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='currentColor'
-                strokeWidth='2'
-              >
-                <path d='M15 18l-6-6 6-6' />
-              </svg>
-            </button>
+          {/* Gradient fade on right to indicate more content */}
+          <div
+            className='absolute top-0 right-0 h-full w-8 pointer-events-none'
+            style={{
+              background:
+                'linear-gradient(to right, transparent, rgba(255, 255, 255, 0.8))',
+            }}
+          />
 
-            {/* Next Arrow */}
-            <button
-              onClick={nextSlide}
-              className='w-12 h-12 rounded-full border-2 border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white flex items-center justify-center transition-all duration-200'
-              aria-label='Próximo produto'
-            >
-              <svg
-                width='20'
-                height='20'
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='currentColor'
-                strokeWidth='2'
-              >
-                <path d='M9 18l6-6-6-6' />
-              </svg>
-            </button>
+          {/* Scroll indicator dots */}
+          <div className='flex justify-center mt-4 gap-1'>
+            {shuffledProducts.map((_, index) => (
+              <div
+                key={index}
+                className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                  index === currentSlide ? 'bg-gray-800 w-4' : 'bg-gray-300'
+                }`}
+              />
+            ))}
           </div>
+
+          {/* Subtle scroll hint text */}
+          <p className='text-center text-xs text-gray-500 mt-2 opacity-75'>
+            Deslize para ver mais produtos
+          </p>
         </div>
       </div>
 
