@@ -19,25 +19,26 @@ const BestSeller = () => {
   const handleScroll = () => {
     if (carouselRef.current) {
       const scrollLeft = carouselRef.current.scrollLeft;
-      const slideWidth = carouselRef.current.offsetWidth * 0.8; // Ajuste baseado no width do slide
+      const containerWidth = carouselRef.current.offsetWidth;
+      const slideWidth = containerWidth * 0.8;
       const newSlide = Math.round(scrollLeft / slideWidth);
-      setCurrentSlide(Math.min(newSlide, shuffledProducts.length - 1));
+      setCurrentSlide(
+        Math.max(0, Math.min(newSlide, shuffledProducts.length - 1))
+      );
     }
   };
 
   // Navigate to next slide
   const nextSlide = () => {
     if (currentSlide < shuffledProducts.length - 1) {
-      const nextIndex = currentSlide + 1;
-      scrollToSlide(nextIndex);
+      scrollToSlide(currentSlide + 1);
     }
   };
 
   // Navigate to previous slide
   const prevSlide = () => {
     if (currentSlide > 0) {
-      const prevIndex = currentSlide - 1;
-      scrollToSlide(prevIndex);
+      scrollToSlide(currentSlide - 1);
     }
   };
 
@@ -45,24 +46,44 @@ const BestSeller = () => {
   const scrollToSlide = slideIndex => {
     if (carouselRef.current) {
       const containerWidth = carouselRef.current.offsetWidth;
-      const slideWidth = containerWidth * 0.8; // 80% da largura do container
+      const slideWidth = containerWidth * 0.8;
       const scrollPosition = slideIndex * slideWidth;
 
-      carouselRef.current.scrollTo({
+      // Temporarily disable scroll listener to prevent conflicts
+      const carousel = carouselRef.current;
+      carousel.removeEventListener('scroll', handleScroll);
+
+      carousel.scrollTo({
         left: scrollPosition,
         behavior: 'smooth',
       });
+
+      // Update state immediately
       setCurrentSlide(slideIndex);
+
+      // Re-enable scroll listener after animation completes
+      setTimeout(() => {
+        if (carousel) {
+          carousel.addEventListener('scroll', handleScroll, { passive: true });
+        }
+      }, 300);
     }
   };
 
   useEffect(() => {
     const carousel = carouselRef.current;
     if (carousel) {
-      carousel.addEventListener('scroll', handleScroll);
-      return () => carousel.removeEventListener('scroll', handleScroll);
+      // Add scroll listener with passive option for better performance
+      const scrollHandler = handleScroll;
+      carousel.addEventListener('scroll', scrollHandler, { passive: true });
+
+      return () => {
+        if (carousel) {
+          carousel.removeEventListener('scroll', scrollHandler);
+        }
+      };
     }
-  }, []);
+  }, [shuffledProducts.length]);
 
   return (
     <div className='mt-16'>
@@ -87,8 +108,8 @@ const BestSeller = () => {
                 key={product._id}
                 className='flex-none snap-center'
                 style={{
-                  width: '80%', // Cada slide ocupa 80% da largura
-                  marginRight: index < shuffledProducts.length - 1 ? '0' : '0',
+                  width: '80%',
+                  minWidth: '80%', // Garante que não vai encolher
                 }}
               >
                 <div className='px-2'>
@@ -145,20 +166,6 @@ const BestSeller = () => {
                 <path d='M9 18l6-6-6-6' />
               </svg>
             </button>
-          </div>
-
-          {/* Optional: Progress Dots */}
-          <div className='flex justify-center mt-4 gap-2'>
-            {shuffledProducts.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => scrollToSlide(index)}
-                className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                  index === currentSlide ? 'bg-primary w-6' : 'bg-gray-300'
-                }`}
-                aria-label={`Ver produto ${index + 1}`}
-              />
-            ))}
           </div>
         </div>
       </div>
