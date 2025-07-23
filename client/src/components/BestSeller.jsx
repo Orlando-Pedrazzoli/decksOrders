@@ -16,29 +16,26 @@ const BestSeller = () => {
       .slice(0, 8);
   }, [products]);
 
-  // Initialize carousel to start at first actual product (index 1 because of preview)
+  // Initialize carousel to start at first product (no offset needed)
   useEffect(() => {
     if (carouselRef.current && shuffledProducts.length > 0) {
-      const containerWidth = carouselRef.current.offsetWidth;
-      const slideWidth = containerWidth * 0.8;
-
-      // Start at index 1 (first real product after the preview)
+      // Start at position 0 - first actual product
       carouselRef.current.scrollTo({
-        left: slideWidth,
+        left: 0,
         behavior: 'auto',
       });
     }
   }, [shuffledProducts]);
 
-  // Handle scroll with preview cards
+  // Handle scroll with standard calculation
   const handleScroll = () => {
     if (carouselRef.current && !isScrollingProgrammatically.current) {
       const scrollLeft = carouselRef.current.scrollLeft;
       const containerWidth = carouselRef.current.offsetWidth;
       const slideWidth = containerWidth * 0.8;
 
-      // Adjust for preview card at beginning
-      const slideIndex = Math.round(scrollLeft / slideWidth) - 1;
+      // Standard calculation without preview offset
+      const slideIndex = Math.round(scrollLeft / slideWidth);
       const clampedSlide = Math.max(
         0,
         Math.min(slideIndex, shuffledProducts.length - 1)
@@ -62,14 +59,14 @@ const BestSeller = () => {
     scrollToSlide(prevIndex);
   };
 
-  // Scroll to specific slide (adjusted for preview cards)
+  // Scroll to specific slide (standard calculation)
   const scrollToSlide = slideIndex => {
     if (carouselRef.current) {
       const containerWidth = carouselRef.current.offsetWidth;
       const slideWidth = containerWidth * 0.8;
 
-      // Add 1 to slideIndex to account for the preview card at the beginning
-      const scrollPosition = (slideIndex + 1) * slideWidth;
+      // Standard position calculation
+      const scrollPosition = slideIndex * slideWidth;
 
       isScrollingProgrammatically.current = true;
       setCurrentSlide(slideIndex);
@@ -119,25 +116,6 @@ const BestSeller = () => {
               scrollSnapType: 'x mandatory',
             }}
           >
-            {/* Add last product at the beginning for peek effect */}
-            {shuffledProducts.length > 0 && (
-              <div
-                className='flex-none snap-center'
-                style={{
-                  width: '80%',
-                  minWidth: '80%',
-                  scrollSnapAlign: 'center',
-                  opacity: 0.7,
-                }}
-              >
-                <div className='px-2'>
-                  <ProductCard
-                    product={shuffledProducts[shuffledProducts.length - 1]}
-                  />
-                </div>
-              </div>
-            )}
-
             {shuffledProducts.map((product, index) => (
               <div
                 key={product._id}
@@ -153,23 +131,6 @@ const BestSeller = () => {
                 </div>
               </div>
             ))}
-
-            {/* Add first product at the end for peek effect */}
-            {shuffledProducts.length > 0 && (
-              <div
-                className='flex-none snap-center'
-                style={{
-                  width: '80%',
-                  minWidth: '80%',
-                  scrollSnapAlign: 'center',
-                  opacity: 0.7,
-                }}
-              >
-                <div className='px-2'>
-                  <ProductCard product={shuffledProducts[0]} />
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Gradient fade on right to indicate more content */}
