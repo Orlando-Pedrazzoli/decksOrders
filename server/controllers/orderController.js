@@ -127,97 +127,288 @@ export const placeOrderCOD = async (req, res) => {
   }
 };
 
-// Manter as outras funções como estão...
-export const stripeWebhooks = async (request, response) => {
-  const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
-  const sig = request.headers['stripe-signature'];
-  let event;
-
+// Place Order Stripe : /api/order/stripe
+export const placeOrderStripe = async (req, res) => {
   try {
-    event = stripeInstance.webhooks.constructEvent(
-      request.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (error) {
-    console.error('❌ Erro ao verificar webhook Stripe:', error.message);
-    return response.status(400).send(`Webhook Error: ${error.message}`);
-  }
+    console.log('💳 Recebendo dados da encomenda Stripe:', req.body);
 
-  switch (event.type) {
-    case 'payment_intent.succeeded': {
-      try {
-        const paymentIntent = event.data.object;
-        const paymentIntentId = paymentIntent.id;
+    const {
+      userId,
+      items,
+      address,
+      promoCode,
+      discountApplied,
+      originalAmount,
+      discountAmount,
+      finalAmount,
+      discountPercentage,
+    } = req.body;
 
-        const sessionList = await stripeInstance.checkout.sessions.list({
-          payment_intent: paymentIntentId,
+    const { origin } = req.headers;
+
+    if (!address || items.length === 0) {
+      console.log('❌ Dados inválidos - address ou items vazios');
+      return res.json({ success: false, message: 'Invalid data' });
+    }
+
+    let productData = [];
+
+    // ✅ USAR VALORES DO FRONTEND (consistente com COD)
+    let orderOriginalAmount = originalAmount;
+    let orderFinalAmount = finalAmount || originalAmount;
+    let orderDiscountAmount = discountAmount || 0;
+    let orderDiscountPercentage = discountPercentage || 0;
+    let validPromoCode = null;
+
+    // Se não vieram do frontend, calcular aqui como backup
+    if (!originalAmount) {
+      orderOriginalAmount = await items.reduce(async (acc, item) => {
+        const product = await Product.findById(item.product);
+        productData.push({
+          name: product.name,
+          price: product.offerPrice,
+          quantity: item.quantity,
         });
+        return (await acc) + product.offerPrice * item.quantity;
+      }, 0);
 
-        const { orderId, userId } = sessionList.data[0].metadata;
+      orderFinalAmount = orderOriginalAmount;
+      console.log('💰 Valor calculado no backend:', orderOriginalAmount);
+    } else {
+      // Se veio do frontend, ainda precisamos do productData para o Stripe
+      await Promise.all(
+        items.map(async item => {
+          const product = await Product.findById(item.product);
+          productData.push({
+            name: product.name,
+            price: product.offerPrice,
+            quantity: item.quantity,
+          });
+        })
+      );
+    }
 
+    // Validar promo code se aplicado (consistente com COD)
+    if (promoCode && discountApplied) {
+      if (promoCode.toUpperCase() === 'BROTHER') {
+        validPromoCode = promoCode.toUpperCase();
+
+        // Usar valores do frontend se vieram, senão calcular
+        if (!discountAmount) {
+          orderDiscountPercentage = 30;
+          orderDiscountAmount =
+            Math.round(orderOriginalAmount * 0.3 * 100) / 100;
+          orderFinalAmount = orderOriginalAmount - orderDiscountAmount;
+        }
+
+        console.log('🎯 Promo code Stripe válido aplicado:', {
+          code: validPromoCode,
+          originalAmount: orderOriginalAmount,
+          discountPercentage: orderDiscountPercentage,
+          discountAmount: orderDiscountAmount,
+          finalAmount: orderFinalAmount,
+        });
+      } else {
+        console.log('❌ Promo code inválido:', promoCode);
+      }
+    }
+
+    console.log('💳 Valores finais Stripe:', {
+      originalAmount: orderOriginalAmount,
+      finalAmount: orderFinalAmount,
+    });
+
+    // Criar pedido com valores corretos
+    const order = await Order.create({
+      userId,
+      items,
+      amount: orderFinalAmount, // ✅ Valor final sem taxa
+      originalAmount: orderOriginalAmount, // ✅ Valor original
+      address,
+      paymentType: 'Online',
+      promoCode: validPromoCode,
+      discountAmount: orderDiscountAmount, // ✅ Desconto aplicado
+      discountPercentage: orderDiscountPercentage, // ✅ Percentagem
+    });
+
+    console.log('✅ Pedido Stripe criado:', {
+      orderId: order._id,
+      amount: order.amount,
+      originalAmount: order.originalAmount,
+      discountAmount: order.discountAmount,
+      promoCode: order.promoCode,
+    });
+
+    // Stripe Gateway Initialize
+    const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    // Create line items for stripe (baseado no valor final com desconto)
+    const line_items = productData.map(item => {
+      // Calcular preço unitário com desconto aplicado proporcionalmente
+      let unitPrice = item.price;
+
+      if (validPromoCode && orderDiscountPercentage > 0) {
+        unitPrice = item.price * (1 - orderDiscountPercentage / 100);
+      }
+
+      return {
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: validPromoCode
+              ? `${item.name} (${orderDiscountPercentage}% OFF)`
+              : item.name,
+          },
+          unit_amount: Math.floor(unitPrice * 100), // Stripe usa centavos
+        },
+        quantity: item.quantity,
+      };
+    });
+
+    // Create session
+    const session = await stripeInstance.checkout.sessions.create({
+      line_items,
+      mode: 'payment',
+      success_url: `${origin}/loader?next=my-orders`,
+      cancel_url: `${origin}/cart`,
+      metadata: {
+        orderId: order._id.toString(),
+        userId,
+        promoCode: validPromoCode || '',
+        originalAmount: orderOriginalAmount.toString(),
+        discountAmount: orderDiscountAmount.toString(),
+      },
+    });
+
+    return res.json({ success: true, url: session.url });
+  } catch (error) {
+    console.error('❌ Erro ao processar pedido Stripe:', error);
+    return res.json({ success: false, message: error.message });
+  }
+};
+
+// Stripe Webhooks to Verify Payments Action : /stripe
+export const stripeWebhooks = async (request, response) => {
+  try {
+    // Stripe Gateway Initialize
+    const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    const sig = request.headers['stripe-signature'];
+    let event;
+
+    try {
+      event = stripeInstance.webhooks.constructEvent(
+        request.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (error) {
+      console.error('❌ Erro na verificação do webhook:', error.message);
+      return response.status(400).send(`Webhook Error: ${error.message}`);
+    }
+
+    console.log('🔔 Webhook recebido:', event.type);
+
+    // Handle the event
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        // ✅ Melhor usar checkout.session.completed em vez de payment_intent.succeeded
+        const session = event.data.object;
+        const { orderId, userId } = session.metadata;
+
+        console.log('✅ Pagamento confirmado:', { orderId, userId });
+
+        // Mark Payment as Paid
         const updatedOrder = await Order.findByIdAndUpdate(
           orderId,
           { isPaid: true },
           { new: true }
-        );
-        await User.findByIdAndUpdate(userId, { cartItems: {} });
+        ).populate('items.product address');
 
-        const user = await User.findById(userId).select('name email');
-        const addressData = await Address.findById(updatedOrder.address);
-        const products = await Promise.all(
-          updatedOrder.items.map(
-            async item => await Product.findById(item.product)
-          )
-        );
+        if (updatedOrder) {
+          // Clear user cart
+          await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-        await sendOrderConfirmationEmail(
-          updatedOrder,
-          user,
-          products,
-          addressData
-        );
+          // 📧 Enviar email de confirmação (consistente com COD)
+          try {
+            const user = await User.findById(userId).select('name email');
+            const addressData = await Address.findById(updatedOrder.address);
+            const products = await Promise.all(
+              updatedOrder.items.map(
+                async item => await Product.findById(item.product)
+              )
+            );
 
-        console.log('✅ Email de confirmação enviado após pagamento Stripe');
-      } catch (err) {
-        console.error(
-          '❌ Erro ao processar payment_intent.succeeded:',
-          err.message
-        );
+            await sendOrderConfirmationEmail(
+              updatedOrder,
+              user,
+              products,
+              addressData
+            );
+            console.log(
+              '📧 Email de confirmação enviado para pedido Stripe:',
+              orderId
+            );
+          } catch (emailError) {
+            console.error(
+              '❌ Erro ao enviar email de confirmação:',
+              emailError
+            );
+            // Não falhar a operação por causa do email
+          }
+
+          console.log('✅ Pedido processado com sucesso:', orderId);
+        } else {
+          console.error('❌ Pedido não encontrado:', orderId);
+        }
+        break;
       }
-      break;
-    }
 
-    case 'payment_intent.payment_failed': {
-      try {
+      case 'payment_intent.payment_failed': {
         const paymentIntent = event.data.object;
         const paymentIntentId = paymentIntent.id;
 
-        const sessionList = await stripeInstance.checkout.sessions.list({
-          payment_intent: paymentIntentId,
-        });
+        console.log('❌ Pagamento falhou:', paymentIntentId);
 
-        const { orderId } = sessionList.data[0].metadata;
+        try {
+          // Getting Session Metadata
+          const sessions = await stripeInstance.checkout.sessions.list({
+            payment_intent: paymentIntentId,
+          });
 
-        await Order.findByIdAndDelete(orderId);
-        console.log(`⚠️ Pedido ${orderId} cancelado após falha de pagamento`);
-      } catch (err) {
-        console.error(
-          '❌ Erro ao processar payment_intent.payment_failed:',
-          err.message
-        );
+          if (sessions.data.length > 0) {
+            const { orderId } = sessions.data[0].metadata;
+            await Order.findByIdAndDelete(orderId);
+            console.log(
+              '🗑️ Pedido removido devido ao pagamento falhado:',
+              orderId
+            );
+          }
+        } catch (error) {
+          console.error('❌ Erro ao processar falha de pagamento:', error);
+        }
+        break;
       }
-      break;
+
+      case 'invoice.payment_succeeded': {
+        // Para subscriptions futuras
+        console.log('💳 Pagamento de fatura bem-sucedido');
+        break;
+      }
+
+      default:
+        console.log(`⚠️ Evento não tratado: ${event.type}`);
+        break;
     }
 
-    default:
-      console.warn(`⚠️ Evento não tratado: ${event.type}`);
-      break;
+    response.json({ received: true });
+  } catch (error) {
+    console.error('❌ Erro no webhook:', error);
+    response.status(500).json({ error: 'Webhook processing failed' });
   }
-
-  response.json({ received: true });
 };
 
+// Get Orders by User ID : /api/order/user
 export const getUserOrders = async (req, res) => {
   try {
     const { userId } = req.body;
@@ -233,6 +424,7 @@ export const getUserOrders = async (req, res) => {
   }
 };
 
+// Get All Orders ( for seller / admin) : /api/order/seller
 export const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find({
@@ -244,11 +436,4 @@ export const getAllOrders = async (req, res) => {
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
-};
-
-export const placeOrderStripe = async (req, res) => {
-  return res.status(503).json({
-    success: false,
-    message: 'Pagamento via Stripe temporariamente desativado.',
-  });
 };

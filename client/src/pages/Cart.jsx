@@ -94,7 +94,7 @@ const Cart = () => {
     return Math.max(0, totalBeforeDiscount).toFixed(2);
   };
 
-  // ✅ FUNÇÃO handlePlaceOrder CORRIGIDA - Substitua no Cart.jsx
+  // ✅ FUNÇÃO handlePlaceOrder ATUALIZADA
   const handlePlaceOrder = async () => {
     if (!requireLogin('fazer a encomenda')) return;
     if (!selectedAddress) {
@@ -135,19 +135,17 @@ const Cart = () => {
         discountAmount,
         finalAmount,
         discountApplied,
+        paymentMethod: paymentOption,
       });
 
       let response;
       if (paymentOption === 'COD') {
         response = await axios.post('/api/order/cod', orderData);
-      } else {
-        response = await axios.post('/api/order/stripe', orderData);
-      }
 
-      console.log('✅ Resposta do servidor:', response.data);
+        console.log('✅ Resposta COD:', response.data);
 
-      if (response.data.success) {
-        if (paymentOption === 'COD') {
+        if (response.data.success) {
+          // Limpar carrinho para COD
           const emptyCart = {};
           setCartItems(emptyCart);
           try {
@@ -159,21 +157,61 @@ const Cart = () => {
           toast.success('Encomenda efetuada com sucesso!');
           navigate(`/order-success/${response.data.orderId}`);
         } else {
-          window.location.href = response.data.url;
+          toast.error(response.data.message || 'Falha ao fazer a encomenda.');
         }
       } else {
-        toast.error(response.data.message || 'Falha ao fazer a encomenda.');
+        // ✅ STRIPE PAYMENT FLOW
+        console.log('💳 Iniciando processo de pagamento Stripe...');
+
+        response = await axios.post('/api/order/stripe', orderData);
+
+        console.log('✅ Resposta Stripe:', response.data);
+
+        if (response.data.success && response.data.url) {
+          console.log(
+            '🚀 Redirecionando para Stripe Checkout:',
+            response.data.url
+          );
+
+          // Mostrar feedback visual antes do redirecionamento
+          toast.success('Redirecionando para o pagamento...');
+
+          // Pequeno delay para mostrar o toast
+          setTimeout(() => {
+            // ✅ Redirecionar para Stripe Checkout
+            window.location.href = response.data.url;
+          }, 1000);
+        } else {
+          console.error('❌ Erro na resposta do Stripe:', response.data);
+          toast.error(
+            response.data.message || 'Falha ao inicializar o pagamento.'
+          );
+        }
       }
     } catch (error) {
       console.error('❌ Erro na encomenda:', error);
-      toast.error(
-        error.response?.data?.message ||
-          'Falha ao fazer a encomenda. Por favor, tente novamente.'
-      );
 
-      if (error.response?.status === 401 && isMobile) {
-        localStorage.removeItem('mobile_auth_token');
+      // Mensagens de erro específicas
+      if (error.response?.status === 401) {
+        toast.error('Sessão expirada. Por favor, inicie sessão novamente.');
+        if (isMobile) {
+          localStorage.removeItem('mobile_auth_token');
+        }
         setShowUserLogin(true);
+      } else if (error.response?.status === 400) {
+        toast.error(
+          error.response?.data?.message ||
+            'Dados inválidos. Verifique os detalhes.'
+        );
+      } else if (error.response?.status === 500) {
+        toast.error('Erro interno do servidor. Tente novamente.');
+      } else if (error.code === 'NETWORK_ERROR') {
+        toast.error('Problema de conectividade. Verifique a sua internet.');
+      } else {
+        toast.error(
+          error.response?.data?.message ||
+            'Falha ao processar a encomenda. Tente novamente.'
+        );
       }
     } finally {
       setIsProcessing(false);
@@ -429,22 +467,72 @@ const Cart = () => {
               </div>
             </div>
 
-            {/* Payment Method */}
+            {/* Payment Method - VERSÃO ATUALIZADA */}
             <div className='mb-6 border-b pb-6 border-gray-200'>
               <h3 className='font-semibold text-gray-700 mb-3'>
                 Método de Pagamento
               </h3>
-              <select
-                value={paymentOption}
-                onChange={e =>
-                  requireLogin('alterar o método de pagamento') &&
-                  setPaymentOption(e.target.value)
-                }
-                className='w-full border border-gray-300 rounded-lg p-2.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 cursor-pointer'
-              >
-                <option value='COD'>Pagamento na Entrega</option>
-                <option value='Online'>Stripe</option>
-              </select>
+
+              {/* Radio buttons para melhor UX */}
+              <div className='space-y-3'>
+                <label className='flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors duration-200'>
+                  <input
+                    type='radio'
+                    name='payment'
+                    value='COD'
+                    checked={paymentOption === 'COD'}
+                    onChange={e => {
+                      if (requireLogin('alterar o método de pagamento')) {
+                        setPaymentOption(e.target.value);
+                      }
+                    }}
+                    className='text-primary focus:ring-primary mr-3'
+                  />
+                  <div className='flex items-center'>
+                    <span className='font-medium'>Pagamento na Entrega</span>
+                    <span className='ml-2 text-sm text-gray-500'>(COD)</span>
+                  </div>
+                </label>
+
+                <label className='flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors duration-200'>
+                  <input
+                    type='radio'
+                    name='payment'
+                    value='Online'
+                    checked={paymentOption === 'Online'}
+                    onChange={e => {
+                      if (requireLogin('alterar o método de pagamento')) {
+                        setPaymentOption(e.target.value);
+                      }
+                    }}
+                    className='text-primary focus:ring-primary mr-3'
+                  />
+                  <div className='flex items-center'>
+                    <span className='font-medium'>
+                      Cartão de Crédito/Débito
+                    </span>
+                    <span className='ml-2 text-sm text-gray-500'>(Stripe)</span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Informação adicional baseada na seleção */}
+              {paymentOption === 'COD' && (
+                <div className='mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg'>
+                  <p className='text-sm text-blue-700'>
+                    💰 Pagará na entrega. Aceitamos dinheiro ou cartão.
+                  </p>
+                </div>
+              )}
+
+              {paymentOption === 'Online' && (
+                <div className='mt-3 p-3 bg-green-50 border border-green-200 rounded-lg'>
+                  <p className='text-sm text-green-700'>
+                    🔒 Pagamento seguro processado pela Stripe. Aceitamos Visa,
+                    Mastercard, e outros.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Order Total */}
@@ -476,25 +564,56 @@ const Cart = () => {
               </div>
             </div>
 
-            {/* Checkout Button */}
+            {/* Checkout Button - VERSÃO ATUALIZADA */}
             <button
               onClick={handlePlaceOrder}
               disabled={
                 isProcessing || !selectedAddress || cartArray.length === 0
               }
-              className={`w-full mt-8 py-3.5 rounded-lg font-bold text-white text-lg shadow-md transition-all duration-300 active:scale-98
+              className={`w-full mt-8 py-3.5 rounded-lg font-bold text-white text-lg shadow-md transition-all duration-300 active:scale-98 flex items-center justify-center gap-2
                 ${
                   isProcessing || !selectedAddress || cartArray.length === 0
                     ? 'bg-gray-400 cursor-not-allowed'
+                    : paymentOption === 'Online'
+                    ? 'bg-indigo-600 hover:bg-indigo-700'
                     : 'bg-primary hover:bg-primary-dull'
                 }`}
             >
-              {isProcessing
-                ? 'A Processar...'
-                : paymentOption === 'COD'
-                ? 'Efetuar Encomenda'
-                : 'Pagar Agora'}
+              {isProcessing ? (
+                <>
+                  <svg className='animate-spin h-5 w-5' viewBox='0 0 24 24'>
+                    <circle
+                      className='opacity-25'
+                      cx='12'
+                      cy='12'
+                      r='10'
+                      stroke='currentColor'
+                      strokeWidth='4'
+                      fill='none'
+                    />
+                    <path
+                      className='opacity-75'
+                      fill='currentColor'
+                      d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                    />
+                  </svg>
+                  <span>A Processar...</span>
+                </>
+              ) : paymentOption === 'COD' ? (
+                'Efetuar Encomenda'
+              ) : (
+                <>🔒 Pagar com Stripe</>
+              )}
             </button>
+
+            {/* Informação de segurança para Stripe */}
+            {paymentOption === 'Online' && !isProcessing && (
+              <div className='mt-3 text-center'>
+                <p className='text-xs text-gray-500'>
+                  Será redirecionado para a página segura de pagamento da Stripe
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
