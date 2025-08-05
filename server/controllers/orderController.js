@@ -269,7 +269,8 @@ export const placeOrderStripe = async (req, res) => {
     const session = await stripeInstance.checkout.sessions.create({
       line_items,
       mode: 'payment',
-      success_url: `${origin}/loader?next=my-orders`,
+      // ✅ CORRIGIDO: Redirecionar para order-success com orderId
+      success_url: `${origin}/order-success/${order._id}?payment=stripe`,
       cancel_url: `${origin}/cart`,
       metadata: {
         orderId: order._id.toString(),
