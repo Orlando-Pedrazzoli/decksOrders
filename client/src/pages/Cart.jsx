@@ -173,6 +173,19 @@ const Cart = () => {
             response.data.url
           );
 
+          // ✅ LIMPAR CARRINHO ANTES DO REDIRECIONAMENTO
+          const emptyCart = {};
+          setCartItems(emptyCart);
+          saveCartToStorage(emptyCart);
+
+          // Sincronizar carrinho vazio com servidor
+          try {
+            await axios.post('/api/cart/update', { cartItems: emptyCart });
+            console.log('🛒 Carrinho limpo e sincronizado com servidor');
+          } catch (syncError) {
+            console.error('❌ Erro ao sincronizar carrinho vazio:', syncError);
+          }
+
           // Mostrar feedback visual antes do redirecionamento
           toast.success('Redirecionando para o pagamento...');
 
