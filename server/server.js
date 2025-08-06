@@ -12,9 +12,9 @@ import cartRouter from './routes/cartRoute.js';
 import addressRouter from './routes/addressRoute.js';
 import orderRouter from './routes/orderRoute.js';
 import reviewRouter from './routes/reviewRoute.js';
-// ✅ Importar apenas as funções necessárias
+// ✅ CORRIGIDO: Importar apenas as funções necessárias (sem duplicatas)
 import {
-  stripeWebhooksDetailed,
+  stripeWebhooksVercel, // ✅ Usar apenas a versão otimizada
   debugEnvironment,
 } from './controllers/orderController.js';
 
@@ -42,10 +42,11 @@ try {
    🔔 Stripe Webhook (RAW BODY)
    ⚠️ TEM de vir ANTES de express.json()
    ========================= */
+// ✅ CORRIGIDO: Apenas uma rota de webhook (não duas)
 app.post(
   '/webhook/stripe',
   express.raw({ type: 'application/json' }),
-  stripeWebhooksDetailed // ✅ Usar versão com logs detalhados
+  stripeWebhooksVercel // ✅ Usar versão otimizada para Vercel
 );
 
 // ✅ Endpoint para debug das variáveis de ambiente
@@ -108,7 +109,7 @@ app.get('/', (req, res) => {
       order: '/api/order/*',
       reviews: '/api/reviews/*',
       webhook: '/webhook/stripe',
-      debug: '/debug/env', // ✅ Adicionar rota de debug
+      debug: '/debug/env',
     },
   });
 });

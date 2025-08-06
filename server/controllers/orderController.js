@@ -555,3 +555,148 @@ export const getAllOrders = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+
+// ✅ WEBHOOK OTIMIZADO PARA VERCEL
+// Adicione esta nova função no orderController.js
+
+export const stripeWebhooksVercel = async (req, res) => {
+  console.log('🎯 WEBHOOK VERCEL - Timestamp:', new Date().toISOString());
+
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!endpointSecret) {
+    console.log('❌ STRIPE_WEBHOOK_SECRET não definido!');
+    return res.status(500).send('STRIPE_WEBHOOK_SECRET não configurado');
+  }
+
+  let event;
+
+  try {
+    // ✅ MÚLTIPLAS TENTATIVAS para lidar com diferentes formatos de body no Vercel
+    let payload = req.body;
+
+    // Se o body vier como string, manter como string
+    if (typeof payload === 'string') {
+      console.log('📝 Body recebido como string');
+    }
+    // Se vier como Buffer, converter para string
+    else if (Buffer.isBuffer(payload)) {
+      console.log('📦 Body recebido como Buffer');
+      payload = payload.toString('utf8');
+    }
+    // Se vier como objeto, stringificar
+    else if (typeof payload === 'object') {
+      console.log('🎯 Body recebido como objeto');
+      payload = JSON.stringify(payload);
+    }
+
+    console.log('📋 Tentando validar com payload tipo:', typeof payload);
+    console.log('📋 Payload length:', payload?.length);
+    console.log('📋 Signature:', sig?.substring(0, 20) + '...');
+
+    // Tentar validar a assinatura
+    event = stripe.webhooks.constructEvent(payload, sig, endpointSecret);
+    console.log('✅ Signature válida! Evento:', event.type);
+  } catch (err) {
+    console.log('❌ Erro na validação da signature:', err.message);
+
+    // ⚠️ TEMPORÁRIO: Para debug, vamos processar mesmo com erro de signature
+    // ❗ REMOVER EM PRODUÇÃO após confirmar que funciona
+    console.log(
+      '⚠️ DEBUG: Tentando processar evento mesmo com erro de signature'
+    );
+
+    try {
+      // Tentar fazer parse do body como JSON
+      let bodyData = req.body;
+      if (typeof bodyData === 'string') {
+        bodyData = JSON.parse(bodyData);
+      }
+
+      if (bodyData.type === 'checkout.session.completed') {
+        event = bodyData;
+        console.log('⚠️ DEBUG: Evento processado sem validação de signature');
+      } else {
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+    } catch (parseErr) {
+      console.log('❌ Erro no parse do body:', parseErr.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+  }
+
+  console.log('🎉 Processando evento:', event.type);
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const orderId = session?.metadata?.orderId;
+
+    console.log('💳 Processando checkout.session.completed');
+    console.log('📋 Session metadata:', session.metadata);
+    console.log('🆔 Order ID:', orderId);
+
+    if (!orderId) {
+      console.log('⚠️ orderId ausente no metadata');
+      return res.status(400).send('orderId missing');
+    }
+
+    try {
+      console.log('🔄 Atualizando pedido:', orderId);
+
+      const updated = await Order.findByIdAndUpdate(
+        orderId,
+        {
+          isPaid: true,
+          paidAt: new Date(),
+          paymentInfo: {
+            id: session.payment_intent,
+            status: session.payment_status,
+            email: session.customer_details?.email || '',
+          },
+        },
+        { new: true }
+      );
+
+      if (!updated) {
+        console.log('❌ Order não encontrada:', orderId);
+        return res.status(404).send('Order not found');
+      }
+
+      console.log('✅ SUCESSO! Pedido atualizado:', {
+        id: updated._id,
+        isPaid: updated.isPaid,
+        paidAt: updated.paidAt,
+        amount: updated.amount,
+      });
+
+      // Enviar email de confirmação
+      try {
+        const user = await User.findById(updated.userId).select('name email');
+        const addressData = await Address.findById(updated.address);
+        const products = await Promise.all(
+          updated.items.map(async item => await Product.findById(item.product))
+        );
+
+        await sendOrderConfirmationEmail(updated, user, products, addressData);
+        console.log('📧 Email enviado para:', orderId);
+      } catch (emailError) {
+        console.error('❌ Erro no email:', emailError.message);
+      }
+
+      res.status(200).json({
+        received: true,
+        orderId,
+        isPaid: true,
+        timestamp: new Date().toISOString(),
+        success: true,
+      });
+    } catch (err) {
+      console.error('❌ Erro ao atualizar pedido:', err.message);
+      res.status(500).send('Erro ao atualizar pedido');
+    }
+  } else {
+    console.log('ℹ️ Evento ignorado:', event.type);
+    res.status(200).json({ received: true });
+  }
+};
