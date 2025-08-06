@@ -700,3 +700,59 @@ export const stripeWebhooksVercel = async (req, res) => {
     res.status(200).json({ received: true });
   }
 };
+
+// Adicione esta função TEMPORÁRIA no orderController.js para teste
+
+export const webhookSimpleTest = async (req, res) => {
+  console.log('🚨 WEBHOOK TESTE RECEBIDO!');
+  console.log('🚨 Timestamp:', new Date().toISOString());
+  console.log('🚨 Method:', req.method);
+  console.log('🚨 Headers:', req.headers);
+  console.log('🚨 Body type:', typeof req.body);
+  console.log('🚨 Body:', req.body);
+
+  // FORÇAR atualização do pedido específico para teste
+  try {
+    const testOrderId = '6893c49cd743efdd4416c30b'; // Seu orderId
+
+    console.log('🚨 Tentando atualizar pedido:', testOrderId);
+
+    const updated = await Order.findByIdAndUpdate(
+      testOrderId,
+      {
+        isPaid: true,
+        paidAt: new Date(),
+        paymentInfo: {
+          id: 'test_manual_update',
+          status: 'paid',
+          email: 'test@webhook.com',
+        },
+      },
+      { new: true }
+    );
+
+    if (updated) {
+      console.log('🚨 ✅ PEDIDO ATUALIZADO COM SUCESSO!');
+      console.log('🚨 Novo status:', {
+        id: updated._id,
+        isPaid: updated.isPaid,
+        paidAt: updated.paidAt,
+      });
+    } else {
+      console.log('🚨 ❌ Pedido não encontrado');
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Webhook teste executado',
+      timestamp: new Date().toISOString(),
+      orderUpdated: !!updated,
+    });
+  } catch (error) {
+    console.error('🚨 ❌ Erro no teste:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};

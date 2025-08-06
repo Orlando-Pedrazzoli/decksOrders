@@ -16,6 +16,7 @@ import reviewRouter from './routes/reviewRoute.js';
 import {
   stripeWebhooksVercel, // ✅ Usar apenas a versão otimizada
   debugEnvironment,
+  webhookSimpleTest,
 } from './controllers/orderController.js';
 
 const app = express();
@@ -46,10 +47,16 @@ try {
 app.post(
   '/webhook/stripe',
   express.raw({ type: 'application/json' }),
-  stripeWebhooksVercel // ✅ Usar versão otimizada para Vercel
+  stripeWebhooksVercel
 );
 
-// ✅ Endpoint para debug das variáveis de ambiente
+// ✅ ADICIONAR: Webhook de teste (aceita JSON normal)
+app.post('/webhook/test', express.json(), webhookSimpleTest);
+
+// ✅ ADICIONAR: Webhook de teste via GET (para testar no navegador)
+app.get('/webhook/test', webhookSimpleTest);
+
+// Debug das variáveis
 app.get('/debug/env', debugEnvironment);
 
 /* =========================
