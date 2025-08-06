@@ -636,4 +636,3 @@ const Cart = () => {
 };
 
 export default Cart;
-checkout.session.completed;
