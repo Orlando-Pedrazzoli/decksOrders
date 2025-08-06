@@ -9,34 +9,12 @@ const MyOrders = () => {
 
   const fetchMyOrders = async () => {
     try {
-      if (!user?._id) {
-        console.log('❌ Usuário não encontrado para buscar pedidos');
-        setMyOrders([]);
-        setIsLoading(false);
-        return;
-      }
-
-      console.log('🔍 Buscando pedidos para usuário:', user._id);
-
-      // ✅ VOLTANDO PARA GET como estava funcionando
       const { data } = await axios.get('/api/order/user');
-
-      console.log('✅ Resposta dos pedidos:', data);
-
       if (data.success) {
-        console.log('📦 Pedidos encontrados:', data.orders.length);
         setMyOrders(data.orders);
-      } else {
-        console.log('❌ Erro na resposta:', data.message);
-        setMyOrders([]);
       }
     } catch (error) {
-      console.error('❌ Erro ao buscar encomendas:', error);
-      console.error('❌ Status:', error.response?.status);
-      console.error('❌ Data:', error.response?.data);
-      setMyOrders([]);
-    } finally {
-      setIsLoading(false);
+      console.error('Erro ao buscar encomendas:', error);
     }
   };
 
