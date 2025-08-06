@@ -313,11 +313,11 @@ export const stripeWebhooks = async (request, response) => {
     // Handle the event
     switch (event.type) {
       case 'checkout.session.completed': {
-        // ✅ Melhor usar checkout.session.completed em vez de payment_intent.succeeded
         const session = event.data.object;
         const { orderId, userId } = session.metadata;
 
         console.log('✅ Pagamento confirmado:', { orderId, userId });
+        console.log('🔍 Session completa:', JSON.stringify(session, null, 2));
 
         // Mark Payment as Paid
         const updatedOrder = await Order.findByIdAndUpdate(
@@ -327,8 +327,16 @@ export const stripeWebhooks = async (request, response) => {
         ).populate('items.product address');
 
         if (updatedOrder) {
+          console.log('✅ Pedido atualizado:', {
+            orderId: updatedOrder._id,
+            isPaid: updatedOrder.isPaid,
+            paymentType: updatedOrder.paymentType,
+            amount: updatedOrder.amount,
+          });
+
           // Clear user cart
           await User.findByIdAndUpdate(userId, { cartItems: {} });
+          console.log('🛒 Carrinho do usuário limpo:', userId);
 
           // 📧 Enviar email de confirmação (consistente com COD)
           try {
@@ -360,7 +368,18 @@ export const stripeWebhooks = async (request, response) => {
 
           console.log('✅ Pedido processado com sucesso:', orderId);
         } else {
-          console.error('❌ Pedido não encontrado:', orderId);
+          console.error('❌ Pedido não encontrado para atualizar:', orderId);
+
+          // Vamos verificar se o pedido existe sem isPaid
+          const orderExists = await Order.findById(orderId);
+          if (orderExists) {
+            console.log(
+              '⚠️ Pedido existe mas não foi atualizado:',
+              orderExists
+            );
+          } else {
+            console.log('❌ Pedido não existe no banco de dados');
+          }
         }
         break;
       }
@@ -413,14 +432,45 @@ export const stripeWebhooks = async (request, response) => {
 export const getUserOrders = async (req, res) => {
   try {
     const { userId } = req.body;
+    console.log('🔍 Buscando pedidos para usuário:', userId);
+
+    // Primeiro, vamos ver TODOS os pedidos do usuário (para debug)
+    const allUserOrders = await Order.find({ userId })
+      .populate('items.product address')
+      .sort({ createdAt: -1 });
+
+    console.log('📦 TODOS os pedidos do usuário:', {
+      total: allUserOrders.length,
+      pedidos: allUserOrders.map(order => ({
+        id: order._id,
+        paymentType: order.paymentType,
+        isPaid: order.isPaid,
+        amount: order.amount,
+        createdAt: order.createdAt,
+      })),
+    });
+
+    // Agora vamos aplicar o filtro original
     const orders = await Order.find({
       userId,
       $or: [{ paymentType: 'COD' }, { isPaid: true }],
     })
       .populate('items.product address')
       .sort({ createdAt: -1 });
+
+    console.log('✅ Pedidos filtrados (COD ou isPaid=true):', {
+      total: orders.length,
+      pedidos: orders.map(order => ({
+        id: order._id,
+        paymentType: order.paymentType,
+        isPaid: order.isPaid,
+        amount: order.amount,
+      })),
+    });
+
     res.json({ success: true, orders });
   } catch (error) {
+    console.error('❌ Erro ao buscar pedidos:', error);
     res.json({ success: false, message: error.message });
   }
 };
