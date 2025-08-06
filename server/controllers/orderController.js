@@ -288,199 +288,57 @@ export const placeOrderStripe = async (req, res) => {
 };
 
 // ✅ WEBHOOK STRIPE OTIMIZADO: /webhook/stripe
-export const stripeWebhooks = async (request, response) => {
-  console.log('🔔 WEBHOOK STRIPE CHAMADO!');
-  console.log('📥 Headers recebidos:', request.headers);
-  console.log('📦 Body type:', typeof request.body);
-  console.log('📦 Body length:', request.body?.length);
+export const stripeWebhooks = async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
 
   try {
-    const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
-    const sig = request.headers['stripe-signature'];
-
-    console.log('🔐 Stripe signature presente:', !!sig);
-    console.log(
-      '🔐 Webhook secret configurado:',
-      !!process.env.STRIPE_WEBHOOK_SECRET
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
     );
+  } catch (err) {
+    console.log('❌ Stripe signature error:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
 
-    let event;
+  console.log('🎉 Evento recebido:', event.type);
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const orderId = session?.metadata?.orderId;
+
+    if (!orderId) {
+      console.log('⚠️ orderId ausente no metadata');
+      return res.status(400).send('orderId missing in session metadata');
+    }
 
     try {
-      event = stripeInstance.webhooks.constructEvent(
-        request.body,
-        sig,
-        process.env.STRIPE_WEBHOOK_SECRET
-      );
-      console.log('✅ Webhook signature verified successfully');
-    } catch (error) {
-      console.error('❌ Webhook signature verification failed:', error.message);
-      return response.status(400).send(`Webhook Error: ${error.message}`);
-    }
+      const updated = await Order.findByIdAndUpdate(orderId, {
+        isPaid: true,
+        paidAt: new Date(),
+        paymentInfo: {
+          id: session.payment_intent,
+          status: session.payment_status,
+          email: session.customer_details?.email || '',
+        },
+      });
 
-    console.log('🎉 Stripe webhook event type:', event.type);
-    console.log('🎉 Event data:', JSON.stringify(event.data.object, null, 2));
-
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object;
-        const { orderId, userId } = session.metadata || {};
-
-        console.log('💳 PAGAMENTO CONFIRMADO!');
-        console.log('💳 Session ID:', session.id);
-        console.log('💳 Order ID from metadata:', orderId);
-        console.log('💳 User ID from metadata:', userId);
-        console.log('💳 Payment status:', session.payment_status);
-        console.log('💳 Amount total:', session.amount_total);
-
-        if (!orderId || !userId) {
-          console.error('❌ ERRO: Metadata missing!', { orderId, userId });
-          return response.status(400).json({ error: 'Missing metadata' });
-        }
-
-        try {
-          console.log('🔍 Buscando pedido no banco:', orderId);
-
-          // ✅ Marcar pedido como pago
-          const updatedOrder = await Order.findByIdAndUpdate(
-            orderId,
-            { isPaid: true },
-            { new: true }
-          );
-
-          if (!updatedOrder) {
-            console.error('❌ PEDIDO NÃO ENCONTRADO:', orderId);
-            return response.status(404).json({ error: 'Order not found' });
-          }
-
-          console.log('✅ PEDIDO MARCADO COMO PAGO:', {
-            orderId: updatedOrder._id,
-            paymentType: updatedOrder.paymentType,
-            amount: updatedOrder.amount,
-            isPaid: updatedOrder.isPaid,
-          });
-
-          // ✅ Limpar carrinho
-          console.log('🛒 Limpando carrinho do usuário:', userId);
-          await User.findByIdAndUpdate(userId, { cartItems: {} });
-          console.log('✅ Carrinho limpo com sucesso');
-
-          // ✅ ENVIAR EMAIL - PROCESSO OTIMIZADO
-          console.log('📧 INICIANDO PROCESSO DE EMAIL...');
-
-          try {
-            // Buscar todos os dados necessários em paralelo para otimizar performance
-            const [user, addressData, ...products] = await Promise.all([
-              User.findById(userId).select('name email'),
-              Address.findById(updatedOrder.address),
-              ...updatedOrder.items.map(item => Product.findById(item.product)),
-            ]);
-
-            console.log('📧 Dados coletados:', {
-              user: user
-                ? `${user.name} (${user.email})`
-                : 'ERRO: não encontrado',
-              address: addressData
-                ? `${addressData.city}, ${addressData.country}`
-                : 'ERRO: não encontrado',
-              productsCount: products.filter(Boolean).length,
-            });
-
-            // Verificar se temos todos os dados necessários
-            if (!user) {
-              console.error('❌ EMAIL FALHOU: Usuário não encontrado');
-              return response.json({ received: true });
-            }
-
-            if (!addressData) {
-              console.error('❌ EMAIL FALHOU: Endereço não encontrado');
-              return response.json({ received: true });
-            }
-
-            const validProducts = products.filter(Boolean);
-            if (validProducts.length === 0) {
-              console.error('❌ EMAIL FALHOU: Nenhum produto encontrado');
-              return response.json({ received: true });
-            }
-
-            console.log(
-              '📧 TODOS OS DADOS OK! Enviando email de confirmação...'
-            );
-
-            const emailResult = await sendOrderConfirmationEmail(
-              updatedOrder,
-              user,
-              validProducts,
-              addressData
-            );
-
-            console.log('📧 RESULTADO DO EMAIL:', emailResult);
-
-            if (emailResult.success) {
-              console.log(
-                '📧 ✅ EMAIL ENVIADO COM SUCESSO PARA:',
-                emailResult.recipient
-              );
-            } else {
-              console.error(
-                '📧 ❌ FALHA NO ENVIO DO EMAIL:',
-                emailResult.error
-              );
-            }
-          } catch (emailError) {
-            console.error('❌ ERRO NO PROCESSAMENTO DO EMAIL:', emailError);
-            console.error('❌ Stack trace:', emailError.stack);
-          }
-
-          console.log('🎉 PROCESSAMENTO COMPLETO DO PEDIDO STRIPE:', orderId);
-        } catch (orderError) {
-          console.error('❌ ERRO AO PROCESSAR PEDIDO:', orderError);
-          console.error('❌ Stack trace:', orderError.stack);
-          return response
-            .status(500)
-            .json({ error: 'Order processing failed' });
-        }
-        break;
+      if (!updated) {
+        console.log('❌ Order não encontrada:', orderId);
+        return res.status(404).send('Order not found');
       }
 
-      case 'payment_intent.payment_failed': {
-        const paymentIntent = event.data.object;
-        console.log('❌ PAGAMENTO FALHOU:', paymentIntent.id);
-
-        try {
-          // Buscar sessões associadas a este payment_intent
-          const sessions = await stripeInstance.checkout.sessions.list({
-            payment_intent: paymentIntent.id,
-          });
-
-          if (sessions.data.length > 0) {
-            const { orderId } = sessions.data[0].metadata || {};
-            if (orderId) {
-              console.log(
-                '🗑️ Removendo pedido devido ao pagamento falhado:',
-                orderId
-              );
-              await Order.findByIdAndDelete(orderId);
-              console.log('✅ Pedido removido com sucesso');
-            }
-          }
-        } catch (error) {
-          console.error('❌ Erro ao limpar pagamento falhado:', error);
-        }
-        break;
-      }
-
-      default:
-        console.log(`⚠️ EVENTO NÃO TRATADO: ${event.type}`);
-        break;
+      console.log('✅ Pedido atualizado como pago:', orderId);
+      res.status(200).json({ received: true });
+    } catch (err) {
+      console.error('❌ Erro ao atualizar pedido:', err.message);
+      res.status(500).send('Erro ao atualizar pedido');
     }
-
-    console.log('✅ WEBHOOK PROCESSADO COM SUCESSO');
-    response.json({ received: true });
-  } catch (error) {
-    console.error('❌ ERRO GERAL NO WEBHOOK:', error);
-    console.error('❌ Stack trace:', error.stack);
-    response.status(500).json({ error: 'Webhook processing failed' });
+  } else {
+    // Se for outro tipo de evento, apenas responde
+    res.status(200).json({ received: true });
   }
 };
 
