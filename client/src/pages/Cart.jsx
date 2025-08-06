@@ -18,6 +18,7 @@ const Cart = () => {
     setCartItems,
     setShowUserLogin,
     isMobile,
+    saveCartToStorage, // ✅ ADICIONADO
   } = useAppContext();
 
   const [cartArray, setCartArray] = useState([]);
