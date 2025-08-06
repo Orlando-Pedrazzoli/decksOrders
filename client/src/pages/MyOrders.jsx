@@ -8,22 +8,31 @@ const MyOrders = () => {
 
   const fetchMyOrders = async () => {
     try {
-      const { data } = await axios.get('/api/order/user');
+      // ✅ CORRIGIDO: Usar POST em vez de GET para manter consistência com o backend
+      const { data } = await axios.post('/api/order/user', {
+        userId: user._id,
+      });
+
       if (data.success) {
+        console.log('📋 Pedidos carregados:', data.orders.length);
+        console.log(
+          '📋 Detalhes dos pedidos:',
+          data.orders.map(order => ({
+            id: order._id,
+            paymentType: order.paymentType,
+            isPaid: order.isPaid,
+            amount: order.amount,
+          }))
+        );
+
         setMyOrders(data.orders);
+      } else {
+        console.error('❌ Erro ao buscar pedidos:', data.message);
       }
     } catch (error) {
-      console.error('Erro ao buscar encomendas:', error);
+      console.error('❌ Erro na requisição de pedidos:', error);
     }
   };
-
-  useEffect(() => {
-    if (user) {
-      fetchMyOrders();
-    } else {
-      setMyOrders([]);
-    }
-  }, [user]);
 
   return (
     <div className='container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-60px)] bg-gray-50'>

@@ -291,9 +291,7 @@ export const placeOrderStripe = async (req, res) => {
 // Stripe Webhooks to Verify Payments Action : /stripe
 export const stripeWebhooks = async (request, response) => {
   try {
-    // Stripe Gateway Initialize
     const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
-
     const sig = request.headers['stripe-signature'];
     let event;
 
@@ -304,107 +302,122 @@ export const stripeWebhooks = async (request, response) => {
         process.env.STRIPE_WEBHOOK_SECRET
       );
     } catch (error) {
-      console.error('❌ Erro na verificação do webhook:', error.message);
+      console.error('❌ Webhook signature verification failed:', error.message);
       return response.status(400).send(`Webhook Error: ${error.message}`);
     }
 
-    console.log('🔔 Webhook recebido:', event.type);
+    console.log('🔔 Stripe webhook received:', event.type);
 
-    // Handle the event
     switch (event.type) {
       case 'checkout.session.completed': {
-        // ✅ Melhor usar checkout.session.completed em vez de payment_intent.succeeded
         const session = event.data.object;
         const { orderId, userId } = session.metadata;
 
-        console.log('✅ Pagamento confirmado:', { orderId, userId });
-
-        // Mark Payment as Paid
-        const updatedOrder = await Order.findByIdAndUpdate(
+        console.log('💳 Processing confirmed payment:', {
           orderId,
-          { isPaid: true },
-          { new: true }
-        ).populate('items.product address');
+          userId,
+          sessionId: session.id,
+        });
 
-        if (updatedOrder) {
-          // Clear user cart
-          await User.findByIdAndUpdate(userId, { cartItems: {} });
+        try {
+          // ✅ Marcar pedido como pago
+          const updatedOrder = await Order.findByIdAndUpdate(
+            orderId,
+            { isPaid: true },
+            { new: true }
+          );
 
-          // 📧 Enviar email de confirmação (consistente com COD)
-          try {
-            const user = await User.findById(userId).select('name email');
-            const addressData = await Address.findById(updatedOrder.address);
-            const products = await Promise.all(
-              updatedOrder.items.map(
-                async item => await Product.findById(item.product)
-              )
-            );
-
-            await sendOrderConfirmationEmail(
-              updatedOrder,
-              user,
-              products,
-              addressData
-            );
-            console.log(
-              '📧 Email de confirmação enviado para pedido Stripe:',
-              orderId
-            );
-          } catch (emailError) {
-            console.error(
-              '❌ Erro ao enviar email de confirmação:',
-              emailError
-            );
-            // Não falhar a operação por causa do email
+          if (!updatedOrder) {
+            console.error('❌ Order not found:', orderId);
+            return response.status(404).json({ error: 'Order not found' });
           }
 
-          console.log('✅ Pedido processado com sucesso:', orderId);
-        } else {
-          console.error('❌ Pedido não encontrado:', orderId);
+          console.log('✅ Order marked as paid:', {
+            orderId: updatedOrder._id,
+            paymentType: updatedOrder.paymentType,
+            amount: updatedOrder.amount,
+            isPaid: updatedOrder.isPaid,
+          });
+
+          // ✅ Limpar carrinho
+          await User.findByIdAndUpdate(userId, { cartItems: {} });
+          console.log('🛒 Cart cleared for user:', userId);
+
+          // ✅ Enviar email de confirmação
+          try {
+            const [user, addressData, ...productData] = await Promise.all([
+              User.findById(userId).select('name email'),
+              Address.findById(updatedOrder.address),
+              ...updatedOrder.items.map(item => Product.findById(item.product)),
+            ]);
+
+            if (user && addressData && productData.every(p => p)) {
+              console.log('📧 Sending confirmation email to:', user.email);
+
+              const emailResult = await sendOrderConfirmationEmail(
+                updatedOrder,
+                user,
+                productData,
+                addressData
+              );
+
+              if (emailResult.success) {
+                console.log(
+                  '📧 ✅ Email sent successfully to:',
+                  emailResult.recipient
+                );
+              } else {
+                console.error('📧 ❌ Email failed:', emailResult.error);
+              }
+            } else {
+              console.error('❌ Missing data for email:', {
+                hasUser: !!user,
+                hasAddress: !!addressData,
+                hasProducts: productData.every(p => p),
+              });
+            }
+          } catch (emailError) {
+            console.error('❌ Email processing error:', emailError.message);
+          }
+
+          console.log('🎉 Stripe order processed successfully:', orderId);
+        } catch (orderError) {
+          console.error('❌ Order processing error:', orderError);
+          return response
+            .status(500)
+            .json({ error: 'Order processing failed' });
         }
         break;
       }
 
       case 'payment_intent.payment_failed': {
         const paymentIntent = event.data.object;
-        const paymentIntentId = paymentIntent.id;
-
-        console.log('❌ Pagamento falhou:', paymentIntentId);
+        console.log('❌ Payment failed:', paymentIntent.id);
 
         try {
-          // Getting Session Metadata
           const sessions = await stripeInstance.checkout.sessions.list({
-            payment_intent: paymentIntentId,
+            payment_intent: paymentIntent.id,
           });
 
           if (sessions.data.length > 0) {
             const { orderId } = sessions.data[0].metadata;
             await Order.findByIdAndDelete(orderId);
-            console.log(
-              '🗑️ Pedido removido devido ao pagamento falhado:',
-              orderId
-            );
+            console.log('🗑️ Order deleted due to payment failure:', orderId);
           }
         } catch (error) {
-          console.error('❌ Erro ao processar falha de pagamento:', error);
+          console.error('❌ Error cleaning up failed payment:', error);
         }
         break;
       }
 
-      case 'invoice.payment_succeeded': {
-        // Para subscriptions futuras
-        console.log('💳 Pagamento de fatura bem-sucedido');
-        break;
-      }
-
       default:
-        console.log(`⚠️ Evento não tratado: ${event.type}`);
+        console.log(`⚠️ Unhandled event type: ${event.type}`);
         break;
     }
 
     response.json({ received: true });
   } catch (error) {
-    console.error('❌ Erro no webhook:', error);
+    console.error('❌ Webhook processing error:', error);
     response.status(500).json({ error: 'Webhook processing failed' });
   }
 };
@@ -413,14 +426,49 @@ export const stripeWebhooks = async (request, response) => {
 export const getUserOrders = async (req, res) => {
   try {
     const { userId } = req.body;
+
+    if (!userId) {
+      return res.json({ success: false, message: 'User ID is required' });
+    }
+
+    console.log('🔍 Fetching orders for user:', userId);
+
+    // ✅ Query corrigida para incluir pedidos Stripe pagos
     const orders = await Order.find({
       userId,
-      $or: [{ paymentType: 'COD' }, { isPaid: true }],
+      $or: [
+        { paymentType: 'COD' }, // COD sempre mostra
+        { paymentType: 'Online', isPaid: true }, // Stripe só quando pago
+      ],
     })
-      .populate('items.product address')
+      .populate({
+        path: 'items.product',
+        select: 'name image category offerPrice weight',
+      })
+      .populate({
+        path: 'address',
+        select:
+          'firstName lastName street city state zipcode country email phone',
+      })
       .sort({ createdAt: -1 });
+
+    console.log(`📋 Orders found for user ${userId}:`, orders.length);
+
+    // Log detalhado para debug
+    orders.forEach((order, index) => {
+      console.log(`📦 Order ${index + 1}:`, {
+        id: order._id,
+        paymentType: order.paymentType,
+        isPaid: order.isPaid,
+        amount: order.amount,
+        status: order.status,
+        itemsCount: order.items?.length || 0,
+      });
+    });
+
     res.json({ success: true, orders });
   } catch (error) {
+    console.error('❌ Error fetching user orders:', error);
     res.json({ success: false, message: error.message });
   }
 };
