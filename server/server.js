@@ -12,7 +12,11 @@ import cartRouter from './routes/cartRoute.js';
 import addressRouter from './routes/addressRoute.js';
 import orderRouter from './routes/orderRoute.js';
 import reviewRouter from './routes/reviewRoute.js';
-import { stripeWebhooks } from './controllers/orderController.js';
+// ✅ Importar apenas as funções necessárias
+import {
+  stripeWebhooksDetailed,
+  debugEnvironment,
+} from './controllers/orderController.js';
 
 const app = express();
 const port = process.env.PORT || 4001;
@@ -41,8 +45,11 @@ try {
 app.post(
   '/webhook/stripe',
   express.raw({ type: 'application/json' }),
-  stripeWebhooks
+  stripeWebhooksDetailed // ✅ Usar versão com logs detalhados
 );
+
+// ✅ Endpoint para debug das variáveis de ambiente
+app.get('/debug/env', debugEnvironment);
 
 /* =========================
    CORS (antes dos parsers normais)
@@ -101,6 +108,7 @@ app.get('/', (req, res) => {
       order: '/api/order/*',
       reviews: '/api/reviews/*',
       webhook: '/webhook/stripe',
+      debug: '/debug/env', // ✅ Adicionar rota de debug
     },
   });
 });
@@ -142,6 +150,7 @@ app.use('*', (req, res) => {
     requestedPath: req.originalUrl,
     availableRoutes: [
       'GET /',
+      'GET /debug/env',
       'POST /webhook/stripe',
       'GET /api/reviews/test',
       'GET /api/reviews/recent',
@@ -162,6 +171,7 @@ if (!isVercel) {
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log('📋 Available endpoints:');
     console.log('  - GET  /');
+    console.log('  - GET  /debug/env');
     console.log('  - POST /webhook/stripe');
     console.log('  - GET  /api/reviews/test');
     console.log('  - GET  /api/reviews/recent');

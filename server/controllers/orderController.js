@@ -387,3 +387,134 @@ export const getAllOrders = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+// Adicione este endpoint temporário para debug das variáveis
+// Em orderController.js
+
+export const debugEnvironment = async (req, res) => {
+  try {
+    console.log('🐛 DEBUG Environment Variables:');
+
+    const envDebug = {
+      NODE_ENV: process.env.NODE_ENV,
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY
+        ? '✅ Definido'
+        : '❌ Não definido',
+      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET
+        ? '✅ Definido'
+        : '❌ Não definido',
+      JWT_SECRET: process.env.JWT_SECRET ? '✅ Definido' : '❌ Não definido',
+    };
+
+    console.log('Environment check:', envDebug);
+
+    // ⚠️ NÃO mostrar valores reais em produção
+    res.json({
+      success: true,
+      environment: envDebug,
+      message: 'Verifique os logs do servidor para detalhes',
+    });
+  } catch (error) {
+    console.error('❌ Erro no debug environment:', error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// ✅ Webhook com logs mais detalhados
+export const stripeWebhooksDetailed = async (req, res) => {
+  console.log('🎯 WEBHOOK RECEBIDO - Timestamp:', new Date().toISOString());
+  console.log('🎯 Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('🎯 Body type:', typeof req.body);
+  console.log('🎯 Body length:', req.body?.length);
+
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  // Verificar se as variáveis de ambiente existem
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.log('❌ STRIPE_WEBHOOK_SECRET não definido!');
+    return res.status(500).send('STRIPE_WEBHOOK_SECRET não configurado');
+  }
+
+  console.log('✅ STRIPE_WEBHOOK_SECRET existe');
+
+  try {
+    console.log('🔐 Tentando validar signature...');
+
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+
+    console.log('✅ Signature válida! Evento:', event.type);
+  } catch (err) {
+    console.log('❌ Erro na signature:', err.message);
+    console.log('❌ Signature recebida:', sig);
+    console.log(
+      '❌ Webhook secret (primeiros 10 chars):',
+      process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10)
+    );
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  console.log('🎉 Evento recebido e validado:', event.type);
+  console.log('📄 Event data:', JSON.stringify(event.data, null, 2));
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const orderId = session?.metadata?.orderId;
+
+    console.log('💳 Processando checkout.session.completed');
+    console.log('📋 Session metadata:', session.metadata);
+    console.log('🆔 Order ID extraído:', orderId);
+
+    if (!orderId) {
+      console.log('⚠️ orderId ausente no metadata');
+      return res.status(400).send('orderId missing in session metadata');
+    }
+
+    try {
+      console.log('🔄 Tentando atualizar pedido:', orderId);
+
+      const updated = await Order.findByIdAndUpdate(
+        orderId,
+        {
+          isPaid: true,
+          paidAt: new Date(),
+          paymentInfo: {
+            id: session.payment_intent,
+            status: session.payment_status,
+            email: session.customer_details?.email || '',
+          },
+        },
+        { new: true }
+      );
+
+      if (!updated) {
+        console.log('❌ Order não encontrada no DB:', orderId);
+        return res.status(404).send('Order not found');
+      }
+
+      console.log('✅ Pedido atualizado com sucesso!');
+      console.log('📦 Pedido atualizado:', {
+        id: updated._id,
+        isPaid: updated.isPaid,
+        paidAt: updated.paidAt,
+        amount: updated.amount,
+      });
+
+      res.status(200).json({
+        received: true,
+        orderId,
+        isPaid: true,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('❌ Erro ao atualizar pedido:', err.message);
+      res.status(500).send('Erro ao atualizar pedido');
+    }
+  } else {
+    console.log('ℹ️ Evento não tratado:', event.type);
+    res.status(200).json({ received: true });
+  }
+};
