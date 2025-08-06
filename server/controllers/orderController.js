@@ -703,6 +703,7 @@ export const stripeWebhooksVercel = async (req, res) => {
 
 // Adicione esta função TEMPORÁRIA no orderController.js para teste
 
+// ✅ ADICIONE ESTA FUNÇÃO NO FINAL DO orderController.js
 export const webhookSimpleTest = async (req, res) => {
   console.log('🚨 WEBHOOK TESTE RECEBIDO!');
   console.log('🚨 Timestamp:', new Date().toISOString());

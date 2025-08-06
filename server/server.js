@@ -12,9 +12,8 @@ import cartRouter from './routes/cartRoute.js';
 import addressRouter from './routes/addressRoute.js';
 import orderRouter from './routes/orderRoute.js';
 import reviewRouter from './routes/reviewRoute.js';
-// ✅ CORRIGIDO: Importar apenas as funções necessárias (sem duplicatas)
 import {
-  stripeWebhooksVercel, // ✅ Usar apenas a versão otimizada
+  stripeWebhooksVercel,
   debugEnvironment,
   webhookSimpleTest,
 } from './controllers/orderController.js';
@@ -43,20 +42,17 @@ try {
    🔔 Stripe Webhook (RAW BODY)
    ⚠️ TEM de vir ANTES de express.json()
    ========================= */
-// ✅ CORRIGIDO: Apenas uma rota de webhook (não duas)
 app.post(
   '/webhook/stripe',
   express.raw({ type: 'application/json' }),
   stripeWebhooksVercel
 );
 
-// ✅ ADICIONAR: Webhook de teste (aceita JSON normal)
+// ✅ Webhook de teste (aceita JSON normal)
 app.post('/webhook/test', express.json(), webhookSimpleTest);
-
-// ✅ ADICIONAR: Webhook de teste via GET (para testar no navegador)
 app.get('/webhook/test', webhookSimpleTest);
 
-// Debug das variáveis
+// ✅ Debug das variáveis
 app.get('/debug/env', debugEnvironment);
 
 /* =========================
@@ -116,6 +112,7 @@ app.get('/', (req, res) => {
       order: '/api/order/*',
       reviews: '/api/reviews/*',
       webhook: '/webhook/stripe',
+      test: '/webhook/test',
       debug: '/debug/env',
     },
   });
@@ -148,26 +145,6 @@ app.use('/api/reviews', reviewRouter);
 console.log('✅ Review routes registered');
 
 /* =========================
-   404 handler
-   ========================= */
-app.use('*', (req, res) => {
-  console.log('❌ Route not found:', req.method, req.originalUrl);
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-    requestedPath: req.originalUrl,
-    availableRoutes: [
-      'GET /',
-      'GET /debug/env',
-      'POST /webhook/stripe',
-      'GET /api/reviews/test',
-      'GET /api/reviews/recent',
-      'POST /api/reviews/eligible-orders',
-    ],
-  });
-});
-
-/* =========================
    Arranque do servidor:
    - Em Vercel: exporta o app (sem listen)
    - Local dev: faz listen
@@ -180,6 +157,8 @@ if (!isVercel) {
     console.log('📋 Available endpoints:');
     console.log('  - GET  /');
     console.log('  - GET  /debug/env');
+    console.log('  - GET  /webhook/test');
+    console.log('  - POST /webhook/test');
     console.log('  - POST /webhook/stripe');
     console.log('  - GET  /api/reviews/test');
     console.log('  - GET  /api/reviews/recent');
@@ -188,6 +167,28 @@ if (!isVercel) {
     console.log('🎯 Ready to handle requests!');
   });
 }
+
+/* =========================
+   ✅ 404 handler - DEVE VIR POR ÚLTIMO!
+   ========================= */
+app.use('*', (req, res) => {
+  console.log('❌ Route not found:', req.method, req.originalUrl);
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    requestedPath: req.originalUrl,
+    availableRoutes: [
+      'GET /',
+      'GET /debug/env',
+      'GET /webhook/test',
+      'POST /webhook/test',
+      'POST /webhook/stripe',
+      'GET /api/reviews/test',
+      'GET /api/reviews/recent',
+      'POST /api/reviews/eligible-orders',
+    ],
+  });
+});
 
 /* =========================
    Export para Vercel (@vercel/node)
