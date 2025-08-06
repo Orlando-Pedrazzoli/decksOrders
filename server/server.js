@@ -1,3 +1,4 @@
+// server.js
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import cors from 'cors';
@@ -16,7 +17,9 @@ import { stripeWebhooks } from './controllers/orderController.js';
 const app = express();
 const port = process.env.PORT || 4001;
 
-// 🔗 Conectar ao banco e cloudinary
+/* =========================
+   Conexões externas
+   ========================= */
 try {
   await connectDB();
   console.log('✅ Database connected successfully');
@@ -31,15 +34,19 @@ try {
   console.error('❌ Cloudinary connection failed:', error);
 }
 
-// 🟡 Webhook do Stripe precisa vir antes de qualquer parser!
-// ✅ CORRIGIDO: Rota agora é /webhook/stripe para coincidir com a configuração do Stripe
+/* =========================
+   🔔 Stripe Webhook (RAW BODY)
+   ⚠️ TEM de vir ANTES de express.json()
+   ========================= */
 app.post(
   '/webhook/stripe',
   express.raw({ type: 'application/json' }),
   stripeWebhooks
 );
 
-// 🟢 CORS deve vir antes de express.json()
+/* =========================
+   CORS (antes dos parsers normais)
+   ========================= */
 app.use(
   cors({
     origin: [
@@ -56,12 +63,17 @@ app.use(
   })
 );
 
-// 🔧 Middlewares de parsing e cookies
+/* =========================
+   Parsers normais e cookies
+   (após o webhook)
+   ========================= */
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
-// ✅ Middleware de log para debug (opcional - remover em produção)
+/* =========================
+   Logs simples (opcional)
+   ========================= */
 if (process.env.NODE_ENV !== 'production') {
   app.use((req, res, next) => {
     console.log(
@@ -71,7 +83,9 @@ if (process.env.NODE_ENV !== 'production') {
   });
 }
 
-// ✅ Health check melhorado
+/* =========================
+   Health-check
+   ========================= */
 app.get('/', (req, res) => {
   res.json({
     message: 'Elite Surfing API is Working',
@@ -86,12 +100,14 @@ app.get('/', (req, res) => {
       address: '/api/address/*',
       order: '/api/order/*',
       reviews: '/api/reviews/*',
-      webhook: '/webhook/stripe', // ✅ Adicionado para referência
+      webhook: '/webhook/stripe',
     },
   });
 });
 
-// 📦 Rotas principais
+/* =========================
+   Rotas principais
+   ========================= */
 console.log('📝 Registrando rotas...');
 
 app.use('/api/user', userRouter);
@@ -115,20 +131,9 @@ console.log('✅ Order routes registered');
 app.use('/api/reviews', reviewRouter);
 console.log('✅ Review routes registered');
 
-// 🚨 Middleware de erro
-app.use((error, req, res, next) => {
-  console.error('❌ Server Error:', error);
-  res.status(500).json({
-    success: false,
-    message:
-      process.env.NODE_ENV === 'production'
-        ? 'Internal Server Error'
-        : error.message,
-    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-  });
-});
-
-// ❌ Rota não encontrada
+/* =========================
+   404 handler
+   ========================= */
 app.use('*', (req, res) => {
   console.log('❌ Route not found:', req.method, req.originalUrl);
   res.status(404).json({
@@ -145,16 +150,28 @@ app.use('*', (req, res) => {
   });
 });
 
-// 🚀 Iniciar servidor
-app.listen(port, () => {
-  console.log(`🚀 Server started on PORT: ${port}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log('📋 Available endpoints:');
-  console.log('  - GET  /');
-  console.log('  - POST /webhook/stripe');
-  console.log('  - GET  /api/reviews/test');
-  console.log('  - GET  /api/reviews/recent');
-  console.log('  - POST /api/reviews/eligible-orders');
-  console.log('  - POST /api/reviews/create');
-  console.log('🎯 Ready to handle requests!');
-});
+/* =========================
+   Arranque do servidor:
+   - Em Vercel: exporta o app (sem listen)
+   - Local dev: faz listen
+   ========================= */
+const isVercel = !!process.env.VERCEL;
+if (!isVercel) {
+  app.listen(port, () => {
+    console.log(`🚀 Server started on PORT: ${port}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log('📋 Available endpoints:');
+    console.log('  - GET  /');
+    console.log('  - POST /webhook/stripe');
+    console.log('  - GET  /api/reviews/test');
+    console.log('  - GET  /api/reviews/recent');
+    console.log('  - POST /api/reviews/eligible-orders');
+    console.log('  - POST /api/reviews/create');
+    console.log('🎯 Ready to handle requests!');
+  });
+}
+
+/* =========================
+   Export para Vercel (@vercel/node)
+   ========================= */
+export default app;
