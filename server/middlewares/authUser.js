@@ -53,7 +53,7 @@ const authUser = async (req, res, next) => {
     }
 
     // ✅ Adicionar userId ao body da requisição
-    req.userId = decoded.id;
+    req.body.userId = decoded.id;
 
     console.log('✅ Usuário autenticado com sucesso:', decoded.id);
 
