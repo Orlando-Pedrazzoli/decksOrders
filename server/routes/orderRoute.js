@@ -11,7 +11,7 @@ import authSeller from '../middlewares/authSeller.js';
 const orderRouter = express.Router();
 
 orderRouter.post('/cod', authUser, placeOrderCOD);
-orderRouter.get('/user', authUser, getUserOrders);
+orderRouter.post('/user', authUser, getUserOrders); // ✅ MUDOU DE GET PARA POST
 orderRouter.get('/seller', authSeller, getAllOrders);
 orderRouter.post('/stripe', authUser, placeOrderStripe);
 
