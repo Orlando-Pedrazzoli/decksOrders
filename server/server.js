@@ -32,7 +32,12 @@ try {
 }
 
 // 🟡 Webhook do Stripe precisa vir antes de qualquer parser!
-app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
+// ✅ CORRIGIDO: Rota agora é /webhook/stripe para coincidir com a configuração do Stripe
+app.post(
+  '/webhook/stripe',
+  express.raw({ type: 'application/json' }),
+  stripeWebhooks
+);
 
 // 🟢 CORS deve vir antes de express.json()
 app.use(
@@ -80,7 +85,8 @@ app.get('/', (req, res) => {
       cart: '/api/cart/*',
       address: '/api/address/*',
       order: '/api/order/*',
-      reviews: '/api/reviews/*', // ✅ Confirma que reviews está disponível
+      reviews: '/api/reviews/*',
+      webhook: '/webhook/stripe', // ✅ Adicionado para referência
     },
   });
 });
@@ -107,7 +113,7 @@ app.use('/api/order', orderRouter);
 console.log('✅ Order routes registered');
 
 app.use('/api/reviews', reviewRouter);
-console.log('✅ Review routes registered'); // ✅ CONFIRMAÇÃO IMPORTANTE
+console.log('✅ Review routes registered');
 
 // 🚨 Middleware de erro
 app.use((error, req, res, next) => {
@@ -131,6 +137,7 @@ app.use('*', (req, res) => {
     requestedPath: req.originalUrl,
     availableRoutes: [
       'GET /',
+      'POST /webhook/stripe',
       'GET /api/reviews/test',
       'GET /api/reviews/recent',
       'POST /api/reviews/eligible-orders',
@@ -144,6 +151,7 @@ app.listen(port, () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log('📋 Available endpoints:');
   console.log('  - GET  /');
+  console.log('  - POST /webhook/stripe');
   console.log('  - GET  /api/reviews/test');
   console.log('  - GET  /api/reviews/recent');
   console.log('  - POST /api/reviews/eligible-orders');

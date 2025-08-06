@@ -5,8 +5,7 @@ import Product from '../models/Product.js';
 import User from '../models/User.js';
 import Address from '../models/Address.js';
 
-// Substitua a função placeOrderCOD no orderController.js por esta:
-
+// Place Order COD : /api/order/cod
 export const placeOrderCOD = async (req, res) => {
   try {
     console.log('📧 Recebendo dados da encomenda:', req.body);
@@ -288,7 +287,7 @@ export const placeOrderStripe = async (req, res) => {
   }
 };
 
-// Stripe Webhooks to Verify Payments Action : /stripe
+// ✅ WEBHOOK STRIPE OTIMIZADO: /webhook/stripe
 export const stripeWebhooks = async (request, response) => {
   console.log('🔔 WEBHOOK STRIPE CHAMADO!');
   console.log('📥 Headers recebidos:', request.headers);
@@ -366,47 +365,28 @@ export const stripeWebhooks = async (request, response) => {
           await User.findByIdAndUpdate(userId, { cartItems: {} });
           console.log('✅ Carrinho limpo com sucesso');
 
-          // ✅ ENVIAR EMAIL - PASSO A PASSO
+          // ✅ ENVIAR EMAIL - PROCESSO OTIMIZADO
           console.log('📧 INICIANDO PROCESSO DE EMAIL...');
 
           try {
-            console.log('📧 Passo 1: Buscando dados do usuário...');
-            const user = await User.findById(userId).select('name email');
-            console.log(
-              '📧 Usuário encontrado:',
-              user ? `${user.name} (${user.email})` : 'ERRO: não encontrado'
-            );
+            // Buscar todos os dados necessários em paralelo para otimizar performance
+            const [user, addressData, ...products] = await Promise.all([
+              User.findById(userId).select('name email'),
+              Address.findById(updatedOrder.address),
+              ...updatedOrder.items.map(item => Product.findById(item.product)),
+            ]);
 
-            console.log('📧 Passo 2: Buscando dados do endereço...');
-            const addressData = await Address.findById(updatedOrder.address);
-            console.log(
-              '📧 Endereço encontrado:',
-              addressData
+            console.log('📧 Dados coletados:', {
+              user: user
+                ? `${user.name} (${user.email})`
+                : 'ERRO: não encontrado',
+              address: addressData
                 ? `${addressData.city}, ${addressData.country}`
-                : 'ERRO: não encontrado'
-            );
+                : 'ERRO: não encontrado',
+              productsCount: products.filter(Boolean).length,
+            });
 
-            console.log('📧 Passo 3: Buscando produtos...');
-            const productPromises = updatedOrder.items.map(
-              async (item, index) => {
-                console.log(`📧 Buscando produto ${index + 1}:`, item.product);
-                const product = await Product.findById(item.product);
-                console.log(
-                  `📧 Produto ${index + 1} encontrado:`,
-                  product ? product.name : 'ERRO: não encontrado'
-                );
-                return product;
-              }
-            );
-
-            const products = await Promise.all(productPromises);
-            const validProducts = products.filter(Boolean);
-            console.log(
-              '📧 Produtos válidos encontrados:',
-              validProducts.length
-            );
-
-            // ✅ Verificar se temos todos os dados
+            // Verificar se temos todos os dados necessários
             if (!user) {
               console.error('❌ EMAIL FALHOU: Usuário não encontrado');
               return response.json({ received: true });
@@ -417,21 +397,15 @@ export const stripeWebhooks = async (request, response) => {
               return response.json({ received: true });
             }
 
+            const validProducts = products.filter(Boolean);
             if (validProducts.length === 0) {
               console.error('❌ EMAIL FALHOU: Nenhum produto encontrado');
               return response.json({ received: true });
             }
 
             console.log(
-              '📧 TODOS OS DADOS OK! Chamando sendOrderConfirmationEmail...'
+              '📧 TODOS OS DADOS OK! Enviando email de confirmação...'
             );
-            console.log('📧 Dados do pedido:', {
-              orderId: updatedOrder._id,
-              amount: updatedOrder.amount,
-              originalAmount: updatedOrder.originalAmount,
-              discountAmount: updatedOrder.discountAmount,
-              promoCode: updatedOrder.promoCode,
-            });
 
             const emailResult = await sendOrderConfirmationEmail(
               updatedOrder,
@@ -474,18 +448,21 @@ export const stripeWebhooks = async (request, response) => {
         console.log('❌ PAGAMENTO FALHOU:', paymentIntent.id);
 
         try {
+          // Buscar sessões associadas a este payment_intent
           const sessions = await stripeInstance.checkout.sessions.list({
             payment_intent: paymentIntent.id,
           });
 
           if (sessions.data.length > 0) {
-            const { orderId } = sessions.data[0].metadata;
-            console.log(
-              '🗑️ Removendo pedido devido ao pagamento falhado:',
-              orderId
-            );
-            await Order.findByIdAndDelete(orderId);
-            console.log('✅ Pedido removido com sucesso');
+            const { orderId } = sessions.data[0].metadata || {};
+            if (orderId) {
+              console.log(
+                '🗑️ Removendo pedido devido ao pagamento falhado:',
+                orderId
+              );
+              await Order.findByIdAndDelete(orderId);
+              console.log('✅ Pedido removido com sucesso');
+            }
           }
         } catch (error) {
           console.error('❌ Erro ao limpar pagamento falhado:', error);
