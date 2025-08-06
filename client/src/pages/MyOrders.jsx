@@ -1,18 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { assets } from '../assets/assets';
+import { assets } from '../assets/assets'; // Assuming you have an assets file for empty state images
 
 const MyOrders = () => {
   const [myOrders, setMyOrders] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const { currency, axios, user } = useAppContext();
 
   const fetchMyOrders = async () => {
     try {
-      // ✅ POST com userId (como o backend espera)
-      const { data } = await axios.post('/api/order/user', {
-        userId: user._id,
-      });
+      const { data } = await axios.get('/api/order/user');
       if (data.success) {
         setMyOrders(data.orders);
       }
@@ -25,27 +21,9 @@ const MyOrders = () => {
     if (user) {
       fetchMyOrders();
     } else {
-      console.log('⚠️ Usuário não logado');
       setMyOrders([]);
-      setIsLoading(false);
     }
   }, [user]);
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className='container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-60px)] bg-gray-50'>
-        <div className='max-w-4xl mx-auto'>
-          <h1 className='text-3xl sm:text-4xl font-bold text-gray-800 mb-8 text-center'>
-            As Minhas Encomendas
-          </h1>
-          <div className='flex items-center justify-center min-h-[50vh]'>
-            <div className='animate-spin rounded-full h-16 w-16 border-b-2 border-primary'></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className='container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-60px)] bg-gray-50'>
@@ -80,68 +58,35 @@ const MyOrders = () => {
                 <div className='bg-primary-light/30 p-4 sm:p-5 border-b border-gray-200'>
                   <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2'>
                     <h3 className='text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-0'>
-                      Encomenda ID: #{order._id}
+                      Encomenda ID: {order._id}
                     </h3>
                     <p className='text-sm sm:text-base text-gray-700'>
                       Data:{' '}
                       {new Date(order.createdAt).toLocaleDateString('pt-PT')}
                     </p>
                   </div>
-
-                  {/* Payment Method */}
-                  <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2'>
-                    <p className='text-sm sm:text-base text-gray-700 font-medium'>
-                      Método de Pagamento:{' '}
-                      <span
-                        className={`font-semibold ${
-                          order.paymentType === 'COD'
-                            ? 'text-orange-600'
-                            : 'text-blue-600'
-                        }`}
-                      >
-                        {order.paymentType === 'COD'
-                          ? 'Pagamento na Entrega'
-                          : 'Pagamento Online (Stripe)'}
-                      </span>
-                      {order.paymentType === 'Online' && (
-                        <span
-                          className={`ml-2 px-2 py-1 text-xs rounded-full ${
-                            order.isPaid
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                          {order.isPaid ? 'Pago' : 'Não Pago'}
-                        </span>
-                      )}
-                    </p>
-
-                    {/* Order Total */}
-                    <div className='text-right'>
-                      {order.originalAmount &&
-                        order.originalAmount !== order.amount && (
-                          <p className='text-sm text-gray-500 line-through'>
-                            {currency} {order.originalAmount.toFixed(2)}
-                          </p>
-                        )}
-                      <p className='text-lg sm:text-xl font-bold text-primary-dark'>
-                        {currency}{' '}
-                        {order.amount ? order.amount.toFixed(2) : '0.00'}
-                      </p>
-                      {order.promoCode && (
-                        <p className='text-xs text-green-600 font-medium'>
-                          Código: {order.promoCode} (-
-                          {order.discountPercentage || 30}%)
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  <p className='text-sm sm:text-base text-gray-700 font-medium'>
+                    Método de Pagamento:{' '}
+                    <span className='font-semibold'>
+                      {/* CORRIGIDO: Usando order.paymentType */}
+                      {order.paymentType === 'COD'
+                        ? 'Pagamento na Entrega'
+                        : 'Pagamento Online (Stripe)'}
+                    </span>
+                  </p>
+                  <p className='text-sm sm:text-base text-gray-700 font-medium mt-1'>
+                    Total da Encomenda:{' '}
+                    <span className='font-semibold text-primary-dark'>
+                      {currency} {/* CORRIGIDO: Usando order.amount */}
+                      {order.amount ? order.amount.toFixed(2) : '0.00'}
+                    </span>
+                  </p>
                 </div>
 
                 {/* Items in the Order */}
                 <div className='divide-y divide-gray-100'>
                   {order.items
-                    .filter(item => item?.product)
+                    .filter(item => item?.product) // Ensure product data exists
                     .map((item, itemIndex) => (
                       <div
                         key={item?.product?._id || itemIndex}
@@ -152,7 +97,7 @@ const MyOrders = () => {
                           <img
                             src={
                               item?.product?.image?.[0] ||
-                              assets.placeholder_image
+                              assets.placeholder_image // Fallback image
                             }
                             alt={item?.product?.name || 'Imagem do Produto'}
                             className='w-full h-full object-contain'
@@ -177,8 +122,7 @@ const MyOrders = () => {
                             <span className='mr-0.5'>{currency}</span>
                             <span>
                               {(
-                                (item?.product?.offerPrice || 0) *
-                                (item.quantity || 1)
+                                item?.product?.offerPrice * item.quantity
                               ).toFixed(2)}
                             </span>
                           </p>
@@ -189,14 +133,12 @@ const MyOrders = () => {
                           <p className='text-sm text-gray-600'>
                             Estado:{' '}
                             <span
-                              className={`font-semibold px-2 py-1 rounded-full text-xs ${
+                              className={`font-semibold ${
                                 order.status === 'Delivered'
-                                  ? 'bg-green-100 text-green-800'
-                                  : order.status === 'Cancelled'
-                                  ? 'bg-red-100 text-red-800'
-                                  : order.status === 'Shipped'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : 'bg-orange-100 text-orange-800'
+                                  ? 'text-green-600' // Cor para entregue
+                                  : order.status === 'Cancelled' // Se tiver estado 'Cancelled'
+                                  ? 'text-red-500' // Cor para cancelada
+                                  : 'text-orange-500' // Cor para outros estados (em processamento, aguardar envio, enviado)
                               }`}
                             >
                               {order.status === 'Processing'
@@ -205,11 +147,10 @@ const MyOrders = () => {
                                 ? 'Enviado'
                                 : order.status === 'Delivered'
                                 ? 'Entregue'
-                                : order.status === 'Cancelled'
-                                ? 'Cancelado'
-                                : order.status === 'Pending'
+                                : order.status === 'Pending' // Um novo estado se desejar, para recém-criadas
                                 ? 'Pendente'
-                                : 'A Aguardar Envio'}
+                                : 'A Aguardar Envio'}{' '}
+                              {/* <--- Este será o estado padrão para 'desconhecido' */}
                             </span>
                           </p>
                         </div>
