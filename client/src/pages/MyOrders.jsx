@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { assets } from '../assets/assets'; // Assuming you have an assets file for empty state images
+import { assets } from '../assets/assets';
 
 const MyOrders = () => {
   const [myOrders, setMyOrders] = useState([]);
@@ -8,10 +8,13 @@ const MyOrders = () => {
 
   const fetchMyOrders = async () => {
     try {
-      // ✅ CORRIGIDO: Usar POST em vez de GET para manter consistência com o backend
+      console.log('🔍 Buscando pedidos para usuário:', user?._id);
+
       const { data } = await axios.post('/api/order/user', {
         userId: user._id,
       });
+
+      console.log('📋 Resposta do servidor:', data);
 
       if (data.success) {
         console.log('📋 Pedidos carregados:', data.orders.length);
@@ -31,8 +34,21 @@ const MyOrders = () => {
       }
     } catch (error) {
       console.error('❌ Erro na requisição de pedidos:', error);
+      console.error('❌ Status do erro:', error.response?.status);
+      console.error('❌ Dados do erro:', error.response?.data);
     }
   };
+
+  // ✅ USEEFFECT ADICIONADO/CORRIGIDO
+  useEffect(() => {
+    if (user && user._id) {
+      console.log('👤 Usuário encontrado, buscando pedidos...');
+      fetchMyOrders();
+    } else {
+      console.log('❌ Usuário não encontrado');
+      setMyOrders([]);
+    }
+  }, [user]); // Dependência do user para recarregar quando user mudar
 
   return (
     <div className='container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-60px)] bg-gray-50'>
@@ -77,7 +93,6 @@ const MyOrders = () => {
                   <p className='text-sm sm:text-base text-gray-700 font-medium'>
                     Método de Pagamento:{' '}
                     <span className='font-semibold'>
-                      {/* CORRIGIDO: Usando order.paymentType */}
                       {order.paymentType === 'COD'
                         ? 'Pagamento na Entrega'
                         : 'Pagamento Online (Stripe)'}
@@ -86,7 +101,7 @@ const MyOrders = () => {
                   <p className='text-sm sm:text-base text-gray-700 font-medium mt-1'>
                     Total da Encomenda:{' '}
                     <span className='font-semibold text-primary-dark'>
-                      {currency} {/* CORRIGIDO: Usando order.amount */}
+                      {currency}{' '}
                       {order.amount ? order.amount.toFixed(2) : '0.00'}
                     </span>
                   </p>
@@ -95,7 +110,7 @@ const MyOrders = () => {
                 {/* Items in the Order */}
                 <div className='divide-y divide-gray-100'>
                   {order.items
-                    .filter(item => item?.product) // Ensure product data exists
+                    .filter(item => item?.product)
                     .map((item, itemIndex) => (
                       <div
                         key={item?.product?._id || itemIndex}
@@ -106,7 +121,7 @@ const MyOrders = () => {
                           <img
                             src={
                               item?.product?.image?.[0] ||
-                              assets.placeholder_image // Fallback image
+                              assets.placeholder_image
                             }
                             alt={item?.product?.name || 'Imagem do Produto'}
                             className='w-full h-full object-contain'
@@ -144,10 +159,10 @@ const MyOrders = () => {
                             <span
                               className={`font-semibold ${
                                 order.status === 'Delivered'
-                                  ? 'text-green-600' // Cor para entregue
-                                  : order.status === 'Cancelled' // Se tiver estado 'Cancelled'
-                                  ? 'text-red-500' // Cor para cancelada
-                                  : 'text-orange-500' // Cor para outros estados (em processamento, aguardar envio, enviado)
+                                  ? 'text-green-600'
+                                  : order.status === 'Cancelled'
+                                  ? 'text-red-500'
+                                  : 'text-orange-500'
                               }`}
                             >
                               {order.status === 'Processing'
@@ -156,10 +171,9 @@ const MyOrders = () => {
                                 ? 'Enviado'
                                 : order.status === 'Delivered'
                                 ? 'Entregue'
-                                : order.status === 'Pending' // Um novo estado se desejar, para recém-criadas
+                                : order.status === 'Pending'
                                 ? 'Pendente'
-                                : 'A Aguardar Envio'}{' '}
-                              {/* <--- Este será o estado padrão para 'desconhecido' */}
+                                : 'A Aguardar Envio'}
                             </span>
                           </p>
                         </div>
