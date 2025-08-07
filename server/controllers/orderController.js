@@ -63,12 +63,38 @@ export const placeOrderCOD = async (req, res) => {
 };
 
 // =============================================================================
-// PLACE ORDER STRIPE
+// PLACE ORDER STRIPE - CORRIGIDO PARA RECEBER TODOS OS CAMPOS
 // =============================================================================
 export const placeOrderStripe = async (req, res) => {
+  console.log('🚀 STRIPE FUNCTION STARTED!!!');
+  console.log('Body received:', req.body);
+
   try {
-    const { userId, items, address } = req.body;
+    const {
+      userId,
+      items,
+      address,
+      originalAmount,
+      amount,
+      discountAmount,
+      discountPercentage,
+      promoCode,
+      paymentType,
+      isPaid,
+    } = req.body;
+
     const { origin } = req.headers;
+
+    console.log('🔍 All fields extracted:', {
+      userId,
+      items,
+      address,
+      originalAmount,
+      amount,
+      discountAmount,
+      discountPercentage,
+      promoCode,
+    });
 
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
@@ -76,23 +102,48 @@ export const placeOrderStripe = async (req, res) => {
 
     let productData = [];
 
-    // Calculate Amount Using Items
-    let amount = await items.reduce(async (acc, item) => {
+    // Preparar productData para Stripe
+    for (const item of items) {
       const product = await Product.findById(item.product);
       productData.push({
         name: product.name,
         price: product.offerPrice,
         quantity: item.quantity,
       });
-      return (await acc) + product.offerPrice * item.quantity;
-    }, 0);
+    }
 
-    const order = await Order.create({
+    console.log('🔍 Creating order with:', {
       userId,
       items,
       amount,
       address,
       paymentType: 'Online',
+      isPaid: false,
+      promoCode: promoCode || '',
+      discountAmount: discountAmount || 0,
+      discountPercentage: discountPercentage || 0,
+      originalAmount,
+    });
+
+    // ✅ CRIAR PEDIDO COM TODOS OS CAMPOS DO MODELO
+    const order = await Order.create({
+      userId,
+      items,
+      amount, // Valor final após desconto
+      address,
+      paymentType: 'Online',
+      isPaid: false, // Sempre false - webhook vai marcar como true
+      promoCode: promoCode || '',
+      discountAmount: discountAmount || 0,
+      discountPercentage: discountPercentage || 0,
+      originalAmount, // OBRIGATÓRIO
+    });
+
+    console.log('✅ Pedido Stripe criado:', {
+      orderId: order._id,
+      amount: order.amount,
+      originalAmount: order.originalAmount,
+      discountAmount: order.discountAmount,
     });
 
     // Stripe Gateway Initialize
@@ -100,13 +151,22 @@ export const placeOrderStripe = async (req, res) => {
 
     // create line items for stripe
     const line_items = productData.map(item => {
+      // Se há desconto, aplicar proporcionalmente
+      let itemPrice = item.price;
+      if (discountPercentage > 0) {
+        itemPrice = item.price * (1 - discountPercentage / 100);
+      }
+
       return {
         price_data: {
           currency: 'usd',
           product_data: {
-            name: item.name,
+            name:
+              discountPercentage > 0
+                ? `${item.name} (${discountPercentage}% OFF)`
+                : item.name,
           },
-          unit_amount: Math.floor(item.price) * 100,
+          unit_amount: Math.floor(itemPrice) * 100,
         },
         quantity: item.quantity,
       };
@@ -116,7 +176,7 @@ export const placeOrderStripe = async (req, res) => {
     const session = await stripeInstance.checkout.sessions.create({
       line_items,
       mode: 'payment',
-      success_url: `${origin}/loader?next=my-orders`,
+      success_url: `${origin}/order-success/${order._id}?payment=stripe`,
       cancel_url: `${origin}/cart`,
       metadata: {
         orderId: order._id.toString(),
@@ -126,6 +186,7 @@ export const placeOrderStripe = async (req, res) => {
 
     return res.json({ success: true, url: session.url });
   } catch (error) {
+    console.error('❌ Erro Stripe completo:', error);
     return res.json({ success: false, message: error.message });
   }
 };
