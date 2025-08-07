@@ -6,86 +6,50 @@ import Address from '../models/Address.js';
 import stripe from 'stripe';
 
 // =============================================================================
-// PLACE ORDER COD
+// PLACE ORDER COD - USANDO MODELO Order COMPLETO
 // =============================================================================
 export const placeOrderCOD = async (req, res) => {
   try {
-    console.log('📧 COD Order - Dados recebidos:', req.body);
-
     const {
       userId,
       items,
       address,
-      promoCode,
-      discountApplied,
       originalAmount,
+      amount,
       discountAmount,
-      finalAmount,
       discountPercentage,
+      promoCode,
+      paymentType,
+      isPaid,
     } = req.body;
 
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
     }
 
-    // ✅ Usar valores do frontend ou calcular como backup
-    let orderOriginalAmount = originalAmount;
-    let orderFinalAmount = finalAmount || originalAmount;
-    let orderDiscountAmount = discountAmount || 0;
-    let orderDiscountPercentage = discountPercentage || 0;
-    let validPromoCode = null;
-
-    // Calcular valores se não vieram do frontend
-    if (!originalAmount) {
-      orderOriginalAmount = await items.reduce(async (acc, item) => {
-        const product = await Product.findById(item.product);
-        return (await acc) + product.offerPrice * item.quantity;
-      }, 0);
-      // Add Tax Charge (2%)
-      orderOriginalAmount += Math.floor(orderOriginalAmount * 0.02);
-      orderFinalAmount = orderOriginalAmount;
-    }
-
-    // Validar promo code
-    if (promoCode && discountApplied && promoCode.toUpperCase() === 'BROTHER') {
-      validPromoCode = promoCode.toUpperCase();
-      if (!discountAmount) {
-        orderDiscountPercentage = 30;
-        orderDiscountAmount = Math.round(orderOriginalAmount * 0.3 * 100) / 100;
-        orderFinalAmount = orderOriginalAmount - orderDiscountAmount;
-      }
-    }
-
-    // Criar pedido
+    // ✅ CRIAR PEDIDO COM TODOS OS CAMPOS DO MODELO
     const newOrder = await Order.create({
       userId,
       items,
-      amount: orderFinalAmount,
-      originalAmount: orderOriginalAmount,
+      amount, // Valor final após desconto
       address,
       paymentType: 'COD',
       isPaid: false, // COD sempre false até entrega
-      promoCode: validPromoCode,
-      discountAmount: orderDiscountAmount,
-      discountPercentage: orderDiscountPercentage,
+      promoCode: promoCode || '',
+      discountAmount: discountAmount || 0,
+      discountPercentage: discountPercentage || 0,
+      originalAmount, // OBRIGATÓRIO
     });
 
     console.log('✅ Pedido COD criado:', {
       orderId: newOrder._id,
       amount: newOrder.amount,
-      isPaid: newOrder.isPaid,
+      originalAmount: newOrder.originalAmount,
+      discountAmount: newOrder.discountAmount,
     });
 
-    // Limpar carrinho e enviar email
+    // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
-
-    const user = await User.findById(userId).select('name email');
-    const addressData = await Address.findById(address);
-    const products = await Promise.all(
-      items.map(async item => await Product.findById(item.product))
-    );
-
-    await sendOrderConfirmationEmail(newOrder, user, products, addressData);
 
     return res.json({
       success: true,
@@ -123,9 +87,6 @@ export const placeOrderStripe = async (req, res) => {
       return (await acc) + product.offerPrice * item.quantity;
     }, 0);
 
-    // Add Tax Charge (2%)
-    amount += Math.floor(amount * 0.02);
-
     const order = await Order.create({
       userId,
       items,
@@ -145,7 +106,7 @@ export const placeOrderStripe = async (req, res) => {
           product_data: {
             name: item.name,
           },
-          unit_amount: Math.floor(item.price + item.price * 0.02) * 100,
+          unit_amount: Math.floor(item.price) * 100,
         },
         quantity: item.quantity,
       };

@@ -52,10 +52,20 @@ const authUser = async (req, res, next) => {
       });
     }
 
-    // ✅ Adicionar userId ao body da requisição
-    req.body.userId = decoded.id;
+    // ✅ CORREÇÃO CRÍTICA: NÃO SOBRESCREVER req.body
+    // Adicionar user ao req ao invés de modificar body
+    req.user = {
+      id: decoded.id,
+      // outros campos do token se necessário
+    };
+
+    // ✅ OPCIONAL: Se o userId não vier no body, usar o do token
+    if (!req.body.userId) {
+      req.body.userId = decoded.id;
+    }
 
     console.log('✅ Usuário autenticado com sucesso:', decoded.id);
+    console.log('🔍 Body preservado:', Object.keys(req.body));
 
     next();
   } catch (error) {

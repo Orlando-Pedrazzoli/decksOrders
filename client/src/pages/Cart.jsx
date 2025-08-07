@@ -83,22 +83,19 @@ const Cart = () => {
     }
   };
 
-  // ✅ FUNÇÃO calculateTotal CORRIGIDA
+  // ✅ FUNÇÃO calculateTotal CORRIGIDA (SEM TAXA 2%)
   const calculateTotal = () => {
     const subtotal = parseFloat(getCartAmount());
     let totalBeforeDiscount = subtotal;
 
-    // Add Tax Charge (2%) - STRIPE LOGIC
-    totalBeforeDiscount += Math.floor(totalBeforeDiscount * 0.02);
-
     if (discountApplied) {
-      const discount = totalBeforeDiscount * 0.3;
+      const discount = subtotal * 0.3;
       totalBeforeDiscount -= discount;
     }
     return Math.max(0, totalBeforeDiscount).toFixed(2);
   };
 
-  // ✅ FUNÇÃO handlePlaceOrder ATUALIZADA COM STRIPE
+  // ✅ FUNÇÃO handlePlaceOrder SIMPLIFICADA - BASEADA NO CÓDIGO QUE FUNCIONA
   const handlePlaceOrder = async () => {
     if (!requireLogin('fazer a encomenda')) return;
     if (!selectedAddress) {
@@ -112,12 +109,10 @@ const Cart = () => {
 
     setIsProcessing(true);
     try {
-      // ✅ CALCULAR VALORES NO FRONTEND PARA ENVIAR CORRETOS
+      // ✅ CALCULAR VALORES PARA MODELO Order COMPLETO
       const subtotal = parseFloat(getCartAmount());
-      const taxAmount = Math.floor(subtotal * 0.02); // 2% tax
-      const subtotalWithTax = subtotal + taxAmount;
-      const discountAmount = discountApplied ? subtotalWithTax * 0.3 : 0;
-      const finalAmount = subtotalWithTax - discountAmount;
+      const discountAmount = discountApplied ? subtotal * 0.3 : 0;
+      const finalAmount = subtotal - discountAmount;
 
       const orderData = {
         userId: user._id,
@@ -126,25 +121,17 @@ const Cart = () => {
           quantity: item.quantity,
         })),
         address: selectedAddress._id,
-        // ✅ ENVIAR DADOS COMPLETOS DO DESCONTO
-        promoCode: discountApplied ? promoCode.toUpperCase() : null,
-        discountApplied: discountApplied,
-        originalAmount: subtotalWithTax, // Valor original com taxa
-        discountAmount: discountAmount, // Valor do desconto
-        finalAmount: finalAmount, // Valor final
-        discountPercentage: discountApplied ? 30 : 0, // Percentagem
+        // ✅ TODOS OS CAMPOS OBRIGATÓRIOS DO MODELO
+        originalAmount: subtotal, // OBRIGATÓRIO
+        amount: finalAmount, // OBRIGATÓRIO - valor final após desconto
+        discountAmount: discountAmount, // Valor do desconto em euros
+        discountPercentage: discountApplied ? 30 : 0, // Percentagem do desconto
+        promoCode: discountApplied ? promoCode.toUpperCase() : '', // Código promocional
+        paymentType: paymentOption === 'COD' ? 'COD' : 'Online', // OBRIGATÓRIO
+        isPaid: false, // OBRIGATÓRIO - sempre false inicialmente
       };
 
       console.log('📦 Dados da encomenda sendo enviados:', orderData);
-      console.log('💰 Valores calculados:', {
-        subtotal,
-        taxAmount,
-        subtotalWithTax,
-        discountAmount,
-        finalAmount,
-        discountApplied,
-        paymentMethod: paymentOption,
-      });
 
       let response;
       if (paymentOption === 'COD') {
@@ -156,19 +143,14 @@ const Cart = () => {
           // Limpar carrinho para COD
           const emptyCart = {};
           setCartItems(emptyCart);
-          try {
-            await axios.post('/api/cart/update', { cartItems: emptyCart });
-          } catch (syncError) {
-            console.error('Erro ao sincronizar o carrinho vazio:', syncError);
-          }
 
           toast.success('Encomenda efetuada com sucesso!');
-          navigate(`/order-success/${response.data.orderId}`);
+          navigate('/my-orders');
         } else {
           toast.error(response.data.message || 'Falha ao fazer a encomenda.');
         }
       } else {
-        // ✅ STRIPE PAYMENT FLOW - UPDATED WITH SIMPLE LOGIC
+        // ✅ STRIPE PAYMENT FLOW - SIMPLES COMO NO CÓDIGO QUE FUNCIONA
         console.log('💳 Iniciando processo de pagamento Stripe...');
 
         response = await axios.post('/api/order/stripe', orderData);
@@ -181,28 +163,8 @@ const Cart = () => {
             response.data.url
           );
 
-          // ✅ LIMPAR CARRINHO ANTES DO REDIRECIONAMENTO
-          const emptyCart = {};
-          setCartItems(emptyCart);
-          if (saveCartToStorage) {
-            saveCartToStorage(emptyCart);
-          }
-
-          // Sincronizar carrinho vazio com servidor
-          try {
-            await axios.post('/api/cart/update', { cartItems: emptyCart });
-            console.log('🛒 Carrinho limpo e sincronizado com servidor');
-          } catch (syncError) {
-            console.error('❌ Erro ao sincronizar carrinho vazio:', syncError);
-          }
-
-          // Mostrar feedback visual antes do redirecionamento
-          toast.success('Redirecionando para o pagamento...');
-
-          // ✅ USAR WINDOW.LOCATION.REPLACE COMO NO CÓDIGO ORIGINAL
-          setTimeout(() => {
-            window.location.replace(response.data.url);
-          }, 1000);
+          // ✅ REDIRECIONAR COMO NO CÓDIGO ORIGINAL
+          window.location.replace(response.data.url);
         } else {
           console.error('❌ Erro na resposta do Stripe:', response.data);
           toast.error(
@@ -557,7 +519,7 @@ const Cart = () => {
               )}
             </div>
 
-            {/* Order Total - ATUALIZADO COM TAXA DE 2% */}
+            {/* Order Total - SEM TAXA DE 2% */}
             <div className='pt-4'>
               <div className='flex justify-between items-center mb-3 text-gray-700'>
                 <span>Subtotal ({getCartCount()} artigos):</span>
@@ -567,26 +529,13 @@ const Cart = () => {
                 </span>
               </div>
 
-              {/* Taxa de 2% */}
-              <div className='flex justify-between items-center mb-3 text-gray-700'>
-                <span>Taxa (2%):</span>
-                <span className='font-medium flex items-baseline'>
-                  <span className='mr-0.5'>{currency}</span>
-                  <span>{(parseFloat(getCartAmount()) * 0.02).toFixed(2)}</span>
-                </span>
-              </div>
-
               {discountApplied && (
                 <div className='flex justify-between items-center text-green-600 mb-3'>
                   <span>Desconto (30%):</span>
                   <span className='font-medium text-lg flex items-baseline'>
                     <span className='mr-0.5'>-{currency}</span>
                     <span>
-                      {(
-                        (parseFloat(getCartAmount()) +
-                          parseFloat(getCartAmount()) * 0.02) *
-                        0.3
-                      ).toFixed(2)}
+                      {(parseFloat(getCartAmount()) * 0.3).toFixed(2)}
                     </span>
                   </span>
                 </div>

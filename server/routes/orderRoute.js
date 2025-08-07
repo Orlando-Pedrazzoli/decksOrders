@@ -12,7 +12,7 @@ const orderRouter = express.Router();
 
 // ✅ TEMPORÁRIO: Manter POST até resolvermos o authUser
 orderRouter.post('/cod', authUser, placeOrderCOD);
-orderRouter.post('/user', authUser, getUserOrders); // ✅ VOLTA PARA POST temporariamente
+orderRouter.post('/user', authUser, getUserOrders);
 orderRouter.get('/seller', authSeller, getAllOrders);
 orderRouter.post('/stripe', authUser, placeOrderStripe);
 
