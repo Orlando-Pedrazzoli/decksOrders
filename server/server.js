@@ -24,14 +24,6 @@ await connectCloudinary();
 console.log('✅ Database connected successfully');
 console.log('✅ Cloudinary connected successfully');
 
-// ✅ WEBHOOK STRIPE - IGUAL AO CÓDIGO QUE FUNCIONA
-// DEVE vir ANTES de express.json()
-app.post(
-  '/webhook/stripe',
-  express.raw({ type: 'application/json' }),
-  stripeWebhooks
-);
-
 // ✅ Middleware configuration (baseado no código que funciona)
 const allowedOrigins = [
   'http://localhost:5173',
@@ -41,6 +33,8 @@ const allowedOrigins = [
   'https://www.elitesurfing.pt',
   'https://elitesurfingeu-backend.vercel.app',
 ];
+
+app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());

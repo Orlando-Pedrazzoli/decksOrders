@@ -88,14 +88,17 @@ const Cart = () => {
     const subtotal = parseFloat(getCartAmount());
     let totalBeforeDiscount = subtotal;
 
+    // Add Tax Charge (2%) - STRIPE LOGIC
+    totalBeforeDiscount += Math.floor(totalBeforeDiscount * 0.02);
+
     if (discountApplied) {
-      const discount = subtotal * 0.3;
+      const discount = totalBeforeDiscount * 0.3;
       totalBeforeDiscount -= discount;
     }
     return Math.max(0, totalBeforeDiscount).toFixed(2);
   };
 
-  // ✅ FUNÇÃO handlePlaceOrder ATUALIZADA
+  // ✅ FUNÇÃO handlePlaceOrder ATUALIZADA COM STRIPE
   const handlePlaceOrder = async () => {
     if (!requireLogin('fazer a encomenda')) return;
     if (!selectedAddress) {
@@ -111,8 +114,10 @@ const Cart = () => {
     try {
       // ✅ CALCULAR VALORES NO FRONTEND PARA ENVIAR CORRETOS
       const subtotal = parseFloat(getCartAmount());
-      const discountAmount = discountApplied ? subtotal * 0.3 : 0;
-      const finalAmount = subtotal - discountAmount;
+      const taxAmount = Math.floor(subtotal * 0.02); // 2% tax
+      const subtotalWithTax = subtotal + taxAmount;
+      const discountAmount = discountApplied ? subtotalWithTax * 0.3 : 0;
+      const finalAmount = subtotalWithTax - discountAmount;
 
       const orderData = {
         userId: user._id,
@@ -124,7 +129,7 @@ const Cart = () => {
         // ✅ ENVIAR DADOS COMPLETOS DO DESCONTO
         promoCode: discountApplied ? promoCode.toUpperCase() : null,
         discountApplied: discountApplied,
-        originalAmount: subtotal, // Valor original
+        originalAmount: subtotalWithTax, // Valor original com taxa
         discountAmount: discountAmount, // Valor do desconto
         finalAmount: finalAmount, // Valor final
         discountPercentage: discountApplied ? 30 : 0, // Percentagem
@@ -133,6 +138,8 @@ const Cart = () => {
       console.log('📦 Dados da encomenda sendo enviados:', orderData);
       console.log('💰 Valores calculados:', {
         subtotal,
+        taxAmount,
+        subtotalWithTax,
         discountAmount,
         finalAmount,
         discountApplied,
@@ -161,7 +168,7 @@ const Cart = () => {
           toast.error(response.data.message || 'Falha ao fazer a encomenda.');
         }
       } else {
-        // ✅ STRIPE PAYMENT FLOW
+        // ✅ STRIPE PAYMENT FLOW - UPDATED WITH SIMPLE LOGIC
         console.log('💳 Iniciando processo de pagamento Stripe...');
 
         response = await axios.post('/api/order/stripe', orderData);
@@ -177,7 +184,9 @@ const Cart = () => {
           // ✅ LIMPAR CARRINHO ANTES DO REDIRECIONAMENTO
           const emptyCart = {};
           setCartItems(emptyCart);
-          saveCartToStorage(emptyCart);
+          if (saveCartToStorage) {
+            saveCartToStorage(emptyCart);
+          }
 
           // Sincronizar carrinho vazio com servidor
           try {
@@ -190,10 +199,9 @@ const Cart = () => {
           // Mostrar feedback visual antes do redirecionamento
           toast.success('Redirecionando para o pagamento...');
 
-          // Pequeno delay para mostrar o toast
+          // ✅ USAR WINDOW.LOCATION.REPLACE COMO NO CÓDIGO ORIGINAL
           setTimeout(() => {
-            // ✅ Redirecionar para Stripe Checkout
-            window.location.href = response.data.url;
+            window.location.replace(response.data.url);
           }, 1000);
         } else {
           console.error('❌ Erro na resposta do Stripe:', response.data);
@@ -481,7 +489,7 @@ const Cart = () => {
               </div>
             </div>
 
-            {/* Payment Method - VERSÃO ATUALIZADA */}
+            {/* Payment Method - VERSÃO ATUALIZADA COM STRIPE */}
             <div className='mb-6 border-b pb-6 border-gray-200'>
               <h3 className='font-semibold text-gray-700 mb-3'>
                 Método de Pagamento
@@ -549,7 +557,7 @@ const Cart = () => {
               )}
             </div>
 
-            {/* Order Total */}
+            {/* Order Total - ATUALIZADO COM TAXA DE 2% */}
             <div className='pt-4'>
               <div className='flex justify-between items-center mb-3 text-gray-700'>
                 <span>Subtotal ({getCartCount()} artigos):</span>
@@ -558,13 +566,27 @@ const Cart = () => {
                   <span>{parseFloat(getCartAmount()).toFixed(2)}</span>
                 </span>
               </div>
+
+              {/* Taxa de 2% */}
+              <div className='flex justify-between items-center mb-3 text-gray-700'>
+                <span>Taxa (2%):</span>
+                <span className='font-medium flex items-baseline'>
+                  <span className='mr-0.5'>{currency}</span>
+                  <span>{(parseFloat(getCartAmount()) * 0.02).toFixed(2)}</span>
+                </span>
+              </div>
+
               {discountApplied && (
                 <div className='flex justify-between items-center text-green-600 mb-3'>
                   <span>Desconto (30%):</span>
                   <span className='font-medium text-lg flex items-baseline'>
                     <span className='mr-0.5'>-{currency}</span>
                     <span>
-                      {(parseFloat(getCartAmount()) * 0.3).toFixed(2)}
+                      {(
+                        (parseFloat(getCartAmount()) +
+                          parseFloat(getCartAmount()) * 0.02) *
+                        0.3
+                      ).toFixed(2)}
                     </span>
                   </span>
                 </div>
@@ -578,7 +600,7 @@ const Cart = () => {
               </div>
             </div>
 
-            {/* Checkout Button - VERSÃO ATUALIZADA */}
+            {/* Checkout Button - VERSÃO ATUALIZADA COM STRIPE */}
             <button
               onClick={handlePlaceOrder}
               disabled={

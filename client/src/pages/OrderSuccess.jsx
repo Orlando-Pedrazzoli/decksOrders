@@ -13,21 +13,39 @@ const OrderSuccess = () => {
   const [orderDetails, setOrderDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ✅ Função para buscar detalhes do pedido
-  // Apenas a parte que precisa ser corrigida no OrderSuccess.jsx
-
-  // ✅ Função para buscar detalhes do pedido (corrigida)
+  // ✅ Função para buscar detalhes do pedido - ATUALIZADA PARA STRIPE
   const fetchOrderDetails = async () => {
     if (!orderId || !user) return;
 
     try {
-      // ✅ MUDANÇA: GET sem parâmetros (igual ao código que funciona)
-      const { data } = await axios.get('/api/order/user');
+      console.log('🔍 Buscando detalhes do pedido:', orderId);
+
+      // ✅ USAR POST com userId para compatibilidade
+      const { data } = await axios.post('/api/order/user', {
+        userId: user._id,
+      });
 
       if (data.success) {
+        // Encontrar o pedido específico
         const currentOrder = data.orders.find(order => order._id === orderId);
-        setOrderDetails(currentOrder);
-        console.log('📦 Detalhes do pedido carregados:', currentOrder);
+
+        if (currentOrder) {
+          // ✅ VERIFICAR SE É PEDIDO VÁLIDO PARA MOSTRAR
+          const isValidOrder =
+            currentOrder.paymentType === 'COD' ||
+            (currentOrder.paymentType === 'Online' &&
+              currentOrder.isPaid === true);
+
+          if (isValidOrder) {
+            setOrderDetails(currentOrder);
+            console.log('✅ Detalhes do pedido carregados:', currentOrder);
+          } else {
+            console.log('⚠️ Pedido Stripe ainda não confirmado');
+            setOrderDetails(null);
+          }
+        } else {
+          console.log('❌ Pedido não encontrado');
+        }
       }
     } catch (error) {
       console.error('❌ Erro ao carregar detalhes do pedido:', error);
@@ -36,19 +54,52 @@ const OrderSuccess = () => {
     }
   };
 
-  // ✅ Verificação de status para pagamentos Stripe
+  // ✅ Verificação de status para pagamentos Stripe - MELHORADA
   const checkStripePaymentStatus = async () => {
     if (payment !== 'stripe' || !orderId) return;
 
-    // Para pagamentos Stripe, aguardar um pouco para o webhook processar
-    setTimeout(async () => {
+    console.log('💳 Verificando status do pagamento Stripe...');
+
+    // Para pagamentos Stripe, aguardar webhook processar
+    const checkPayment = async (attempt = 1, maxAttempts = 6) => {
       try {
-        console.log('🔍 Verificando status do pagamento Stripe...');
-        await fetchOrderDetails();
+        console.log(`🔍 Tentativa ${attempt} de verificar pagamento Stripe...`);
+
+        const { data } = await axios.post('/api/order/user', {
+          userId: user._id,
+        });
+
+        if (data.success) {
+          const currentOrder = data.orders.find(order => order._id === orderId);
+
+          if (currentOrder) {
+            if (
+              currentOrder.paymentType === 'Online' &&
+              currentOrder.isPaid === true
+            ) {
+              console.log('✅ Pagamento Stripe confirmado!');
+              setOrderDetails(currentOrder);
+              return;
+            } else if (attempt < maxAttempts) {
+              // Tentar novamente após 3 segundos
+              setTimeout(() => checkPayment(attempt + 1, maxAttempts), 3000);
+            } else {
+              console.log(
+                '⚠️ Pagamento ainda não confirmado após múltiplas tentativas'
+              );
+            }
+          }
+        }
       } catch (error) {
-        console.error('❌ Erro ao verificar status do pagamento:', error);
+        console.error(`❌ Erro na tentativa ${attempt}:`, error);
+        if (attempt < maxAttempts) {
+          setTimeout(() => checkPayment(attempt + 1, maxAttempts), 3000);
+        }
       }
-    }, 3000); // 3 segundos para dar tempo do webhook processar
+    };
+
+    // Iniciar verificações após 2 segundos
+    setTimeout(() => checkPayment(), 2000);
   };
 
   useEffect(() => {
@@ -75,6 +126,7 @@ const OrderSuccess = () => {
     return () => clearInterval(timer);
   }, [navigate, orderId, payment, user]);
 
+  // ✅ FUNÇÃO ATUALIZADA PARA STRIPE
   const getPaymentMethodText = () => {
     if (payment === 'stripe' || orderDetails?.paymentType === 'Online') {
       return '💳 Pagamento Online (Stripe)';
@@ -82,23 +134,47 @@ const OrderSuccess = () => {
     return '💰 Pagamento na Entrega (COD)';
   };
 
+  // ✅ FUNÇÃO ATUALIZADA PARA STRIPE
   const getPaymentStatusBadge = () => {
     if (payment === 'stripe' || orderDetails?.paymentType === 'Online') {
-      return (
-        <div className='inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium'>
-          <svg className='w-4 h-4 mr-1' fill='currentColor' viewBox='0 0 20 20'>
-            <path
-              fillRule='evenodd'
-              d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
-              clipRule='evenodd'
-            />
-          </svg>
-          Pago ✅
-        </div>
-      );
+      if (orderDetails?.isPaid) {
+        return (
+          <div className='inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium'>
+            <svg
+              className='w-4 h-4 mr-1'
+              fill='currentColor'
+              viewBox='0 0 20 20'
+            >
+              <path
+                fillRule='evenodd'
+                d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
+                clipRule='evenodd'
+              />
+            </svg>
+            Pagamento Confirmado ✅
+          </div>
+        );
+      } else {
+        return (
+          <div className='inline-flex items-center px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium'>
+            <svg
+              className='w-4 h-4 mr-1'
+              fill='currentColor'
+              viewBox='0 0 20 20'
+            >
+              <path
+                fillRule='evenodd'
+                d='M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z'
+                clipRule='evenodd'
+              />
+            </svg>
+            Aguardando Confirmação
+          </div>
+        );
+      }
     }
     return (
-      <div className='inline-flex items-center px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium'>
+      <div className='inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium'>
         <svg className='w-4 h-4 mr-1' fill='currentColor' viewBox='0 0 20 20'>
           <path
             fillRule='evenodd'
@@ -111,29 +187,45 @@ const OrderSuccess = () => {
     );
   };
 
+  // ✅ FUNÇÃO PARA MOSTRAR MENSAGEM BASEADA NO STATUS
+  const getSuccessMessage = () => {
+    if (payment === 'stripe') {
+      if (orderDetails?.isPaid) {
+        return {
+          title: 'Pagamento Confirmado!',
+          subtitle: 'O seu pagamento foi processado com sucesso.',
+          icon: '✅',
+        };
+      } else {
+        return {
+          title: 'Encomenda Criada!',
+          subtitle: 'A aguardar confirmação do pagamento...',
+          icon: '⏳',
+        };
+      }
+    } else {
+      return {
+        title: 'Encomenda Efetuada com Sucesso!',
+        subtitle: 'A sua encomenda foi registada e está a ser processada.',
+        icon: '🎉',
+      };
+    }
+  };
+
+  const successInfo = getSuccessMessage();
+
   return (
     <div className='min-h-[calc(100vh-80px)] bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center px-4 py-8'>
       <div className='max-w-2xl w-full bg-white rounded-2xl shadow-xl p-6 sm:p-8 text-center'>
         {/* Success Icon */}
         <div className='mb-6'>
           <div className='mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4'>
-            <svg
-              className='w-12 h-12 text-green-600'
-              fill='none'
-              stroke='currentColor'
-              viewBox='0 0 24 24'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                strokeWidth={2}
-                d='M5 13l4 4L19 7'
-              />
-            </svg>
+            <div className='text-4xl'>{successInfo.icon}</div>
           </div>
           <h1 className='text-2xl sm:text-3xl md:text-4xl font-bold text-gray-800 mb-2'>
-            Encomenda Efetuada com Sucesso!
+            {successInfo.title}
           </h1>
+          <p className='text-lg text-gray-600 mb-4'>{successInfo.subtitle}</p>
           <div className='w-24 h-1 bg-green-500 mx-auto rounded-full'></div>
         </div>
 
@@ -146,12 +238,30 @@ const OrderSuccess = () => {
             </span>
             ,
           </p>
-          <p className='text-gray-700 mb-4'>
-            Muito obrigado pela sua compra! A sua encomenda foi processada com
-            sucesso e está a ser preparada para envio.
-          </p>
 
-          {/* Order Details */}
+          {/* Mensagem específica por tipo de pagamento */}
+          {payment === 'stripe' ? (
+            orderDetails?.isPaid ? (
+              <p className='text-gray-700 mb-4'>
+                O seu pagamento foi processado com sucesso pela Stripe! A
+                encomenda está confirmada e será preparada para envio.
+              </p>
+            ) : (
+              <div className='bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4'>
+                <p className='text-orange-800'>
+                  A sua encomenda foi criada mas ainda aguardamos a confirmação
+                  do pagamento. Isto pode demorar alguns minutos.
+                </p>
+              </div>
+            )
+          ) : (
+            <p className='text-gray-700 mb-4'>
+              Muito obrigado pela sua compra! A sua encomenda foi registada com
+              sucesso e está a ser preparada.
+            </p>
+          )}
+
+          {/* Order Details - ATUALIZADOS PARA STRIPE */}
           {orderId && (
             <div className='bg-gray-50 rounded-lg p-4 mb-6'>
               <div className='flex flex-col sm:flex-row justify-between items-center gap-3 mb-3'>
@@ -160,7 +270,7 @@ const OrderSuccess = () => {
                     Número da Encomenda:
                   </p>
                   <p className='text-lg font-mono font-semibold text-gray-800 break-all'>
-                    #{orderId}
+                    #{orderId.slice(-8)}
                   </p>
                 </div>
                 {getPaymentStatusBadge()}
@@ -175,7 +285,7 @@ const OrderSuccess = () => {
                   {getPaymentMethodText()}
                 </p>
 
-                {/* Order Value */}
+                {/* Order Value - ATUALIZADO COM STRIPE LOGIC */}
                 {orderDetails && (
                   <div className='mt-3 pt-3 border-t border-gray-200'>
                     {orderDetails.originalAmount &&
@@ -186,10 +296,15 @@ const OrderSuccess = () => {
                         </p>
                       )}
                     {orderDetails.discountAmount > 0 && (
-                      <p className='text-sm text-green-600 font-medium'>
-                        Desconto ({orderDetails.discountPercentage}%): -
-                        {currency} {orderDetails.discountAmount.toFixed(2)}
-                      </p>
+                      <div className='space-y-1'>
+                        <p className='text-sm text-green-600 font-medium'>
+                          Código: <strong>{orderDetails.promoCode}</strong>
+                        </p>
+                        <p className='text-sm text-green-600 font-medium'>
+                          Desconto ({orderDetails.discountPercentage}%): -
+                          {currency} {orderDetails.discountAmount.toFixed(2)}
+                        </p>
+                      </div>
                     )}
                     <p className='text-lg font-bold text-primary-dark'>
                       Total Pago: {currency} {orderDetails.amount.toFixed(2)}
@@ -197,6 +312,31 @@ const OrderSuccess = () => {
                   </div>
                 )}
               </div>
+
+              {/* Stripe-specific info */}
+              {payment === 'stripe' && (
+                <div className='mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg'>
+                  <div className='flex items-center justify-center mb-2'>
+                    <svg
+                      className='w-5 h-5 text-indigo-600 mr-2'
+                      fill='currentColor'
+                      viewBox='0 0 20 20'
+                    >
+                      <path
+                        fillRule='evenodd'
+                        d='M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
+                        clipRule='evenodd'
+                      />
+                    </svg>
+                    <span className='text-sm font-medium text-indigo-800'>
+                      Processado pela Stripe
+                    </span>
+                  </div>
+                  <p className='text-xs text-indigo-700'>
+                    Pagamento seguro processado através da plataforma Stripe
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
