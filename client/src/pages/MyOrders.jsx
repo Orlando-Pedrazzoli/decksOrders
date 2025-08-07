@@ -6,10 +6,12 @@ const MyOrders = () => {
   const [myOrders, setMyOrders] = useState([]);
   const { currency, axios, user } = useAppContext();
 
+  // ✅ VOLTA PARA POST temporariamente até resolvermos o authUser
   const fetchMyOrders = async () => {
     try {
       console.log('🔍 Buscando pedidos para usuário:', user?._id);
 
+      // ✅ VOLTA PARA POST com userId
       const { data } = await axios.post('/api/order/user', {
         userId: user._id,
       });
@@ -18,16 +20,6 @@ const MyOrders = () => {
 
       if (data.success) {
         console.log('📋 Pedidos carregados:', data.orders.length);
-        console.log(
-          '📋 Detalhes dos pedidos:',
-          data.orders.map(order => ({
-            id: order._id,
-            paymentType: order.paymentType,
-            isPaid: order.isPaid,
-            amount: order.amount,
-          }))
-        );
-
         setMyOrders(data.orders);
       } else {
         console.error('❌ Erro ao buscar pedidos:', data.message);
@@ -39,16 +31,16 @@ const MyOrders = () => {
     }
   };
 
-  // ✅ USEEFFECT ADICIONADO/CORRIGIDO
+  // ✅ IGUAL AO CÓDIGO QUE FUNCIONA
   useEffect(() => {
-    if (user && user._id) {
+    if (user) {
       console.log('👤 Usuário encontrado, buscando pedidos...');
       fetchMyOrders();
     } else {
       console.log('❌ Usuário não encontrado');
       setMyOrders([]);
     }
-  }, [user]); // Dependência do user para recarregar quando user mudar
+  }, [user]);
 
   return (
     <div className='container mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-60px)] bg-gray-50'>

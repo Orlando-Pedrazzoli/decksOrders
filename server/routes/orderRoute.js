@@ -10,8 +10,9 @@ import authSeller from '../middlewares/authSeller.js';
 
 const orderRouter = express.Router();
 
+// ✅ TEMPORÁRIO: Manter POST até resolvermos o authUser
 orderRouter.post('/cod', authUser, placeOrderCOD);
-orderRouter.post('/user', authUser, getUserOrders); // ✅ POST em vez de GET
+orderRouter.post('/user', authUser, getUserOrders); // ✅ VOLTA PARA POST temporariamente
 orderRouter.get('/seller', authSeller, getAllOrders);
 orderRouter.post('/stripe', authUser, placeOrderStripe);
 

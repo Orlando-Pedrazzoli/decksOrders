@@ -14,13 +14,15 @@ const OrderSuccess = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // ✅ Função para buscar detalhes do pedido
+  // Apenas a parte que precisa ser corrigida no OrderSuccess.jsx
+
+  // ✅ Função para buscar detalhes do pedido (corrigida)
   const fetchOrderDetails = async () => {
     if (!orderId || !user) return;
 
     try {
-      const { data } = await axios.post('/api/order/user', {
-        userId: user._id,
-      });
+      // ✅ MUDANÇA: GET sem parâmetros (igual ao código que funciona)
+      const { data } = await axios.get('/api/order/user');
 
       if (data.success) {
         const currentOrder = data.orders.find(order => order._id === orderId);
