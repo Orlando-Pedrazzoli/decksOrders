@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
+import '../styles/ProductDetails.css';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Link, useParams } from 'react-router-dom';
 import { assets } from '../assets/assets';
@@ -14,31 +15,43 @@ const ProductDetails = () => {
     cartItems,
     updateCartItem,
     axios,
-  } = useAppContext(); // ✅ ADICIONADO: axios
+  } = useAppContext();
   const { id } = useParams();
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [thumbStartIndex, setThumbStartIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [quantity, setQuantity] = useState(1); // ✅ Será sincronizado com cartItems
-  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false); // ✅ Estado para accordion
+  const [quantity, setQuantity] = useState(1);
+  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [reviewStats, setReviewStats] = useState({
-    // ✅ NOVO: Estado para estatísticas de reviews
     averageRating: 0,
     totalReviews: 0,
     loading: true,
   });
 
+  // 🎯 NOVO: Estados para o modal melhorado
+  const [modalImageIndex, setModalImageIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isImageLoading, setIsImageLoading] = useState(false);
+
   const imageScrollRef = useRef(null);
+  const modalRef = useRef(null);
+  const modalImageRef = useRef(null);
+  const pinchStartDistance = useRef(0);
 
   const product = products.find(item => item._id === id);
 
-  // ✅ CORRIGIDO: Sincronização com mínimo de 1
+  // Sincronização com cartItems
   useEffect(() => {
     if (product) {
       const cartQuantity = cartItems[product._id] || 0;
-      // ✅ SEMPRE mínimo 1, mesmo quando não está no carrinho
       setQuantity(Math.max(1, cartQuantity));
     }
   }, [product, cartItems]);
@@ -52,14 +65,13 @@ const ProductDetails = () => {
     }
   }, [products, product]);
 
-  // ✅ NOVO: Buscar estatísticas de reviews quando o produto mudar
+  // Buscar estatísticas de reviews
   useEffect(() => {
     if (product?._id) {
       fetchReviewStats();
     }
   }, [product]);
 
-  // ✅ NOVA FUNÇÃO: Buscar estatísticas dos reviews
   const fetchReviewStats = async () => {
     try {
       setReviewStats(prev => ({ ...prev, loading: true }));
@@ -91,7 +103,197 @@ const ProductDetails = () => {
     }
   };
 
-  // Programmatic scroll for the main mobile carousel
+  // 🎯 NOVO: Abrir modal com índice correto
+  const openModal = useCallback(
+    index => {
+      setModalImageIndex(index || currentImageIndex);
+      setIsModalOpen(true);
+      setIsZoomed(false);
+      setZoomLevel(1);
+      setImagePosition({ x: 0, y: 0 });
+      document.body.style.overflow = 'hidden'; // Previne scroll do body
+    },
+    [currentImageIndex]
+  );
+
+  // 🎯 NOVO: Fechar modal
+  const closeModal = useCallback(() => {
+    setIsModalOpen(false);
+    setIsZoomed(false);
+    setZoomLevel(1);
+    setImagePosition({ x: 0, y: 0 });
+    document.body.style.overflow = 'auto';
+  }, []);
+
+  // 🎯 NOVO: Handlers de touch para swipe
+  const minSwipeDistance = 50;
+
+  const onTouchStart = useCallback(
+    e => {
+      if (isZoomed) return;
+      setTouchEnd(null);
+      setTouchStart(e.targetTouches[0].clientX);
+    },
+    [isZoomed]
+  );
+
+  const onTouchMove = useCallback(
+    e => {
+      if (isZoomed) return;
+      setTouchEnd(e.targetTouches[0].clientX);
+    },
+    [isZoomed]
+  );
+
+  const onTouchEnd = useCallback(() => {
+    if (!touchStart || !touchEnd || isZoomed) return;
+
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && product) {
+      // Swipe left - próxima imagem
+      const nextIndex =
+        modalImageIndex < product.image.length - 1 ? modalImageIndex + 1 : 0;
+      setModalImageIndex(nextIndex);
+      setCurrentImageIndex(nextIndex);
+    }
+
+    if (isRightSwipe && product) {
+      // Swipe right - imagem anterior
+      const prevIndex =
+        modalImageIndex > 0 ? modalImageIndex - 1 : product.image.length - 1;
+      setModalImageIndex(prevIndex);
+      setCurrentImageIndex(prevIndex);
+    }
+  }, [touchStart, touchEnd, modalImageIndex, product, isZoomed]);
+
+  // 🎯 NOVO: Double tap para zoom
+  const lastTap = useRef(0);
+  const handleDoubleTap = useCallback(
+    e => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap.current;
+
+      if (tapLength < 300 && tapLength > 0) {
+        e.preventDefault();
+        if (isZoomed) {
+          setIsZoomed(false);
+          setZoomLevel(1);
+          setImagePosition({ x: 0, y: 0 });
+        } else {
+          setIsZoomed(true);
+          setZoomLevel(2);
+        }
+      }
+      lastTap.current = currentTime;
+    },
+    [isZoomed]
+  );
+
+  // 🎯 NOVO: Pinch to zoom para mobile
+  const handlePinch = useCallback(
+    e => {
+      if (e.touches.length === 2) {
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const distance = Math.sqrt(
+          Math.pow(touch2.clientX - touch1.clientX, 2) +
+            Math.pow(touch2.clientY - touch1.clientY, 2)
+        );
+
+        if (pinchStartDistance.current === 0) {
+          pinchStartDistance.current = distance;
+        } else {
+          const scale = distance / pinchStartDistance.current;
+          const newZoomLevel = Math.min(Math.max(1, zoomLevel * scale), 3);
+          setZoomLevel(newZoomLevel);
+          setIsZoomed(newZoomLevel > 1);
+        }
+      }
+    },
+    [zoomLevel]
+  );
+
+  const handlePinchEnd = useCallback(() => {
+    pinchStartDistance.current = 0;
+  }, []);
+
+  // 🎯 NOVO: Arrastar imagem com zoom
+  const handleMouseDown = useCallback(
+    e => {
+      if (!isZoomed) return;
+      setIsDragging(true);
+      setDragStart({
+        x: e.clientX - imagePosition.x,
+        y: e.clientY - imagePosition.y,
+      });
+    },
+    [isZoomed, imagePosition]
+  );
+
+  const handleMouseMove = useCallback(
+    e => {
+      if (!isDragging || !isZoomed) return;
+      setImagePosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      });
+    },
+    [isDragging, isZoomed, dragStart]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Navegação do modal
+  const nextModalImage = useCallback(() => {
+    if (!product) return;
+    setIsImageLoading(true);
+    const newIndex =
+      modalImageIndex < product.image.length - 1 ? modalImageIndex + 1 : 0;
+    setModalImageIndex(newIndex);
+    setCurrentImageIndex(newIndex);
+    setIsZoomed(false);
+    setZoomLevel(1);
+    setImagePosition({ x: 0, y: 0 });
+  }, [modalImageIndex, product]);
+
+  const prevModalImage = useCallback(() => {
+    if (!product) return;
+    setIsImageLoading(true);
+    const newIndex =
+      modalImageIndex > 0 ? modalImageIndex - 1 : product.image.length - 1;
+    setModalImageIndex(newIndex);
+    setCurrentImageIndex(newIndex);
+    setIsZoomed(false);
+    setZoomLevel(1);
+    setImagePosition({ x: 0, y: 0 });
+  }, [modalImageIndex, product]);
+
+  // Navegação com teclado
+  useEffect(() => {
+    const handleKeyDown = e => {
+      if (!isModalOpen) return;
+
+      if (e.key === 'ArrowLeft') {
+        prevModalImage();
+      } else if (e.key === 'ArrowRight') {
+        nextModalImage();
+      } else if (e.key === 'Escape') {
+        closeModal();
+      }
+    };
+
+    if (isModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isModalOpen, nextModalImage, prevModalImage, closeModal]);
+
+  // Scroll programático para o carousel mobile principal
   useEffect(() => {
     if (imageScrollRef.current && window.innerWidth < 640) {
       const scrollContainer = imageScrollRef.current;
@@ -100,7 +302,6 @@ const ProductDetails = () => {
     }
   }, [currentImageIndex]);
 
-  // ✅ CORRIGIDO: Funções com mínimo de 1
   const increaseQuantity = () => {
     const currentCartQuantity = cartItems[product._id] || 0;
     const newQuantity = Math.max(1, currentCartQuantity) + 1;
@@ -115,17 +316,13 @@ const ProductDetails = () => {
       setQuantity(newQuantity);
       updateCartItem(product._id, newQuantity);
     }
-    // ✅ NÃO FAZ NADA se quantity já é 1 - não pode diminuir mais
   };
 
-  // ✅ SIMPLIFICADO: Adicionar apenas +1 ao carrinho
   const handleAddToCart = () => {
     addToCart(product._id);
   };
 
-  // ✅ Função para comprar agora
   const handleBuyNow = () => {
-    // Se não há nada no carrinho, adiciona a quantidade atual (mínimo 1)
     if (!cartItems[product._id]) {
       for (let i = 0; i < quantity; i++) {
         addToCart(product._id);
@@ -138,7 +335,6 @@ const ProductDetails = () => {
     setIsTransitioning(true);
     setCurrentImageIndex(newIndex);
 
-    // ✅ CORREÇÃO: Auto-scroll thumbnails para horizontal (5 imagens)
     if (window.innerWidth >= 640) {
       if (newIndex >= thumbStartIndex + 5) {
         setThumbStartIndex(prev =>
@@ -149,7 +345,6 @@ const ProductDetails = () => {
       }
     }
 
-    // Reset transition flag
     setTimeout(() => setIsTransitioning(false), 300);
   };
 
@@ -180,7 +375,6 @@ const ProductDetails = () => {
     changeImage(index);
   };
 
-  // Only handle scroll for the main mobile image carousel
   const handleImageScroll = ref => {
     if (ref.current) {
       const scrollContainer = ref.current;
@@ -206,66 +400,154 @@ const ProductDetails = () => {
 
   return (
     <div className='mt-12 px-4 sm:px-6 md:px-16 lg:px-24 xl:px-32'>
-      {/* Full Image Modal */}
+      {/* 🎯 MODAL MELHORADO COM SWIPE, ZOOM E GESTURES */}
       {isModalOpen && (
         <div
-          className='fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4'
-          onClick={() => setIsModalOpen(false)}
+          className='fixed inset-0 bg-black z-50 flex items-center justify-center'
+          onClick={closeModal}
+          style={{ touchAction: isZoomed ? 'none' : 'pan-y' }}
         >
-          <div
-            className='relative max-w-4xl w-full'
-            onClick={e => e.stopPropagation()}
+          {/* Close button */}
+          <button
+            className='absolute top-4 right-4 text-white text-4xl hover:text-gray-300 transition-all duration-300 z-50 bg-black/50 rounded-full w-12 h-12 flex items-center justify-center'
+            onClick={closeModal}
+            aria-label='Fechar'
           >
-            <button
-              className='absolute -top-12 -right-4 text-white text-4xl hover:text-gray-300 transition-all duration-300 z-50'
-              onClick={() => setIsModalOpen(false)}
-            >
-              &times;
-            </button>
+            ×
+          </button>
 
-            <div className='relative'>
-              <img
-                src={product.image[currentImageIndex]}
-                alt='Selected product'
-                className={`w-full h-full object-contain max-h-[80vh] cursor-pointer transition-opacity duration-300 ${
-                  isTransitioning ? 'opacity-70' : 'opacity-100'
-                } border border-gray-500/30 rounded`}
-                onClick={() => setIsModalOpen(false)}
-              />
-
-              {/* Modal navigation arrows */}
-              {product.image.length > 1 && (
-                <>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      prevImage();
-                    }}
-                    className='absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 rounded-full p-3 shadow-lg hover:bg-white transition-all duration-300 active:scale-90'
-                  >
-                    <img
-                      src={assets.arrow_left}
-                      alt='Previous'
-                      className='w-5 h-5'
-                    />
-                  </button>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      nextImage();
-                    }}
-                    className='absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 rounded-full p-3 shadow-lg hover:bg-white transition-all duration-300 active:scale-90'
-                  >
-                    <img
-                      src={assets.arrow_right}
-                      alt='Next'
-                      className='w-5 h-5'
-                    />
-                  </button>
-                </>
-              )}
-            </div>
+          {/* Image counter */}
+          <div className='absolute top-4 left-4 text-white bg-black/50 px-3 py-1 rounded-full text-sm z-50'>
+            {modalImageIndex + 1} / {product.image.length}
           </div>
+
+          {/* Zoom indicator */}
+          {isZoomed && (
+            <div className='absolute bottom-20 left-1/2 transform -translate-x-1/2 text-white bg-black/50 px-3 py-1 rounded-full text-sm z-50'>
+              Zoom: {Math.round(zoomLevel * 100)}%
+            </div>
+          )}
+
+          {/* Main image container */}
+          <div
+            className='relative w-full h-full flex items-center justify-center'
+            onClick={e => e.stopPropagation()}
+            onTouchStart={onTouchStart}
+            onTouchMove={e => {
+              onTouchMove(e);
+              if (e.touches.length === 2) handlePinch(e);
+            }}
+            onTouchEnd={e => {
+              onTouchEnd();
+              handlePinchEnd();
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            {/* Loading spinner */}
+            {isImageLoading && (
+              <div className='absolute inset-0 flex items-center justify-center bg-black/50 z-40'>
+                <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-white'></div>
+              </div>
+            )}
+
+            {/* Product image */}
+            <img
+              ref={modalImageRef}
+              src={product.image[modalImageIndex]}
+              alt={`${product.name} - Imagem ${modalImageIndex + 1}`}
+              className='max-w-full max-h-full object-contain transition-transform duration-300'
+              style={{
+                transform: `scale(${zoomLevel}) translate(${
+                  imagePosition.x / zoomLevel
+                }px, ${imagePosition.y / zoomLevel}px)`,
+                cursor: isZoomed
+                  ? isDragging
+                    ? 'grabbing'
+                    : 'grab'
+                  : 'pointer',
+                userSelect: 'none',
+                WebkitUserDrag: 'none',
+                touchAction: 'none',
+              }}
+              onClick={handleDoubleTap}
+              onLoad={() => setIsImageLoading(false)}
+              draggable={false}
+            />
+
+            {/* Navigation arrows - hidden when zoomed */}
+            {!isZoomed && product.image.length > 1 && (
+              <>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    prevModalImage();
+                  }}
+                  className='absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/90 rounded-full p-2 sm:p-3 shadow-lg hover:bg-white transition-all duration-300 active:scale-90'
+                  aria-label='Imagem anterior'
+                >
+                  <img
+                    src={assets.arrow_left}
+                    alt=''
+                    className='w-4 h-4 sm:w-5 sm:h-5'
+                  />
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    nextModalImage();
+                  }}
+                  className='absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/90 rounded-full p-2 sm:p-3 shadow-lg hover:bg-white transition-all duration-300 active:scale-90'
+                  aria-label='Próxima imagem'
+                >
+                  <img
+                    src={assets.arrow_right}
+                    alt=''
+                    className='w-4 h-4 sm:w-5 sm:h-5'
+                  />
+                </button>
+              </>
+            )}
+
+            {/* Thumbnail strip at bottom */}
+            {!isZoomed && product.image.length > 1 && (
+              <div className='absolute bottom-0 left-0 right-0 bg-black/70 p-2 sm:p-4'>
+                <div className='flex gap-2 justify-center overflow-x-auto scrollbar-hide max-w-full'>
+                  {product.image.map((image, index) => (
+                    <button
+                      key={index}
+                      onClick={e => {
+                        e.stopPropagation();
+                        setModalImageIndex(index);
+                        setCurrentImageIndex(index);
+                        setIsImageLoading(true);
+                      }}
+                      className={`flex-shrink-0 border-2 transition-all duration-300 ${
+                        modalImageIndex === index
+                          ? 'border-white scale-110'
+                          : 'border-transparent opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <img
+                        src={image}
+                        alt={`Thumbnail ${index + 1}`}
+                        className='w-12 h-12 sm:w-16 sm:h-16 object-cover'
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Instructions for mobile */}
+          {!isZoomed && (
+            <div className='absolute bottom-24 left-1/2 transform -translate-x-1/2 text-white text-xs bg-black/50 px-3 py-1 rounded-full opacity-75 sm:hidden'>
+              Deslize ou toque duplo para zoom
+            </div>
+          )}
         </div>
       )}
 
@@ -305,7 +587,7 @@ const ProductDetails = () => {
             <div
               ref={imageScrollRef}
               onScroll={() => handleImageScroll(imageScrollRef)}
-              className='flex w-full h-full overflow-x-scroll snap-x snap-mandatory scroll-smooth hide-scrollbar sm:hidden border border-gray-200 rounded-xl shadow-sm'
+              className='flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide sm:hidden border border-gray-200 rounded-xl shadow-sm'
             >
               {product.image.map((image, index) => (
                 <img
@@ -313,7 +595,7 @@ const ProductDetails = () => {
                   src={image}
                   alt={`Product image ${index + 1}`}
                   className='w-full h-full object-contain flex-shrink-0 snap-center cursor-pointer'
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={() => openModal(index)}
                 />
               ))}
             </div>
@@ -326,8 +608,13 @@ const ProductDetails = () => {
                 className={`w-full h-full object-contain cursor-pointer transition-opacity duration-300 ${
                   isTransitioning ? 'opacity-70' : 'opacity-100'
                 }`}
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => openModal(currentImageIndex)}
               />
+
+              {/* Zoom hint */}
+              <div className='absolute top-2 right-2 bg-black/50 text-white p-2 rounded-lg text-xs opacity-0 hover:opacity-100 transition-opacity'>
+                🔍 Clique para ampliar
+              </div>
 
               {/* Desktop Navigation Arrows */}
               {product.image.length > 1 && (
@@ -379,7 +666,7 @@ const ProductDetails = () => {
             </div>
           </div>
 
-          {/* ✅ Horizontal Thumbnail Carousel for Desktop */}
+          {/* Horizontal Thumbnail Carousel for Desktop */}
           <div className='hidden sm:flex justify-center'>
             <div className='flex items-center gap-2 max-w-[550px]'>
               {/* Left Arrow */}
@@ -396,7 +683,7 @@ const ProductDetails = () => {
                 </button>
               )}
 
-              {/* Thumbnail Container - ✅ 5 imagens */}
+              {/* Thumbnail Container */}
               <div className='flex gap-3 overflow-hidden'>
                 {product.image
                   .slice(thumbStartIndex, thumbStartIndex + 5)
@@ -435,7 +722,7 @@ const ProductDetails = () => {
             </div>
           </div>
 
-          {/* ✅ Accordion embaixo do carousel horizontal - mesma largura */}
+          {/* Accordion below horizontal carousel */}
           <div className='hidden sm:flex justify-center'>
             <div className='w-full max-w-[550px]'>
               <button
@@ -488,11 +775,10 @@ const ProductDetails = () => {
               {product.name}
             </h1>
 
-            {/* Rating - ✅ ATUALIZADO: Usando dados reais dos reviews */}
+            {/* Rating */}
             <div className='flex items-center gap-2 mt-2'>
               <div className='flex items-center gap-1'>
                 {reviewStats.loading ? (
-                  // Loading skeleton para as estrelas
                   <div className='flex gap-1'>
                     {Array(5)
                       .fill('')
@@ -504,7 +790,6 @@ const ProductDetails = () => {
                       ))}
                   </div>
                 ) : (
-                  // ✅ ESTRELAS AMARELAS: Como no WriteReview
                   <div className='flex text-yellow-500 text-lg'>
                     {Array(5)
                       .fill('')
@@ -559,7 +844,7 @@ const ProductDetails = () => {
             </div>
           </div>
 
-          {/* Product Description - ✅ ACCORDION - Mobile/Tablet only */}
+          {/* Product Description - Mobile/Tablet only */}
           <div className='sm:hidden'>
             <button
               onClick={() => setIsDescriptionOpen(!isDescriptionOpen)}
@@ -635,7 +920,6 @@ const ProductDetails = () => {
                     +
                   </button>
                 </div>
-                {/* ✅ INDICADOR: Mostrar se já está no carrinho */}
                 {cartItems[product._id] && (
                   <p className='text-xs text-primary mt-1'>
                     {cartItems[product._id]}{' '}
@@ -647,7 +931,7 @@ const ProductDetails = () => {
             </div>
           </div>
 
-          {/* Action Buttons - ✅ MELHORADO: Stack vertical */}
+          {/* Action Buttons */}
           <div className='space-y-3'>
             <button
               onClick={handleAddToCart}
