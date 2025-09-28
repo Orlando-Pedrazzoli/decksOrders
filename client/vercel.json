@@ -11,6 +11,16 @@
   ],
   "routes": [
     {
+      "src": "/sitemap.xml",
+      "dest": "/sitemap.xml",
+      "headers": { "Cache-Control": "public, max-age=3600" }
+    },
+    {
+      "src": "/robots.txt",
+      "dest": "/robots.txt",
+      "headers": { "Cache-Control": "public, max-age=3600" }
+    },
+    {
       "src": "/assets/(.*)",
       "headers": { "Cache-Control": "public, max-age=31536000, immutable" }
     },
@@ -31,6 +41,21 @@
     {
       "src": "/ES_Icon.svg",
       "dest": "/ES_Icon.svg",
+      "headers": { "Cache-Control": "public, max-age=86400" }
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "dest": "/favicon-32x32.png",
+      "headers": { "Cache-Control": "public, max-age=86400" }
+    },
+    {
+      "src": "/favicon-16x16.png",
+      "dest": "/favicon-16x16.png",
+      "headers": { "Cache-Control": "public, max-age=86400" }
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "dest": "/apple-touch-icon.png",
       "headers": { "Cache-Control": "public, max-age=86400" }
     },
     {
