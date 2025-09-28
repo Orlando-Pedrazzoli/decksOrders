@@ -1,6 +1,8 @@
+cat > robots.txt << 'EOF'
 User-agent: *
 Allow: /
 Disallow: /seller/
 Disallow: /api/
 
 Sitemap: https://www.elitesurfing.pt/sitemap.xml
+EOF
