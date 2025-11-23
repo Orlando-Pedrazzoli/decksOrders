@@ -1,48 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 
-const ProductCard = ({ product }) => {
+const ProductCard = memo(({ product }) => {
   const { currency, addToCart, removeFromCart, cartItems, navigate } =
     useAppContext();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   if (!product || !product.image || product.image.length === 0) return null;
 
+  const isInactive = !product.inStock;
+
   const nextImage = e => {
     e.stopPropagation();
+    if (isInactive) return;
     setCurrentImageIndex(prev => (prev + 1) % product.image.length);
   };
 
   const prevImage = e => {
     e.stopPropagation();
+    if (isInactive) return;
     setCurrentImageIndex(
       prev => (prev - 1 + product.image.length) % product.image.length
     );
   };
 
+  const handleCardClick = () => {
+    navigate(`/products/${product.category.toLowerCase()}/${product._id}`);
+    window.scrollTo(0, 0);
+  };
+
   return (
     <div
-      onClick={() => {
-        navigate(`/products/${product.category.toLowerCase()}/${product._id}`);
-        window.scrollTo(0, 0);
-      }}
-      className='border border-gray-500/20 rounded-md p-2 bg-white w-full hover:shadow-md transition-shadow cursor-pointer flex flex-col h-full'
+      onClick={handleCardClick}
+      className={`border border-gray-500/20 rounded-md p-2 bg-white w-full transition-all duration-300 flex flex-col h-full relative ${
+        isInactive
+          ? 'opacity-90 cursor-default'
+          : 'hover:shadow-md cursor-pointer'
+      }`}
     >
-      {/* Image Carousel Container com ajustes de layout */}
+      {/* Image Carousel Container */}
       <div
         className='group relative flex items-center justify-center mb-3 overflow-hidden bg-gray-50 rounded-lg'
         style={{ aspectRatio: '1 / 1', minHeight: '160px' }}
       >
+        {/* Imagem com blur quando inativo */}
         <img
-          className='max-w-[90%] max-h-[90%] object-contain object-center transition-transform duration-300'
+          className={`max-w-[90%] max-h-[90%] object-contain object-center transition-all duration-300 ${
+            isInactive ? 'blur-sm grayscale' : ''
+          }`}
           src={product.image[currentImageIndex]}
           alt={product.name}
           loading='lazy'
         />
 
-        {/* Setas de navegação */}
-        {product.image.length > 1 && (
+        {/* Overlay de indisponível */}
+        {isInactive && (
+          <div className='absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]'>
+            <div className='bg-red-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg border-2 border-white/30 transform rotate-[-5deg]'>
+              INDISPONÍVEL
+            </div>
+          </div>
+        )}
+
+        {/* Setas de navegação - desabilitadas quando inativo */}
+        {!isInactive && product.image.length > 1 && (
           <>
             <button
               onClick={prevImage}
@@ -69,8 +91,8 @@ const ProductCard = ({ product }) => {
           </>
         )}
 
-        {/* Indicadores (pontos) */}
-        {product.image.length > 1 && (
+        {/* Indicadores (pontos) - hidden quando inativo */}
+        {!isInactive && product.image.length > 1 && (
           <div className='absolute bottom-2 z-10 left-0 right-0 flex justify-center gap-1.5'>
             {product.image.map((_, index) => (
               <button
@@ -93,7 +115,11 @@ const ProductCard = ({ product }) => {
 
       {/* Product Info */}
       <div className='flex flex-col flex-grow text-gray-500/60 text-sm'>
-        <p className='text-gray-700 font-medium text-base md:text-lg line-clamp-2 h-[3em] mt-1'>
+        <p
+          className={`text-gray-700 font-medium text-base md:text-lg line-clamp-2 h-[3em] mt-1 ${
+            isInactive ? 'opacity-60' : ''
+          }`}
+        >
           {product.name}
         </p>
 
@@ -115,7 +141,11 @@ const ProductCard = ({ product }) => {
         {/* Price and Add to Cart */}
         <div className='flex items-end justify-between mt-3 flex-grow'>
           <div>
-            <p className='text-lg md:text-xl font-medium text-gray-700'>
+            <p
+              className={`text-lg md:text-xl font-medium text-gray-700 ${
+                isInactive ? 'opacity-60' : ''
+              }`}
+            >
               {product.offerPrice.toLocaleString('pt-PT', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -123,7 +153,11 @@ const ProductCard = ({ product }) => {
               {currency}
             </p>
             {product.offerPrice < product.price && (
-              <p className='text-gray-500/60 text-xs md:text-sm line-through'>
+              <p
+                className={`text-gray-500/60 text-xs md:text-sm line-through ${
+                  isInactive ? 'opacity-60' : ''
+                }`}
+              >
                 {product.price.toLocaleString('pt-PT', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
@@ -133,6 +167,7 @@ const ProductCard = ({ product }) => {
             )}
           </div>
 
+          {/* Botão de adicionar ao carrinho - desabilitado quando inativo */}
           <div
             onClick={e => {
               e.stopPropagation();
@@ -140,7 +175,13 @@ const ProductCard = ({ product }) => {
             }}
             className='text-primary'
           >
-            {!cartItems[product._id] ? (
+            {isInactive ? (
+              <div className='flex items-center justify-center gap-1 bg-gray-200 border border-gray-300 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 rounded-lg text-sm sm:text-base md:text-lg font-medium shadow-sm cursor-not-allowed opacity-60'>
+                <span className='text-gray-500 text-xs sm:text-sm'>
+                  Indisponível
+                </span>
+              </div>
+            ) : !cartItems[product._id] ? (
               <button
                 className='flex items-center justify-center gap-1 bg-primary/10 border border-primary/40 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 rounded-lg hover:bg-primary/20 transition-colors text-sm sm:text-base md:text-lg font-medium shadow-sm active:scale-95'
                 onClick={e => {
@@ -185,6 +226,8 @@ const ProductCard = ({ product }) => {
       </div>
     </div>
   );
-};
+});
+
+ProductCard.displayName = 'ProductCard';
 
 export default ProductCard;

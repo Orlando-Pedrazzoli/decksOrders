@@ -48,6 +48,9 @@ const ProductDetails = () => {
 
   const product = products.find(item => item._id === id);
 
+  // 🎯 NOVO: Verificação de produto inativo
+  const isInactive = !product?.inStock;
+
   // Sincronização com cartItems
   useEffect(() => {
     if (product) {
@@ -59,7 +62,10 @@ const ProductDetails = () => {
   useEffect(() => {
     if (product && products.length > 0) {
       const productsCopy = [...products].filter(
-        item => product.category === item.category && item._id !== product._id
+        item =>
+          product.category === item.category &&
+          item._id !== product._id &&
+          item.inStock // 🎯 NOVO: Filtrar apenas produtos ativos
       );
       setRelatedProducts(productsCopy);
     }
@@ -103,17 +109,18 @@ const ProductDetails = () => {
     }
   };
 
-  // 🎯 NOVO: Abrir modal com índice correto
+  // 🎯 NOVO: Abrir modal com índice correto (desabilitado para produtos inativos)
   const openModal = useCallback(
     index => {
+      if (isInactive) return; // Não abrir modal para produtos inativos
       setModalImageIndex(index || currentImageIndex);
       setIsModalOpen(true);
       setIsZoomed(false);
       setZoomLevel(1);
       setImagePosition({ x: 0, y: 0 });
-      document.body.style.overflow = 'hidden'; // Previne scroll do body
+      document.body.style.overflow = 'hidden';
     },
-    [currentImageIndex]
+    [currentImageIndex, isInactive]
   );
 
   // 🎯 NOVO: Fechar modal
@@ -153,7 +160,6 @@ const ProductDetails = () => {
     const isRightSwipe = distance < -minSwipeDistance;
 
     if (isLeftSwipe && product) {
-      // Swipe left - próxima imagem
       const nextIndex =
         modalImageIndex < product.image.length - 1 ? modalImageIndex + 1 : 0;
       setModalImageIndex(nextIndex);
@@ -161,7 +167,6 @@ const ProductDetails = () => {
     }
 
     if (isRightSwipe && product) {
-      // Swipe right - imagem anterior
       const prevIndex =
         modalImageIndex > 0 ? modalImageIndex - 1 : product.image.length - 1;
       setModalImageIndex(prevIndex);
@@ -303,6 +308,7 @@ const ProductDetails = () => {
   }, [currentImageIndex]);
 
   const increaseQuantity = () => {
+    if (isInactive) return; // Não permitir se inativo
     const currentCartQuantity = cartItems[product._id] || 0;
     const newQuantity = Math.max(1, currentCartQuantity) + 1;
     setQuantity(newQuantity);
@@ -310,6 +316,7 @@ const ProductDetails = () => {
   };
 
   const decreaseQuantity = () => {
+    if (isInactive) return; // Não permitir se inativo
     const currentCartQuantity = cartItems[product._id] || 0;
     if (currentCartQuantity > 1) {
       const newQuantity = currentCartQuantity - 1;
@@ -319,10 +326,12 @@ const ProductDetails = () => {
   };
 
   const handleAddToCart = () => {
+    if (isInactive) return; // Não permitir se inativo
     addToCart(product._id);
   };
 
   const handleBuyNow = () => {
+    if (isInactive) return; // Não permitir se inativo
     if (!cartItems[product._id]) {
       for (let i = 0; i < quantity; i++) {
         addToCart(product._id);
@@ -332,6 +341,7 @@ const ProductDetails = () => {
   };
 
   const changeImage = newIndex => {
+    if (isInactive) return; // Desabilitar navegação para produtos inativos
     setIsTransitioning(true);
     setCurrentImageIndex(newIndex);
 
@@ -349,17 +359,20 @@ const ProductDetails = () => {
   };
 
   const nextImage = () => {
+    if (isInactive) return;
     const newIndex = (currentImageIndex + 1) % product.image.length;
     changeImage(newIndex);
   };
 
   const prevImage = () => {
+    if (isInactive) return;
     const newIndex =
       (currentImageIndex - 1 + product.image.length) % product.image.length;
     changeImage(newIndex);
   };
 
   const scrollThumbsLeft = () => {
+    if (isInactive) return;
     const newIndex = thumbStartIndex - 1;
     setThumbStartIndex(
       newIndex < 0 ? Math.max(0, product.image.length - 5) : newIndex
@@ -367,11 +380,13 @@ const ProductDetails = () => {
   };
 
   const scrollThumbsRight = () => {
+    if (isInactive) return;
     const newIndex = thumbStartIndex + 1;
     setThumbStartIndex(newIndex > product.image.length - 5 ? 0 : newIndex);
   };
 
   const selectThumbnail = index => {
+    if (isInactive) return;
     changeImage(index);
   };
 
@@ -587,17 +602,30 @@ const ProductDetails = () => {
             <div
               ref={imageScrollRef}
               onScroll={() => handleImageScroll(imageScrollRef)}
-              className='flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide sm:hidden border border-gray-200 rounded-xl shadow-sm'
+              className='flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide sm:hidden border border-gray-200 rounded-xl shadow-sm relative'
             >
               {product.image.map((image, index) => (
                 <img
                   key={index}
                   src={image}
                   alt={`Product image ${index + 1}`}
-                  className='w-full h-full object-contain flex-shrink-0 snap-center cursor-pointer'
-                  onClick={() => openModal(index)}
+                  className={`w-full h-full object-contain flex-shrink-0 snap-center transition-all duration-300 ${
+                    isInactive
+                      ? 'blur-sm grayscale cursor-default'
+                      : 'cursor-pointer'
+                  }`}
+                  onClick={() => !isInactive && openModal(index)}
                 />
               ))}
+
+              {/* 🎯 NOVO: Overlay de indisponível para mobile */}
+              {isInactive && (
+                <div className='absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px] pointer-events-none rounded-xl'>
+                  <div className='bg-red-500 text-white px-6 py-3 rounded-xl font-bold text-lg shadow-2xl border-2 border-white/30 transform rotate-[-5deg] animate-pulse'>
+                    INDISPONÍVEL
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Desktop Main Image */}
@@ -605,19 +633,34 @@ const ProductDetails = () => {
               <img
                 src={product.image[currentImageIndex]}
                 alt='Selected product'
-                className={`w-full h-full object-contain cursor-pointer transition-opacity duration-300 ${
+                className={`w-full h-full object-contain transition-all duration-300 ${
                   isTransitioning ? 'opacity-70' : 'opacity-100'
+                } ${
+                  isInactive
+                    ? 'blur-sm grayscale cursor-default'
+                    : 'cursor-pointer'
                 }`}
-                onClick={() => openModal(currentImageIndex)}
+                onClick={() => !isInactive && openModal(currentImageIndex)}
               />
 
-              {/* Zoom hint */}
-              <div className='absolute top-2 right-2 bg-black/50 text-white p-2 rounded-lg text-xs opacity-0 hover:opacity-100 transition-opacity'>
-                🔍 Clique para ampliar
-              </div>
+              {/* 🎯 NOVO: Overlay de indisponível para desktop */}
+              {isInactive && (
+                <div className='absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px] rounded-xl pointer-events-none'>
+                  <div className='bg-red-500 text-white px-6 py-3 rounded-xl font-bold text-lg shadow-2xl border-2 border-white/30 transform rotate-[-5deg] animate-pulse'>
+                    INDISPONÍVEL
+                  </div>
+                </div>
+              )}
 
-              {/* Desktop Navigation Arrows */}
-              {product.image.length > 1 && (
+              {/* Zoom hint - apenas para produtos ativos */}
+              {!isInactive && (
+                <div className='absolute top-2 right-2 bg-black/50 text-white p-2 rounded-lg text-xs opacity-0 hover:opacity-100 transition-opacity'>
+                  🔍 Clique para ampliar
+                </div>
+              )}
+
+              {/* Desktop Navigation Arrows - desabilitadas para produtos inativos */}
+              {!isInactive && product.image.length > 1 && (
                 <>
                   <button
                     onClick={e => {
@@ -654,12 +697,13 @@ const ProductDetails = () => {
               {product.image.map((_, index) => (
                 <button
                   key={index}
-                  onClick={() => changeImage(index)}
+                  onClick={() => !isInactive && changeImage(index)}
+                  disabled={isInactive}
                   className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
                     currentImageIndex === index
                       ? 'bg-primary scale-110'
                       : 'bg-gray-300 hover:bg-gray-400'
-                  }`}
+                  } ${isInactive ? 'cursor-not-allowed opacity-50' : ''}`}
                   aria-label={`Go to image ${index + 1}`}
                 ></button>
               ))}
@@ -667,60 +711,64 @@ const ProductDetails = () => {
           </div>
 
           {/* Horizontal Thumbnail Carousel for Desktop */}
-          <div className='hidden sm:flex justify-center'>
-            <div className='flex items-center gap-2 max-w-[550px]'>
-              {/* Left Arrow */}
-              {product.image.length > 5 && (
-                <button
-                  onClick={scrollThumbsLeft}
-                  className='p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 active:scale-90 flex-shrink-0'
-                >
-                  <img
-                    src={assets.arrow_left}
-                    alt='Previous'
-                    className='w-4 h-4'
-                  />
-                </button>
-              )}
+          {!isInactive && (
+            <div className='hidden sm:flex justify-center'>
+              <div className='flex items-center gap-2 max-w-[550px]'>
+                {/* Left Arrow */}
+                {product.image.length > 5 && (
+                  <button
+                    onClick={scrollThumbsLeft}
+                    className='p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 active:scale-90 flex-shrink-0'
+                  >
+                    <img
+                      src={assets.arrow_left}
+                      alt='Previous'
+                      className='w-4 h-4'
+                    />
+                  </button>
+                )}
 
-              {/* Thumbnail Container */}
-              <div className='flex gap-3 overflow-hidden'>
-                {product.image
-                  .slice(thumbStartIndex, thumbStartIndex + 5)
-                  .map((image, index) => (
-                    <div
-                      key={thumbStartIndex + index}
-                      onClick={() => selectThumbnail(thumbStartIndex + index)}
-                      className={`border-2 w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 flex-shrink-0 ${
-                        currentImageIndex === thumbStartIndex + index
-                          ? 'border-primary scale-105 shadow-lg'
-                          : 'border-gray-300 hover:scale-105 hover:border-gray-400'
-                      }`}
-                    >
-                      <img
-                        src={image}
-                        alt={`Thumbnail ${thumbStartIndex + index + 1}`}
-                        className='w-full h-full object-cover transition-transform duration-300'
-                      />
-                    </div>
-                  ))}
+                {/* Thumbnail Container */}
+                <div className='flex gap-3 overflow-hidden'>
+                  {product.image
+                    .slice(thumbStartIndex, thumbStartIndex + 5)
+                    .map((image, index) => (
+                      <div
+                        key={thumbStartIndex + index}
+                        onClick={() =>
+                          selectThumbnail(thumbStartIndex + index)
+                        }
+                        className={`border-2 w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 flex-shrink-0 ${
+                          currentImageIndex === thumbStartIndex + index
+                            ? 'border-primary scale-105 shadow-lg'
+                            : 'border-gray-300 hover:scale-105 hover:border-gray-400'
+                        }`}
+                      >
+                        <img
+                          src={image}
+                          alt={`Thumbnail ${thumbStartIndex + index + 1}`}
+                          className='w-full h-full object-cover transition-transform duration-300'
+                        />
+                      </div>
+                    ))}
+                </div>
+
+                {/* Right Arrow */}
+                {product.image.length > 5 && (
+                  <button
+                    onClick={scrollThumbsRight}
+                    className='p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 active:scale-90 flex-shrink-0'
+                  >
+                    <img
+                      src={assets.arrow_right}
+                      alt='Next'
+                      className='w-4 h-4'
+                    />
+                  </button>
+                )}
               </div>
-
-              {/* Right Arrow */}
-              {product.image.length > 5 && (
-                <button
-                  onClick={scrollThumbsRight}
-                  className='p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 active:scale-90 flex-shrink-0'
-                >
-                  <img
-                    src={assets.arrow_right}
-                    alt='Next'
-                    className='w-4 h-4'
-                  />
-                </button>
-              )}
             </div>
-          </div>
+          )}
 
           {/* Accordion below horizontal carousel */}
           <div className='hidden sm:flex justify-center'>
@@ -886,96 +934,220 @@ const ProductDetails = () => {
             )}
           </div>
 
-          {/* Quantity Selector */}
-          <div className='bg-white border border-gray-200 p-3 md:p-4 rounded-lg'>
+          {/* 🎯 ATUALIZADO: Quantity Selector com verificação de inativo */}
+          <div
+            className={`bg-white border p-3 md:p-4 rounded-lg transition-all duration-300 ${
+              isInactive ? 'border-red-200 bg-red-50/30' : 'border-gray-200'
+            }`}
+          >
             <div className='space-y-3'>
               {/* Stock Status */}
               <div className='flex items-center gap-2'>
-                <div className='w-2.5 h-2.5 bg-green-500 rounded-full'></div>
-                <span className='text-sm text-gray-700 font-medium'>
-                  Em Stock - Pronto para envio
+                <div
+                  className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
+                    isInactive
+                      ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50'
+                      : 'bg-green-500 shadow-lg shadow-green-500/50'
+                  }`}
+                ></div>
+                <span
+                  className={`text-sm font-medium transition-colors duration-300 ${
+                    isInactive ? 'text-red-700' : 'text-green-700'
+                  }`}
+                >
+                  {isInactive
+                    ? 'Produto Indisponível'
+                    : 'Em Stock - Pronto para envio'}
                 </span>
               </div>
 
-              {/* Quantity Selector */}
-              <div>
-                <label className='block text-sm font-semibold text-gray-900 mb-2'>
-                  Quantidade
-                </label>
-                <div className='flex items-center w-fit'>
-                  <button
-                    onClick={decreaseQuantity}
-                    className='w-10 h-10 flex items-center justify-center border border-gray-300 rounded-l-lg hover:bg-gray-50 transition-colors duration-200 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed'
-                    disabled={quantity <= 1 && !cartItems[product._id]}
-                  >
-                    −
-                  </button>
-                  <div className='w-16 h-10 flex items-center justify-center border-t border-b border-gray-300 bg-gray-50 text-base font-semibold'>
-                    {quantity}
+              {/* Quantity Selector - Apenas se produto estiver ativo */}
+              {!isInactive && (
+                <div>
+                  <label className='block text-sm font-semibold text-gray-900 mb-2'>
+                    Quantidade
+                  </label>
+                  <div className='flex items-center w-fit'>
+                    <button
+                      onClick={decreaseQuantity}
+                      className='w-10 h-10 flex items-center justify-center border border-gray-300 rounded-l-lg hover:bg-gray-50 transition-colors duration-200 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed'
+                      disabled={quantity <= 1 && !cartItems[product._id]}
+                    >
+                      −
+                    </button>
+                    <div className='w-16 h-10 flex items-center justify-center border-t border-b border-gray-300 bg-gray-50 text-base font-semibold'>
+                      {quantity}
+                    </div>
+                    <button
+                      onClick={increaseQuantity}
+                      className='w-10 h-10 flex items-center justify-center border border-gray-300 rounded-r-lg hover:bg-gray-50 transition-colors duration-200 text-lg font-medium'
+                    >
+                      +
+                    </button>
                   </div>
-                  <button
-                    onClick={increaseQuantity}
-                    className='w-10 h-10 flex items-center justify-center border border-gray-300 rounded-r-lg hover:bg-gray-50 transition-colors duration-200 text-lg font-medium'
-                  >
-                    +
-                  </button>
+                  {cartItems[product._id] && (
+                    <p className='text-xs text-primary mt-1'>
+                      {cartItems[product._id]}{' '}
+                      {cartItems[product._id] === 1 ? 'item' : 'itens'} no
+                      carrinho
+                    </p>
+                  )}
                 </div>
-                {cartItems[product._id] && (
-                  <p className='text-xs text-primary mt-1'>
-                    {cartItems[product._id]}{' '}
-                    {cartItems[product._id] === 1 ? 'item' : 'itens'} no
-                    carrinho
+              )}
+
+              {/* Mensagem quando produto está inativo */}
+              {isInactive && (
+                <div className='bg-red-50 border border-red-200 rounded-lg p-3'>
+                  <p className='text-sm text-red-700 text-center'>
+                    Este produto está temporariamente indisponível
                   </p>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* 🎯 ATUALIZADO: Action Buttons com verificação de inativo */}
           <div className='space-y-3'>
-            <button
-              onClick={handleAddToCart}
-              className='w-full py-3 px-4 text-base font-semibold bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-all duration-300 active:scale-[0.98] border border-gray-200'
-            >
-              Adicionar ao Carrinho
-            </button>
+            {isInactive ? (
+              <>
+                {/* Alerta de Indisponibilidade */}
+                <div className='bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-5 text-center transform transition-all duration-300 hover:scale-[1.02]'>
+                  <div className='flex items-center justify-center gap-3 mb-3'>
+                    <svg
+                      className='w-8 h-8 text-red-500 animate-pulse'
+                      fill='currentColor'
+                      viewBox='0 0 20 20'
+                    >
+                      <path
+                        fillRule='evenodd'
+                        d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z'
+                        clipRule='evenodd'
+                      />
+                    </svg>
+                    <span className='text-red-700 font-bold text-xl'>
+                      PRODUTO INDISPONÍVEL
+                    </span>
+                  </div>
+                  <p className='text-red-600 text-sm leading-relaxed'>
+                    Este produto está temporariamente indisponível. <br />
+                    Entre em contacto connosco para saber quando voltará ao
+                    stock.
+                  </p>
+                </div>
 
-            <button
-              onClick={handleBuyNow}
-              className='w-full py-3 px-4 text-base font-semibold bg-primary text-white rounded-lg hover:bg-primary-dull transition-all duration-300 active:scale-[0.98] shadow-lg hover:shadow-xl'
-            >
-              Comprar Agora
-            </button>
+                {/* Botões Desabilitados */}
+                <button
+                  disabled
+                  className='w-full py-3.5 px-4 text-base font-semibold bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed opacity-70 flex items-center justify-center gap-2'
+                >
+                  <svg
+                    className='w-5 h-5'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636'
+                    />
+                  </svg>
+                  Adicionar ao Carrinho - Indisponível
+                </button>
+
+                <button
+                  disabled
+                  className='w-full py-3.5 px-4 text-base font-semibold bg-gray-400 text-gray-600 rounded-lg cursor-not-allowed opacity-70 flex items-center justify-center gap-2'
+                >
+                  <svg
+                    className='w-5 h-5'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636'
+                    />
+                  </svg>
+                  Comprar Agora - Indisponível
+                </button>
+
+                {/* Botão de Contacto */}
+                <button
+                  onClick={() => navigate('/contact')}
+                  className='w-full py-3 px-4 text-base font-semibold bg-primary/10 text-primary border-2 border-primary rounded-lg hover:bg-primary hover:text-white transition-all duration-300 active:scale-[0.98]'
+                >
+                  Contacte-nos para Mais Informações
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleAddToCart}
+                  className='w-full py-3 px-4 text-base font-semibold bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-all duration-300 active:scale-[0.98] border border-gray-200'
+                >
+                  Adicionar ao Carrinho
+                </button>
+
+                <button
+                  onClick={handleBuyNow}
+                  className='w-full py-3 px-4 text-base font-semibold bg-primary text-white rounded-lg hover:bg-primary-dull transition-all duration-300 active:scale-[0.98] shadow-lg hover:shadow-xl'
+                >
+                  Comprar Agora
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Additional Info */}
-          <div className='bg-blue-50 p-3 md:p-4 rounded-lg'>
-            <div className='space-y-2'>
-              <div className='flex items-center gap-2'>
-                <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
-                  <span className='text-white text-xs'>✓</span>
-                </div>
-                <span className='text-xs md:text-sm text-gray-700'>
-                  Envio grátis para Portugal Continental
-                </span>
+          {/* 🎯 ATUALIZADO: Additional Info com verificação de inativo */}
+          <div
+            className={`p-3 md:p-4 rounded-lg transition-all duration-300 ${
+              isInactive
+                ? 'bg-red-50 border border-red-200'
+                : 'bg-blue-50 border border-blue-200'
+            }`}
+          >
+            {isInactive ? (
+              <div className='space-y-2 text-center'>
+                <p className='text-red-700 font-semibold'>
+                  🚫 Produto Temporariamente Indisponível
+                </p>
+                <p className='text-sm text-red-600'>
+                  Entre em contacto para saber quando voltará ao stock
+                </p>
               </div>
-              <div className='flex items-center gap-2'>
-                <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
-                  <span className='text-white text-xs'>✓</span>
+            ) : (
+              <div className='space-y-2'>
+                <div className='flex items-center gap-2'>
+                  <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
+                    <span className='text-white text-xs'>✓</span>
+                  </div>
+                  <span className='text-xs md:text-sm text-gray-700'>
+                    Envio grátis para Portugal Continental
+                  </span>
                 </div>
-                <span className='text-xs md:text-sm text-gray-700'>
-                  Garantia de 24 meses
-                </span>
-              </div>
-              <div className='flex items-center gap-2'>
-                <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
-                  <span className='text-white text-xs'>✓</span>
+                <div className='flex items-center gap-2'>
+                  <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
+                    <span className='text-white text-xs'>✓</span>
+                  </div>
+                  <span className='text-xs md:text-sm text-gray-700'>
+                    Garantia de 24 meses
+                  </span>
                 </div>
-                <span className='text-xs md:text-sm text-gray-700'>
-                  Devolução gratuita em 30 dias
-                </span>
+                <div className='flex items-center gap-2'>
+                  <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
+                    <span className='text-white text-xs'>✓</span>
+                  </div>
+                  <span className='text-xs md:text-sm text-gray-700'>
+                    Devolução gratuita em 30 dias
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -995,12 +1167,9 @@ const ProductDetails = () => {
         </div>
 
         <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6'>
-          {relatedProducts
-            .filter(product => product.inStock)
-            .slice(0, 10)
-            .map((product, index) => (
-              <ProductCard key={index} product={product} />
-            ))}
+          {relatedProducts.slice(0, 10).map((product, index) => (
+            <ProductCard key={index} product={product} />
+          ))}
         </div>
 
         {relatedProducts.length > 10 && (
