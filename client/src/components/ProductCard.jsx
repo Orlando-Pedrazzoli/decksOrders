@@ -44,21 +44,21 @@ const ProductCard = memo(({ product }) => {
         className='group relative flex items-center justify-center mb-3 overflow-hidden bg-gray-50 rounded-lg'
         style={{ aspectRatio: '1 / 1', minHeight: '160px' }}
       >
-        {/* Imagem com blur quando inativo */}
+        {/* 🎯 ATUALIZADO: Imagem com escurecimento suave quando inativo */}
         <img
           className={`max-w-[90%] max-h-[90%] object-contain object-center transition-all duration-300 ${
-            isInactive ? 'blur-sm grayscale' : ''
+            isInactive ? 'opacity-40' : ''
           }`}
           src={product.image[currentImageIndex]}
           alt={product.name}
           loading='lazy'
         />
 
-        {/* Overlay de indisponível */}
+        {/* 🎯 ATUALIZADO: Overlay mais suave e clean */}
         {isInactive && (
-          <div className='absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px]'>
-            <div className='bg-red-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg border-2 border-white/30 transform rotate-[-5deg]'>
-              INDISPONÍVEL
+          <div className='absolute inset-0 flex items-center justify-center bg-black/5'>
+            <div className='text-gray-600 px-3 py-1.5 rounded-md font-medium text-xs tracking-wide uppercase'>
+              Indisponível
             </div>
           </div>
         )}
@@ -167,7 +167,7 @@ const ProductCard = memo(({ product }) => {
             )}
           </div>
 
-          {/* Botão de adicionar ao carrinho - desabilitado quando inativo */}
+          {/* 🎯 ATUALIZADO: Botão mais clean quando indisponível */}
           <div
             onClick={e => {
               e.stopPropagation();
@@ -176,10 +176,8 @@ const ProductCard = memo(({ product }) => {
             className='text-primary'
           >
             {isInactive ? (
-              <div className='flex items-center justify-center gap-1 bg-gray-200 border border-gray-300 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 rounded-lg text-sm sm:text-base md:text-lg font-medium shadow-sm cursor-not-allowed opacity-60'>
-                <span className='text-gray-500 text-xs sm:text-sm'>
-                  Indisponível
-                </span>
+              <div className='flex items-center justify-center gap-1 bg-gray-100 border border-gray-300 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 rounded-lg text-xs sm:text-sm font-medium cursor-not-allowed opacity-70'>
+                <span className='text-gray-500'>Esgotado</span>
               </div>
             ) : !cartItems[product._id] ? (
               <button

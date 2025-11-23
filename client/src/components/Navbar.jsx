@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { Lock } from 'lucide-react'; // ✅ NOVO: Ícone de cadeado
 import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
-import toast from 'react-hot-toast'; // Keep toast for local error messages if needed, but AppContext handles most.
+import toast from 'react-hot-toast';
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -15,8 +16,9 @@ const Navbar = () => {
     setSearchQuery,
     searchQuery,
     getCartCount,
-    logoutUser, // <--- Import the new logoutUser from AppContext
-  } = useAppContext(); // Removed setUser, setCartItems, axios as they are now handled by logoutUser
+    logoutUser,
+    isSeller, // ✅ NOVO: Verificar se é seller
+  } = useAppContext();
 
   // Sync with global search query
   useEffect(() => {
@@ -25,13 +27,11 @@ const Navbar = () => {
     }
   }, [searchQuery]);
 
-  // ✅ NOVO: Limpar search quando navegar para rotas específicas
+  // ✅ Limpar search quando navegar para rotas específicas
   useEffect(() => {
     const currentPath = window.location.pathname;
 
-    // ✅ Limpar search quando sair da página de produtos ou ir para produto específico
     if (currentPath !== '/products' && !currentPath.startsWith('/products/')) {
-      // Limpar apenas se não estamos em páginas relacionadas a produtos
       if (searchQuery && searchQuery.length > 0) {
         setSearchQuery('');
         setLocalSearchInput('');
@@ -40,74 +40,61 @@ const Navbar = () => {
       currentPath.includes('/products/') &&
       currentPath.split('/').length > 2
     ) {
-      // ✅ Se estamos numa página de produto específico, limpar search
       if (searchQuery && searchQuery.length > 0) {
         setSearchQuery('');
         setLocalSearchInput('');
       }
     }
-  }, [window.location.pathname]); // ✅ Monitorar mudanças de rota
+  }, [window.location.pathname]);
 
   // Navigate to products when search query changes
   useEffect(() => {
-    // Only navigate if search query is not empty to avoid navigating on initial load
     if (searchQuery && searchQuery.length > 0) {
       navigate('/products');
     }
   }, [searchQuery, navigate]);
 
-  // Handle logout: This function now just calls the context's logoutUser
   const handleLogout = async () => {
-    setOpen(false); // Close mobile menu first
-    await logoutUser(); // Call the centralized logout function from context
-    // The context's logoutUser handles:
-    // - API call to /api/user/logout
-    // - Clearing user state (setUser(null))
-    // - Clearing cart items (setCartItems({}))
-    // - Clearing mobile_auth_token from localStorage
-    // - Showing success/error toasts
-    // - Navigating to '/'
-    // - Setting sessionStorage.setItem('userLoggedOut', 'true');
-    // - Potentially forcing a reload if necessary (though the context function should be robust enough without it)
-    // No need for window.location.reload() or explicit setUser/setCartItems here.
+    setOpen(false);
+    await logoutUser();
   };
 
   const handleSearch = e => {
     const value = e.target.value;
     setLocalSearchInput(value);
-    setSearchQuery(value); // Update global search immediately
+    setSearchQuery(value);
   };
 
-  // ✅ CORRIGIDO: Função específica para mobile search
   const handleMobileSearch = e => {
     const value = e.target.value;
     setLocalSearchInput(value);
-    setSearchQuery(value); // Update global search immediately
+    setSearchQuery(value);
   };
 
-  // ✅ NOVO: Função para executar pesquisa (mobile)
   const executeMobileSearch = () => {
     if (localSearchInput.trim()) {
-      setOpen(false); // Fechar menu mobile
+      setOpen(false);
       navigate('/products');
     }
   };
 
-  // ✅ NOVO: Função para limpar search manualmente
   const clearSearch = () => {
     setLocalSearchInput('');
     setSearchQuery('');
   };
 
   const handleNavLinkClick = path => {
-    setOpen(false); // Close mobile menu when navigating
-
-    // ✅ NOVO: Limpar search quando navegar para outras páginas
+    setOpen(false);
     if (path !== '/products') {
       clearSearch();
     }
-
     navigate(path);
+  };
+
+  // ✅ NOVO: Função para acessar área de admin
+  const handleAdminAccess = () => {
+    setOpen(false); // Fechar menu mobile se estiver aberto
+    navigate('/seller');
   };
 
   // Render search input consistently
@@ -126,22 +113,19 @@ const Navbar = () => {
         type='text'
         placeholder='Pesquisar produtos'
         onKeyDown={e => {
-          // ✅ Pesquisar ao pressionar Enter
           if (e.key === 'Enter' && localSearchInput.trim()) {
             if (isMobile) {
-              executeMobileSearch(); // ✅ Usar função específica para mobile
+              executeMobileSearch();
             } else {
               navigate('/products');
             }
           }
-          // ✅ Limpar com Escape
           if (e.key === 'Escape') {
             clearSearch();
           }
         }}
       />
 
-      {/* ✅ Ícone de pesquisa OU botão de limpar */}
       {localSearchInput.length > 0 ? (
         <button
           onClick={clearSearch}
@@ -156,10 +140,9 @@ const Navbar = () => {
           alt='search'
           className='w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 transition-opacity'
           onClick={() => {
-            // ✅ Pesquisar ao clicar no ícone
             if (localSearchInput.trim()) {
               if (isMobile) {
-                executeMobileSearch(); // ✅ Usar função específica para mobile
+                executeMobileSearch();
               } else {
                 navigate('/products');
               }
@@ -190,7 +173,6 @@ const Navbar = () => {
         >
           Produtos
         </NavLink>
-        {/* ✅ REMOVIDO: Reviews link do menu principal */}
         <NavLink
           to='/contact'
           className={({ isActive }) => (isActive ? 'text-primary' : '')}
@@ -200,6 +182,23 @@ const Navbar = () => {
 
         {/* Desktop Search */}
         <div className='hidden lg:flex items-center'>{renderSearchInput()}</div>
+
+        {/* ✅ NOVO: Ícone de Admin (Desktop) */}
+        <button
+          onClick={handleAdminAccess}
+          className='relative group cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-all duration-200'
+          title='Área de Administração'
+        >
+          <Lock className='w-5 h-5 text-gray-600 group-hover:text-primary transition-colors' />
+          {/* Tooltip */}
+          <span className='absolute hidden group-hover:block top-full mt-2 right-0 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap z-10'>
+            Admin
+          </span>
+          {/* Badge para sellers autenticados */}
+          {isSeller && (
+            <span className='absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white'></span>
+          )}
+        </button>
 
         {/* Desktop Cart Icon */}
         <div
@@ -227,11 +226,9 @@ const Navbar = () => {
         ) : (
           <div className='relative group flex flex-col items-center'>
             <img src={assets.profile_icon} className='w-10' alt='profile' />
-            {/* ✅ NOVO: Nome do usuário embaixo do profile */}
             <span className='text-xs text-gray-600 mt-1 max-w-20 truncate'>
               {user.name}
             </span>
-            {/* ✅ EXPANDIDO: Menu do profile com Reviews */}
             <ul className='hidden group-hover:block absolute top-12 right-0 bg-white shadow-lg border border-gray-200 py-2.5 w-44 rounded-md text-sm z-40 transition-all duration-200'>
               <li
                 onClick={() => navigate('/my-orders')}
@@ -240,7 +237,6 @@ const Navbar = () => {
                 <span className='text-primary'>📦</span>
                 Os meus Pedidos
               </li>
-              {/* ✅ NOVO: Reviews no menu do profile */}
               <li
                 onClick={() => navigate('/write-review')}
                 className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 transition-colors duration-200'
@@ -252,7 +248,7 @@ const Navbar = () => {
                 onClick={handleLogout}
                 className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 transition-colors duration-200 border-t border-gray-100 mt-1'
               >
-                <span className='text-red-500'></span>
+                <span className='text-red-500'>🚪</span>
                 Sair
               </li>
             </ul>
@@ -261,7 +257,19 @@ const Navbar = () => {
       </div>
 
       {/* Mobile-specific elements */}
-      <div className='flex items-center gap-6 sm:hidden'>
+      <div className='flex items-center gap-4 sm:hidden'>
+        {/* ✅ NOVO: Ícone de Admin (Mobile) */}
+        <button
+          onClick={handleAdminAccess}
+          className='relative p-1.5 hover:bg-gray-100 rounded-lg transition-all duration-200'
+          aria-label='Área de Administração'
+        >
+          <Lock className='w-5 h-5 text-gray-600' />
+          {isSeller && (
+            <span className='absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-white'></span>
+          )}
+        </button>
+
         {/* Mobile Cart Icon */}
         <div
           onClick={() => navigate('/cart')}
@@ -291,11 +299,11 @@ const Navbar = () => {
       {open && (
         <div
           className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden transition-opacity duration-300'
-          onClick={() => setOpen(false)} // Close menu when clicking outside
+          onClick={() => setOpen(false)}
         >
           <div
             className='absolute top-0 right-0 h-full w-3/4 sm:w-1/2 bg-white shadow-lg p-6 flex flex-col items-start gap-6 transition-transform duration-300 ease-out transform translate-x-0'
-            onClick={e => e.stopPropagation()} // Prevent closing when clicking inside the panel
+            onClick={e => e.stopPropagation()}
           >
             <button
               onClick={() => setOpen(false)}
@@ -316,9 +324,10 @@ const Navbar = () => {
                 />
               </svg>
             </button>
+
             {/* Mobile Search Input */}
-            <div className='w-full mb-4'>{renderSearchInput(true)}</div>{' '}
-            {/* Added mobile search here */}
+            <div className='w-full mb-4'>{renderSearchInput(true)}</div>
+
             <NavLink
               to='/'
               className={({ isActive }) =>
@@ -352,10 +361,24 @@ const Navbar = () => {
             >
               Contacto
             </NavLink>
+
+            {/* ✅ NOVO: Link Admin no menu mobile */}
+            <button
+              onClick={handleAdminAccess}
+              className='flex items-center gap-2 w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
+            >
+              <Lock className='w-5 h-5' />
+              <span>Área Admin</span>
+              {isSeller && (
+                <span className='ml-auto text-xs bg-green-500 text-white px-2 py-0.5 rounded-full'>
+                  Autenticado
+                </span>
+              )}
+            </button>
+
             {/* Mobile User Profile / Login / Logout */}
             {user ? (
               <>
-                {/* ✅ NOVO: Nome do usuário no menu mobile */}
                 <div className='w-full p-3 bg-primary/5 rounded-lg border border-primary/20 mb-2'>
                   <div className='flex items-center gap-3'>
                     <img
@@ -383,7 +406,6 @@ const Navbar = () => {
                 >
                   📦 Os meus Pedidos
                 </NavLink>
-                {/* ✅ NOVO: Reviews no menu mobile */}
                 <NavLink
                   to='/write-review'
                   className={({ isActive }) =>
@@ -396,10 +418,10 @@ const Navbar = () => {
                   ⭐ Escrever Reviews
                 </NavLink>
                 <button
-                  onClick={handleLogout} // <--- Use handleLogout here
+                  onClick={handleLogout}
                   className='w-full cursor-pointer px-6 py-3 mt-4 bg-primary hover:bg-primary-dull transition text-white rounded-lg text-base font-semibold flex items-center justify-center gap-2'
                 >
-                  Sair
+                  🚪 Sair
                 </button>
               </>
             ) : (
