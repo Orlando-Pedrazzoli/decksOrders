@@ -94,7 +94,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // ✅ CORREÇÃO: Enhanced fetch user function with better error handling
+  // ✅ Enhanced fetch user function with better error handling
   const fetchUser = async () => {
     try {
       console.log(
@@ -104,7 +104,7 @@ export const AppContextProvider = ({ children }) => {
       setIsLoading(true);
 
       // First, try to get user with existing session/cookie
-      let response = await axios.get('/api/user/is-auth'); // ✅ CORRIGIDO: Adicionada barra inicial
+      let response = await axios.get('/api/user/is-auth');
 
       if (response.data.success) {
         setUser(response.data.user);
@@ -129,7 +129,7 @@ export const AppContextProvider = ({ children }) => {
         ] = `Bearer ${storedToken}`;
 
         try {
-          response = await axios.get('/api/user/is-auth'); // ✅ CORRIGIDO: Adicionada barra inicial
+          response = await axios.get('/api/user/is-auth');
 
           if (response.data.success) {
             setUser(response.data.user);
@@ -252,11 +252,9 @@ export const AppContextProvider = ({ children }) => {
     const newCartItems = { ...cartItems };
 
     if (quantity <= 0) {
-      // ✅ REMOVE COMPLETAMENTE quando quantity é 0 ou menor
       delete newCartItems[itemId];
       toast.success('Produto removido do carrinho');
     } else {
-      // ✅ ATUALIZA a quantidade quando é maior que 0
       newCartItems[itemId] = quantity;
       toast.success('Carrinho atualizado');
     }
@@ -398,8 +396,8 @@ export const AppContextProvider = ({ children }) => {
     navigate,
     user,
     setUser,
-    setIsSeller,
-    isSeller,
+    isSeller, // ✅ Exportar isSeller
+    setIsSeller, // ✅ CRÍTICO: Exportar setIsSeller
     showUserLogin,
     setShowUserLogin,
     products,
@@ -415,13 +413,14 @@ export const AppContextProvider = ({ children }) => {
     getCartCount,
     axios,
     fetchProducts,
+    fetchSeller, // ✅ Exportar fetchSeller também
     setCartItems,
     logoutUser,
     setAuthToken,
     isLoading,
     saveCartToStorage,
     loadCartFromStorage,
-    saveUserToStorage, // ✅ ADICIONADO: Exporte esta função também
+    saveUserToStorage,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

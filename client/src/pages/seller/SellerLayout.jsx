@@ -4,7 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import toast from 'react-hot-toast';
 
 const SellerLayout = () => {
-  const { axios, navigate } = useAppContext();
+  const { axios, navigate, setIsSeller } = useAppContext();
 
   const sidebarLinks = [
     { name: 'Add Product', path: '/seller', icon: assets.add_icon },
@@ -20,13 +20,19 @@ const SellerLayout = () => {
     try {
       const { data } = await axios.get('/api/seller/logout');
       if (data.success) {
+        // ✅ CRÍTICO: Atualizar o estado isSeller para false
+        setIsSeller(false);
         toast.success(data.message);
         navigate('/');
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error('Erro no logout:', error);
+      // ✅ Mesmo com erro, limpar o estado local
+      setIsSeller(false);
+      toast.success('Logout realizado');
+      navigate('/');
     }
   };
 
@@ -44,7 +50,7 @@ const SellerLayout = () => {
           <p>Hi! Admin</p>
           <button
             onClick={logout}
-            className='border rounded-full text-sm px-4 py-1'
+            className='border rounded-full text-sm px-4 py-1 hover:bg-red-50 hover:text-red-600 hover:border-red-600 transition-all duration-200'
           >
             Logout
           </button>

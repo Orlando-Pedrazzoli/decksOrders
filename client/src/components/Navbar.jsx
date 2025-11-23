@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Lock } from 'lucide-react'; // ✅ NOVO: Ícone de cadeado
+import { Lock, LogOut } from 'lucide-react';
 import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 import toast from 'react-hot-toast';
@@ -17,7 +17,9 @@ const Navbar = () => {
     searchQuery,
     getCartCount,
     logoutUser,
-    isSeller, // ✅ NOVO: Verificar se é seller
+    isSeller,
+    setIsSeller,
+    axios,
   } = useAppContext();
 
   // Sync with global search query
@@ -27,7 +29,7 @@ const Navbar = () => {
     }
   }, [searchQuery]);
 
-  // ✅ Limpar search quando navegar para rotas específicas
+  // Limpar search quando navegar para rotas específicas
   useEffect(() => {
     const currentPath = window.location.pathname;
 
@@ -57,6 +59,28 @@ const Navbar = () => {
   const handleLogout = async () => {
     setOpen(false);
     await logoutUser();
+  };
+
+  // ✅ NOVO: Função para fazer logout do seller/admin
+  const handleSellerLogout = async () => {
+    try {
+      setOpen(false);
+      const { data } = await axios.get('/api/seller/logout');
+      
+      if (data.success) {
+        setIsSeller(false);
+        toast.success('Logout do Admin realizado com sucesso');
+        navigate('/');
+      } else {
+        toast.error('Erro ao fazer logout');
+      }
+    } catch (error) {
+      console.error('Erro no logout do seller:', error);
+      // Mesmo com erro, limpar o estado local
+      setIsSeller(false);
+      toast.success('Logout realizado');
+      navigate('/');
+    }
   };
 
   const handleSearch = e => {
@@ -91,9 +115,9 @@ const Navbar = () => {
     navigate(path);
   };
 
-  // ✅ NOVO: Função para acessar área de admin
+  // Função para acessar área de admin
   const handleAdminAccess = () => {
-    setOpen(false); // Fechar menu mobile se estiver aberto
+    setOpen(false);
     navigate('/seller');
   };
 
@@ -183,22 +207,37 @@ const Navbar = () => {
         {/* Desktop Search */}
         <div className='hidden lg:flex items-center'>{renderSearchInput()}</div>
 
-        {/* ✅ NOVO: Ícone de Admin (Desktop) */}
-        <button
-          onClick={handleAdminAccess}
-          className='relative group cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-all duration-200'
-          title='Área de Administração'
-        >
-          <Lock className='w-5 h-5 text-gray-600 group-hover:text-primary transition-colors' />
-          {/* Tooltip */}
-          <span className='absolute hidden group-hover:block top-full mt-2 right-0 bg-gray-800 text-white text-xs py-1 px-2 rounded whitespace-nowrap z-10'>
-            Admin
-          </span>
-          {/* Badge para sellers autenticados */}
+        {/* ✅ Ícone de Admin com Dropdown (Desktop) */}
+        <div className='relative group'>
+          <button
+            onClick={handleAdminAccess}
+            className='relative group cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-all duration-200'
+            title='Área de Administração'
+          >
+            <Lock className='w-5 h-5 text-gray-600 group-hover:text-primary transition-colors' />
+            {/* Badge para sellers autenticados */}
+            {isSeller && (
+              <span className='absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white'></span>
+            )}
+          </button>
+
+          {/* ✅ NOVO: Dropdown de logout do admin */}
           {isSeller && (
-            <span className='absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white'></span>
+            <div className='hidden group-hover:block absolute top-full right-0 mt-2 bg-white shadow-lg border border-gray-200 py-2 w-48 rounded-md text-sm z-50'>
+              <div className='px-4 py-2 border-b border-gray-100'>
+                <p className='font-semibold text-gray-800'>Admin Panel</p>
+                <p className='text-xs text-gray-500'>Sessão ativa</p>
+              </div>
+              <button
+                onClick={handleSellerLogout}
+                className='w-full px-4 py-2 text-left hover:bg-red-50 text-red-600 flex items-center gap-2 transition-colors'
+              >
+                <LogOut className='w-4 h-4' />
+                Logout Admin
+              </button>
+            </div>
           )}
-        </button>
+        </div>
 
         {/* Desktop Cart Icon */}
         <div
@@ -258,7 +297,7 @@ const Navbar = () => {
 
       {/* Mobile-specific elements */}
       <div className='flex items-center gap-4 sm:hidden'>
-        {/* ✅ NOVO: Ícone de Admin (Mobile) */}
+        {/* Ícone de Admin (Mobile) */}
         <button
           onClick={handleAdminAccess}
           className='relative p-1.5 hover:bg-gray-100 rounded-lg transition-all duration-200'
@@ -362,7 +401,7 @@ const Navbar = () => {
               Contacto
             </NavLink>
 
-            {/* ✅ NOVO: Link Admin no menu mobile */}
+            {/* ✅ Link Admin no menu mobile com logout */}
             <button
               onClick={handleAdminAccess}
               className='flex items-center gap-2 w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
@@ -371,10 +410,21 @@ const Navbar = () => {
               <span>Área Admin</span>
               {isSeller && (
                 <span className='ml-auto text-xs bg-green-500 text-white px-2 py-0.5 rounded-full'>
-                  Autenticado
+                  Ativo
                 </span>
               )}
             </button>
+
+            {/* ✅ NOVO: Botão de logout do admin no mobile */}
+            {isSeller && (
+              <button
+                onClick={handleSellerLogout}
+                className='flex items-center gap-2 w-full text-left py-2 px-3 bg-red-50 text-red-600 hover:bg-red-100 transition-colors duration-200 text-base font-medium rounded-lg border border-red-200'
+              >
+                <LogOut className='w-5 h-5' />
+                <span>Logout Admin</span>
+              </button>
+            )}
 
             {/* Mobile User Profile / Login / Logout */}
             {user ? (
