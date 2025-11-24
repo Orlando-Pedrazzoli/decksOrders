@@ -1,8 +1,101 @@
-cat > robots.txt << 'EOF'
+# ═══════════════════════════════════════════════════════════════════════════
+# ROBOTS.TXT - Elite Surfing Portugal
+# https://www.elitesurfing.pt/robots.txt
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Permitir todos os crawlers principais
 User-agent: *
+Allow: /
+
+# Páginas para não indexar (privadas/admin)
+Disallow: /seller/
+Disallow: /seller/*
+Disallow: /api/
+Disallow: /api/*
+Disallow: /*.json$
+Disallow: /*?*
+
+# Permitir assets importantes
+Allow: /og-image.jpg
+Allow: /logo.png
+Allow: /favicon.ico
+Allow: /*.css
+Allow: /*.js
+
+# ═══════════════════════════════════════════════════════════════════════════
+# GOOGLEBOT ESPECÍFICO
+# ═══════════════════════════════════════════════════════════════════════════
+User-agent: Googlebot
 Allow: /
 Disallow: /seller/
 Disallow: /api/
 
+User-agent: Googlebot-Image
+Allow: /
+Allow: /*.jpg
+Allow: /*.jpeg
+Allow: /*.png
+Allow: /*.webp
+Allow: /*.svg
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BINGBOT
+# ═══════════════════════════════════════════════════════════════════════════
+User-agent: Bingbot
+Allow: /
+Disallow: /seller/
+Disallow: /api/
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SOCIAL MEDIA BOTS (para previews)
+# ═══════════════════════════════════════════════════════════════════════════
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+User-agent: Pinterest
+Allow: /
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BLOQUEAR BOTS MALICIOSOS/SPAM
+# ═══════════════════════════════════════════════════════════════════════════
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+User-agent: BLEXBot
+Disallow: /
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SITEMAP
+# ═══════════════════════════════════════════════════════════════════════════
 Sitemap: https://www.elitesurfing.pt/sitemap.xml
-EOF
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CRAWL-DELAY (opcional - para servidores com recursos limitados)
+# ═══════════════════════════════════════════════════════════════════════════
+# Crawl-delay: 1
+
+# ═══════════════════════════════════════════════════════════════════════════
+# HOST (URL principal - ajuda com www vs non-www)
+# ═══════════════════════════════════════════════════════════════════════════
+Host: https://www.elitesurfing.pt
