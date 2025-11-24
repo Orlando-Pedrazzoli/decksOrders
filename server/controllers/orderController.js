@@ -323,3 +323,77 @@ export const getAllOrders = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+
+// =============================================================================
+// ✅ NOVO: UPDATE ORDER STATUS (SELLER/ADMIN)
+// =============================================================================
+export const updateOrderStatus = async (req, res) => {
+  try {
+    const { orderId, status } = req.body;
+
+    // Validar dados
+    if (!orderId || !status) {
+      return res.json({
+        success: false,
+        message: 'Order ID e Status são obrigatórios',
+      });
+    }
+
+    // Lista de status válidos
+    const validStatuses = [
+      'Order Placed',
+      'Processing',
+      'Shipped',
+      'Out for Delivery',
+      'Delivered',
+      'Cancelled',
+    ];
+
+    if (!validStatuses.includes(status)) {
+      return res.json({
+        success: false,
+        message: 'Status inválido',
+      });
+    }
+
+    // Buscar o pedido
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.json({
+        success: false,
+        message: 'Pedido não encontrado',
+      });
+    }
+
+    // Atualizar status
+    const updatedOrder = await Order.findByIdAndUpdate(
+      orderId,
+      { status },
+      { new: true }
+    )
+      .populate('items.product address')
+      .exec();
+
+    console.log('✅ Status atualizado:', {
+      orderId: updatedOrder._id,
+      oldStatus: order.status,
+      newStatus: status,
+    });
+
+    // Se o status for "Delivered" e for COD, marcar como pago
+    if (status === 'Delivered' && order.paymentType === 'COD') {
+      await Order.findByIdAndUpdate(orderId, { isPaid: true });
+      console.log('✅ Pedido COD marcado como pago (entregue)');
+    }
+
+    res.json({
+      success: true,
+      message: `Status atualizado para "${status}"`,
+      order: updatedOrder,
+    });
+  } catch (error) {
+    console.error('❌ Erro ao atualizar status:', error);
+    res.json({ success: false, message: error.message });
+  }
+};
