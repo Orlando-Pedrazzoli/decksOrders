@@ -1,10 +1,9 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { assets } from '../../assets/assets';
 import { useAppContext } from '../../context/AppContext';
-import toast from 'react-hot-toast';
 
 const SellerLayout = () => {
-  const { axios, navigate, setIsSeller } = useAppContext();
+  const { logoutSeller } = useAppContext();
 
   const sidebarLinks = [
     { name: 'Add Product', path: '/seller', icon: assets.add_icon },
@@ -16,40 +15,20 @@ const SellerLayout = () => {
     { name: 'Orders', path: '/seller/orders', icon: assets.order_icon },
   ];
 
-  const logout = async () => {
-    try {
-      const { data } = await axios.get('/api/seller/logout');
-      if (data.success) {
-        // ✅ CRÍTICO: Atualizar o estado isSeller para false
-        setIsSeller(false);
-        toast.success(data.message);
-        navigate('/');
-      } else {
-        toast.error(data.message);
-      }
-    } catch (error) {
-      console.error('Erro no logout:', error);
-      // ✅ Mesmo com erro, limpar o estado local
-      setIsSeller(false);
-      toast.success('Logout realizado');
-      navigate('/');
-    }
-  };
-
   return (
     <>
       <div className='flex items-center justify-between px-4 md:px-8 border-b border-gray-300 py-3 bg-white'>
         <Link to='/'>
           <img
             src={assets.logo_es}
-            alt='log'
+            alt='logo'
             className='cursor-pointer w-34 md:w-30'
           />
         </Link>
         <div className='flex items-center gap-5 text-gray-500'>
           <p>Hi! Admin</p>
           <button
-            onClick={logout}
+            onClick={logoutSeller}
             className='border rounded-full text-sm px-4 py-1 hover:bg-red-50 hover:text-red-600 hover:border-red-600 transition-all duration-200'
           >
             Logout
@@ -64,11 +43,11 @@ const SellerLayout = () => {
               key={item.name}
               end={item.path === '/seller'}
               className={({ isActive }) => `flex items-center py-3 px-4 gap-3 
-                            ${
-                              isActive
-                                ? 'border-r-4 md:border-r-[6px] bg-primary/10 border-primary text-primary'
-                                : 'hover:bg-gray-100/90 border-white'
-                            }`}
+                ${
+                  isActive
+                    ? 'border-r-4 md:border-r-[6px] bg-primary/10 border-primary text-primary'
+                    : 'hover:bg-gray-100/90 border-white'
+                }`}
             >
               <img src={item.icon} alt='' className='w-7 h-7' />
               <p className='md:block hidden text-center'>{item.name}</p>

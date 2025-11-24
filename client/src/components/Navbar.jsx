@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom';
 import { Lock, LogOut } from 'lucide-react';
 import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
-import toast from 'react-hot-toast';
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
@@ -17,19 +16,16 @@ const Navbar = () => {
     searchQuery,
     getCartCount,
     logoutUser,
+    logoutSeller, // ✅ Usar logoutSeller do contexto
     isSeller,
-    setIsSeller,
-    axios,
   } = useAppContext();
 
-  // Sync with global search query
   useEffect(() => {
     if (typeof searchQuery === 'string') {
       setLocalSearchInput(searchQuery);
     }
   }, [searchQuery]);
 
-  // Limpar search quando navegar para rotas específicas
   useEffect(() => {
     const currentPath = window.location.pathname;
 
@@ -49,7 +45,6 @@ const Navbar = () => {
     }
   }, [window.location.pathname]);
 
-  // Navigate to products when search query changes
   useEffect(() => {
     if (searchQuery && searchQuery.length > 0) {
       navigate('/products');
@@ -61,26 +56,10 @@ const Navbar = () => {
     await logoutUser();
   };
 
-  // ✅ NOVO: Função para fazer logout do seller/admin
-  const handleSellerLogout = async () => {
-    try {
-      setOpen(false);
-      const { data } = await axios.get('/api/seller/logout');
-      
-      if (data.success) {
-        setIsSeller(false);
-        toast.success('Logout do Admin realizado com sucesso');
-        navigate('/');
-      } else {
-        toast.error('Erro ao fazer logout');
-      }
-    } catch (error) {
-      console.error('Erro no logout do seller:', error);
-      // Mesmo com erro, limpar o estado local
-      setIsSeller(false);
-      toast.success('Logout realizado');
-      navigate('/');
-    }
+  // ✅ Usar logoutSeller do contexto
+  const handleSellerLogout = () => {
+    setOpen(false);
+    logoutSeller();
   };
 
   const handleSearch = e => {
@@ -115,13 +94,11 @@ const Navbar = () => {
     navigate(path);
   };
 
-  // Função para acessar área de admin
   const handleAdminAccess = () => {
     setOpen(false);
     navigate('/seller');
   };
 
-  // Render search input consistently
   const renderSearchInput = (isMobile = false) => (
     <div
       className={`flex items-center gap-2 border border-gray-300 px-3 rounded-full relative ${
@@ -204,10 +181,9 @@ const Navbar = () => {
           Contacto
         </NavLink>
 
-        {/* Desktop Search */}
         <div className='hidden lg:flex items-center'>{renderSearchInput()}</div>
 
-        {/* ✅ Ícone de Admin com Dropdown (Desktop) */}
+        {/* Admin Icon com Dropdown */}
         <div className='relative group'>
           <button
             onClick={handleAdminAccess}
@@ -215,13 +191,11 @@ const Navbar = () => {
             title='Área de Administração'
           >
             <Lock className='w-5 h-5 text-gray-600 group-hover:text-primary transition-colors' />
-            {/* Badge para sellers autenticados */}
             {isSeller && (
               <span className='absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white'></span>
             )}
           </button>
 
-          {/* ✅ NOVO: Dropdown de logout do admin */}
           {isSeller && (
             <div className='hidden group-hover:block absolute top-full right-0 mt-2 bg-white shadow-lg border border-gray-200 py-2 w-48 rounded-md text-sm z-50'>
               <div className='px-4 py-2 border-b border-gray-100'>
@@ -239,7 +213,7 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Desktop Cart Icon */}
+        {/* Cart Icon */}
         <div
           onClick={() => navigate('/cart')}
           className='relative cursor-pointer'
@@ -254,7 +228,7 @@ const Navbar = () => {
           </button>
         </div>
 
-        {/* Desktop User Login/Profile */}
+        {/* User Login/Profile */}
         {!user ? (
           <button
             onClick={() => setShowUserLogin(true)}
@@ -268,24 +242,24 @@ const Navbar = () => {
             <span className='text-xs text-gray-600 mt-1 max-w-20 truncate'>
               {user.name}
             </span>
-            <ul className='hidden group-hover:block absolute top-12 right-0 bg-white shadow-lg border border-gray-200 py-2.5 w-44 rounded-md text-sm z-40 transition-all duration-200'>
+            <ul className='hidden group-hover:block absolute top-12 right-0 bg-white shadow-lg border border-gray-200 py-2.5 w-44 rounded-md text-sm z-40'>
               <li
                 onClick={() => navigate('/my-orders')}
-                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 transition-colors duration-200'
+                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2'
               >
                 <span className='text-primary'>📦</span>
                 Os meus Pedidos
               </li>
               <li
                 onClick={() => navigate('/write-review')}
-                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 transition-colors duration-200'
+                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2'
               >
                 <span className='text-primary'>⭐</span>
                 Escrever Reviews
               </li>
               <li
                 onClick={handleLogout}
-                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 transition-colors duration-200 border-t border-gray-100 mt-1'
+                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 border-t border-gray-100 mt-1'
               >
                 <span className='text-red-500'>🚪</span>
                 Sair
@@ -295,9 +269,8 @@ const Navbar = () => {
         )}
       </div>
 
-      {/* Mobile-specific elements */}
+      {/* Mobile elements */}
       <div className='flex items-center gap-4 sm:hidden'>
-        {/* Ícone de Admin (Mobile) */}
         <button
           onClick={handleAdminAccess}
           className='relative p-1.5 hover:bg-gray-100 rounded-lg transition-all duration-200'
@@ -309,7 +282,6 @@ const Navbar = () => {
           )}
         </button>
 
-        {/* Mobile Cart Icon */}
         <div
           onClick={() => navigate('/cart')}
           className='relative cursor-pointer'
@@ -324,7 +296,6 @@ const Navbar = () => {
           </button>
         </div>
 
-        {/* Mobile Menu Toggle */}
         <button
           onClick={() => setOpen(!open)}
           aria-label='Menu'
@@ -337,16 +308,16 @@ const Navbar = () => {
       {/* Mobile Menu Panel */}
       {open && (
         <div
-          className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden transition-opacity duration-300'
+          className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden'
           onClick={() => setOpen(false)}
         >
           <div
-            className='absolute top-0 right-0 h-full w-3/4 sm:w-1/2 bg-white shadow-lg p-6 flex flex-col items-start gap-6 transition-transform duration-300 ease-out transform translate-x-0'
+            className='absolute top-0 right-0 h-full w-3/4 sm:w-1/2 bg-white shadow-lg p-6 flex flex-col items-start gap-6'
             onClick={e => e.stopPropagation()}
           >
             <button
               onClick={() => setOpen(false)}
-              className='self-end text-gray-500 hover:text-gray-800 transition-colors duration-200'
+              className='self-end text-gray-500 hover:text-gray-800'
             >
               <svg
                 xmlns='http://www.w3.org/2000/svg'
@@ -364,13 +335,12 @@ const Navbar = () => {
               </svg>
             </button>
 
-            {/* Mobile Search Input */}
             <div className='w-full mb-4'>{renderSearchInput(true)}</div>
 
             <NavLink
               to='/'
               className={({ isActive }) =>
-                `block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100 ${
+                `block w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100 ${
                   isActive ? 'text-primary' : ''
                 }`
               }
@@ -381,7 +351,7 @@ const Navbar = () => {
             <NavLink
               to='/products'
               className={({ isActive }) =>
-                `block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100 ${
+                `block w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100 ${
                   isActive ? 'text-primary' : ''
                 }`
               }
@@ -392,7 +362,7 @@ const Navbar = () => {
             <NavLink
               to='/contact'
               className={({ isActive }) =>
-                `block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100 ${
+                `block w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100 ${
                   isActive ? 'text-primary' : ''
                 }`
               }
@@ -401,10 +371,9 @@ const Navbar = () => {
               Contacto
             </NavLink>
 
-            {/* ✅ Link Admin no menu mobile com logout */}
             <button
               onClick={handleAdminAccess}
-              className='flex items-center gap-2 w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100'
+              className='flex items-center gap-2 w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100'
             >
               <Lock className='w-5 h-5' />
               <span>Área Admin</span>
@@ -415,18 +384,16 @@ const Navbar = () => {
               )}
             </button>
 
-            {/* ✅ NOVO: Botão de logout do admin no mobile */}
             {isSeller && (
               <button
                 onClick={handleSellerLogout}
-                className='flex items-center gap-2 w-full text-left py-2 px-3 bg-red-50 text-red-600 hover:bg-red-100 transition-colors duration-200 text-base font-medium rounded-lg border border-red-200'
+                className='flex items-center gap-2 w-full text-left py-2 px-3 bg-red-50 text-red-600 hover:bg-red-100 text-base font-medium rounded-lg border border-red-200'
               >
                 <LogOut className='w-5 h-5' />
                 <span>Logout Admin</span>
               </button>
             )}
 
-            {/* Mobile User Profile / Login / Logout */}
             {user ? (
               <>
                 <div className='w-full p-3 bg-primary/5 rounded-lg border border-primary/20 mb-2'>
@@ -448,7 +415,7 @@ const Navbar = () => {
                 <NavLink
                   to='/my-orders'
                   className={({ isActive }) =>
-                    `block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100 ${
+                    `block w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100 ${
                       isActive ? 'text-primary' : ''
                     }`
                   }
@@ -459,7 +426,7 @@ const Navbar = () => {
                 <NavLink
                   to='/write-review'
                   className={({ isActive }) =>
-                    `block w-full text-left py-2 text-gray-700 hover:text-primary transition-colors duration-200 text-lg font-medium border-b border-gray-100 ${
+                    `block w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100 ${
                       isActive ? 'text-primary' : ''
                     }`
                   }
