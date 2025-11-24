@@ -18,7 +18,7 @@ const Cart = () => {
     setCartItems,
     setShowUserLogin,
     isMobile,
-    saveCartToStorage, // ✅ ADICIONADO
+    saveCartToStorage,
   } = useAppContext();
 
   const [cartArray, setCartArray] = useState([]);
@@ -83,7 +83,7 @@ const Cart = () => {
     }
   };
 
-  // ✅ FUNÇÃO calculateTotal CORRIGIDA (SEM TAXA 2%)
+  // ✅ FUNÇÃO calculateTotal (SEM TAXA 2%)
   const calculateTotal = () => {
     const subtotal = parseFloat(getCartAmount());
     let totalBeforeDiscount = subtotal;
@@ -95,7 +95,7 @@ const Cart = () => {
     return Math.max(0, totalBeforeDiscount).toFixed(2);
   };
 
-  // ✅ FUNÇÃO handlePlaceOrder SIMPLIFICADA - BASEADA NO CÓDIGO QUE FUNCIONA
+  // ✅ FUNÇÃO handlePlaceOrder CORRIGIDA - REDIRECIONA PARA ORDER-SUCCESS
   const handlePlaceOrder = async () => {
     if (!requireLogin('fazer a encomenda')) return;
     if (!selectedAddress) {
@@ -121,14 +121,13 @@ const Cart = () => {
           quantity: item.quantity,
         })),
         address: selectedAddress._id,
-        // ✅ TODOS OS CAMPOS OBRIGATÓRIOS DO MODELO
-        originalAmount: subtotal, // OBRIGATÓRIO
-        amount: finalAmount, // OBRIGATÓRIO - valor final após desconto
-        discountAmount: discountAmount, // Valor do desconto em euros
-        discountPercentage: discountApplied ? 30 : 0, // Percentagem do desconto
-        promoCode: discountApplied ? promoCode.toUpperCase() : '', // Código promocional
-        paymentType: paymentOption === 'COD' ? 'COD' : 'Online', // OBRIGATÓRIO
-        isPaid: false, // OBRIGATÓRIO - sempre false inicialmente
+        originalAmount: subtotal,
+        amount: finalAmount,
+        discountAmount: discountAmount,
+        discountPercentage: discountApplied ? 30 : 0,
+        promoCode: discountApplied ? promoCode.toUpperCase() : '',
+        paymentType: paymentOption === 'COD' ? 'COD' : 'Online',
+        isPaid: false,
       };
 
       console.log('📦 Dados da encomenda sendo enviados:', orderData);
@@ -140,17 +139,19 @@ const Cart = () => {
         console.log('✅ Resposta COD:', response.data);
 
         if (response.data.success) {
-          // Limpar carrinho para COD
+          // ✅ LIMPAR CARRINHO
           const emptyCart = {};
           setCartItems(emptyCart);
+          saveCartToStorage(emptyCart);
 
+          // ✅ CORRIGIDO: REDIRECIONAR PARA ORDER-SUCCESS
           toast.success('Encomenda efetuada com sucesso!');
-          navigate('/my-orders');
+          navigate(`/order-success/${response.data.orderId}`);
         } else {
           toast.error(response.data.message || 'Falha ao fazer a encomenda.');
         }
       } else {
-        // ✅ STRIPE PAYMENT FLOW - SIMPLES COMO NO CÓDIGO QUE FUNCIONA
+        // ✅ STRIPE PAYMENT FLOW
         console.log('💳 Iniciando processo de pagamento Stripe...');
 
         response = await axios.post('/api/order/stripe', orderData);
@@ -163,7 +164,12 @@ const Cart = () => {
             response.data.url
           );
 
-          // ✅ REDIRECIONAR COMO NO CÓDIGO ORIGINAL
+          // ✅ LIMPAR CARRINHO ANTES DE REDIRECIONAR
+          const emptyCart = {};
+          setCartItems(emptyCart);
+          saveCartToStorage(emptyCart);
+
+          // ✅ REDIRECIONAR PARA STRIPE
           window.location.replace(response.data.url);
         } else {
           console.error('❌ Erro na resposta do Stripe:', response.data);
@@ -451,13 +457,12 @@ const Cart = () => {
               </div>
             </div>
 
-            {/* Payment Method - VERSÃO ATUALIZADA COM STRIPE */}
+            {/* Payment Method */}
             <div className='mb-6 border-b pb-6 border-gray-200'>
               <h3 className='font-semibold text-gray-700 mb-3'>
                 Método de Pagamento
               </h3>
 
-              {/* Radio buttons para melhor UX */}
               <div className='space-y-3'>
                 <label className='flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors duration-200'>
                   <input
@@ -500,7 +505,6 @@ const Cart = () => {
                 </label>
               </div>
 
-              {/* Informação adicional baseada na seleção */}
               {paymentOption === 'COD' && (
                 <div className='mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg'>
                   <p className='text-sm text-blue-700'>
@@ -519,7 +523,7 @@ const Cart = () => {
               )}
             </div>
 
-            {/* Order Total - SEM TAXA DE 2% */}
+            {/* Order Total */}
             <div className='pt-4'>
               <div className='flex justify-between items-center mb-3 text-gray-700'>
                 <span>Subtotal ({getCartCount()} artigos):</span>
@@ -549,7 +553,7 @@ const Cart = () => {
               </div>
             </div>
 
-            {/* Checkout Button - VERSÃO ATUALIZADA COM STRIPE */}
+            {/* Checkout Button */}
             <button
               onClick={handlePlaceOrder}
               disabled={
@@ -591,7 +595,6 @@ const Cart = () => {
               )}
             </button>
 
-            {/* Informação de segurança para Stripe */}
             {paymentOption === 'Online' && !isProcessing && (
               <div className='mt-3 text-center'>
                 <p className='text-xs text-gray-500'>

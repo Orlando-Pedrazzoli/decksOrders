@@ -1,8 +1,7 @@
 // server/controllers/orderController.js
-// ATUALIZADO COM NOTIFICAÇÕES EMAIL + WHATSAPP PARA ADMIN
+// VERSÃO RESTAURADA - EMAILS FUNCIONANDO + WHATSAPP ADICIONADO
 
 import { sendOrderConfirmationEmail } from '../services/emailService.js';
-import { notifyAdminNewOrder } from '../services/adminNotificationService.js';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
@@ -10,50 +9,61 @@ import Address from '../models/Address.js';
 import stripe from 'stripe';
 
 // =============================================================================
-// FUNÇÃO AUXILIAR: ENVIAR TODAS AS NOTIFICAÇÕES
+// IMPORTAÇÃO SEGURA DO WHATSAPP (não quebra se não existir)
 // =============================================================================
-const sendAllNotifications = async (order, userId) => {
-  try {
-    console.log('📧 Preparando notificações para pedido:', order._id);
+let notifyAdminNewOrder = null;
+try {
+  const adminNotification = await import('../services/adminNotificationService.js');
+  notifyAdminNewOrder = adminNotification.notifyAdminNewOrder;
+  console.log('✅ Serviço de notificação admin carregado');
+} catch (error) {
+  console.log('⚠️ Serviço de notificação admin não disponível:', error.message);
+}
 
-    // Buscar dados necessários
+// =============================================================================
+// FUNÇÃO PARA ENVIAR EMAIL AO CLIENTE (ORIGINAL QUE FUNCIONAVA)
+// =============================================================================
+const sendClientEmail = async (order, userId) => {
+  try {
+    console.log('📧 Preparando email para cliente...');
+    
     const user = await User.findById(userId);
     const address = await Address.findById(order.address);
     const productIds = order.items.map(item => item.product);
     const products = await Product.find({ _id: { $in: productIds } });
 
     if (!user || !address) {
-      console.error('❌ Dados insuficientes para enviar notificações');
+      console.error('❌ Dados insuficientes para enviar email');
       return;
     }
 
-    // ✅ 1. EMAIL PARA O CLIENTE
-    try {
-      const emailResult = await sendOrderConfirmationEmail(order, user, products, address);
-      if (emailResult.success) {
-        console.log('✅ Email de confirmação enviado para cliente:', emailResult.recipient);
-      } else {
-        console.error('❌ Falha no email para cliente:', emailResult.error);
-      }
-    } catch (error) {
-      console.error('❌ Erro ao enviar email para cliente:', error.message);
+    // ✅ EMAIL PARA O CLIENTE (código original que funcionava)
+    const emailResult = await sendOrderConfirmationEmail(order, user, products, address);
+    
+    if (emailResult.success) {
+      console.log('✅ Email de confirmação enviado para:', emailResult.recipient);
+    } else {
+      console.error('❌ Falha no email:', emailResult.error);
     }
 
-    // ✅ 2. NOTIFICAÇÕES PARA O ADMIN (Email + WhatsApp)
-    try {
-      const adminResult = await notifyAdminNewOrder(order, user, products, address);
-      console.log('🔔 Resultado notificações admin:', adminResult);
-    } catch (error) {
-      console.error('❌ Erro nas notificações para admin:', error.message);
+    // ✅ NOTIFICAÇÃO ADMIN (WhatsApp + Email) - só se disponível
+    if (notifyAdminNewOrder) {
+      try {
+        console.log('🔔 Enviando notificação para admin...');
+        const adminResult = await notifyAdminNewOrder(order, user, products, address);
+        console.log('🔔 Resultado notificação admin:', adminResult);
+      } catch (adminError) {
+        console.error('❌ Erro na notificação admin (não crítico):', adminError.message);
+      }
     }
 
   } catch (error) {
-    console.error('❌ Erro geral nas notificações:', error.message);
+    console.error('❌ Erro ao enviar email:', error.message);
   }
 };
 
 // =============================================================================
-// PLACE ORDER COD - COM NOTIFICAÇÕES
+// PLACE ORDER COD - USANDO MODELO Order COMPLETO
 // =============================================================================
 export const placeOrderCOD = async (req, res) => {
   try {
@@ -66,13 +76,15 @@ export const placeOrderCOD = async (req, res) => {
       discountAmount,
       discountPercentage,
       promoCode,
+      paymentType,
+      isPaid,
     } = req.body;
 
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
     }
 
-    // ✅ CRIAR PEDIDO
+    // ✅ CRIAR PEDIDO COM TODOS OS CAMPOS DO MODELO
     const newOrder = await Order.create({
       userId,
       items,
@@ -89,14 +101,16 @@ export const placeOrderCOD = async (req, res) => {
     console.log('✅ Pedido COD criado:', {
       orderId: newOrder._id,
       amount: newOrder.amount,
+      originalAmount: newOrder.originalAmount,
+      discountAmount: newOrder.discountAmount,
     });
 
     // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // ✅ ENVIAR NOTIFICAÇÕES (não bloqueia a resposta)
-    sendAllNotifications(newOrder, userId).catch(err => {
-      console.error('❌ Erro nas notificações (background):', err.message);
+    // ✅ ENVIAR EMAIL (em background, não bloqueia resposta)
+    sendClientEmail(newOrder, userId).catch(err => {
+      console.error('❌ Erro no envio de email (background):', err.message);
     });
 
     return res.json({
@@ -111,10 +125,11 @@ export const placeOrderCOD = async (req, res) => {
 };
 
 // =============================================================================
-// PLACE ORDER STRIPE - COM NOTIFICAÇÕES NO WEBHOOK
+// PLACE ORDER STRIPE - CORRIGIDO PARA RECEBER TODOS OS CAMPOS
 // =============================================================================
 export const placeOrderStripe = async (req, res) => {
   console.log('🚀 STRIPE FUNCTION STARTED!!!');
+  console.log('Body received:', req.body);
 
   try {
     const {
@@ -126,9 +141,22 @@ export const placeOrderStripe = async (req, res) => {
       discountAmount,
       discountPercentage,
       promoCode,
+      paymentType,
+      isPaid,
     } = req.body;
 
     const { origin } = req.headers;
+
+    console.log('🔍 All fields extracted:', {
+      userId,
+      items,
+      address,
+      originalAmount,
+      amount,
+      discountAmount,
+      discountPercentage,
+      promoCode,
+    });
 
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
@@ -136,6 +164,7 @@ export const placeOrderStripe = async (req, res) => {
 
     let productData = [];
 
+    // Preparar productData para Stripe
     for (const item of items) {
       const product = await Product.findById(item.product);
       productData.push({
@@ -145,7 +174,20 @@ export const placeOrderStripe = async (req, res) => {
       });
     }
 
-    // ✅ CRIAR PEDIDO (ainda não pago)
+    console.log('🔍 Creating order with:', {
+      userId,
+      items,
+      amount,
+      address,
+      paymentType: 'Online',
+      isPaid: false,
+      promoCode: promoCode || '',
+      discountAmount: discountAmount || 0,
+      discountPercentage: discountPercentage || 0,
+      originalAmount,
+    });
+
+    // ✅ CRIAR PEDIDO COM TODOS OS CAMPOS DO MODELO
     const order = await Order.create({
       userId,
       items,
@@ -162,12 +204,16 @@ export const placeOrderStripe = async (req, res) => {
     console.log('✅ Pedido Stripe criado:', {
       orderId: order._id,
       amount: order.amount,
+      originalAmount: order.originalAmount,
+      discountAmount: order.discountAmount,
     });
 
-    // Stripe Gateway
+    // Stripe Gateway Initialize
     const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
 
+    // create line items for stripe
     const line_items = productData.map(item => {
+      // Se há desconto, aplicar proporcionalmente
       let itemPrice = item.price;
       if (discountPercentage > 0) {
         itemPrice = item.price * (1 - discountPercentage / 100);
@@ -177,9 +223,10 @@ export const placeOrderStripe = async (req, res) => {
         price_data: {
           currency: 'eur',
           product_data: {
-            name: discountPercentage > 0
-              ? `${item.name} (${discountPercentage}% OFF)`
-              : item.name,
+            name:
+              discountPercentage > 0
+                ? `${item.name} (${discountPercentage}% OFF)`
+                : item.name,
           },
           unit_amount: Math.floor(itemPrice * 100),
         },
@@ -187,6 +234,7 @@ export const placeOrderStripe = async (req, res) => {
       };
     });
 
+    // create session
     const session = await stripeInstance.checkout.sessions.create({
       line_items,
       mode: 'payment',
@@ -200,15 +248,16 @@ export const placeOrderStripe = async (req, res) => {
 
     return res.json({ success: true, url: session.url });
   } catch (error) {
-    console.error('❌ Erro Stripe:', error);
+    console.error('❌ Erro Stripe completo:', error);
     return res.json({ success: false, message: error.message });
   }
 };
 
 // =============================================================================
-// STRIPE WEBHOOKS - COM NOTIFICAÇÕES APÓS PAGAMENTO CONFIRMADO
+// STRIPE WEBHOOKS
 // =============================================================================
 export const stripeWebhooks = async (request, response) => {
+  // Stripe Gateway Initialize
   const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
 
   const sig = request.headers['stripe-signature'];
@@ -221,7 +270,7 @@ export const stripeWebhooks = async (request, response) => {
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (error) {
-    console.error('❌ Webhook signature verification failed:', error.message);
+    console.error('❌ Webhook Error:', error.message);
     return response.status(400).send(`Webhook Error: ${error.message}`);
   }
 
@@ -240,42 +289,40 @@ export const stripeWebhooks = async (request, response) => {
         });
 
         if (!session.data || session.data.length === 0) {
-          console.error('❌ Sessão não encontrada para payment intent');
+          console.error('❌ Sessão não encontrada');
           break;
         }
 
         const { orderId, userId } = session.data[0].metadata;
-
+        
         // Mark Payment as Paid
         const updatedOrder = await Order.findByIdAndUpdate(
           orderId, 
           { isPaid: true },
           { new: true }
         );
-
+        
         console.log('✅ Pedido marcado como pago:', orderId);
-
+        
         // Clear user cart
         await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-        // ✅ ENVIAR NOTIFICAÇÕES APÓS PAGAMENTO CONFIRMADO
+        // ✅ ENVIAR EMAIL APÓS PAGAMENTO CONFIRMADO
         if (updatedOrder) {
-          sendAllNotifications(updatedOrder, userId).catch(err => {
-            console.error('❌ Erro nas notificações Stripe (background):', err.message);
+          sendClientEmail(updatedOrder, userId).catch(err => {
+            console.error('❌ Erro no email Stripe (background):', err.message);
           });
         }
-
       } catch (error) {
-        console.error('❌ Erro ao processar payment_intent.succeeded:', error.message);
+        console.error('❌ Erro no webhook:', error.message);
       }
       break;
     }
-
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object;
       const paymentIntentId = paymentIntent.id;
 
-      console.log('❌ Pagamento Stripe falhou:', paymentIntentId);
+      console.log('❌ Pagamento falhou:', paymentIntentId);
 
       try {
         const session = await stripeInstance.checkout.sessions.list({
@@ -285,10 +332,10 @@ export const stripeWebhooks = async (request, response) => {
         if (session.data && session.data.length > 0) {
           const { orderId } = session.data[0].metadata;
           await Order.findByIdAndDelete(orderId);
-          console.log('🗑️ Pedido deletado após falha no pagamento:', orderId);
+          console.log('🗑️ Pedido deletado:', orderId);
         }
       } catch (error) {
-        console.error('❌ Erro ao processar payment_intent.payment_failed:', error.message);
+        console.error('❌ Erro ao deletar pedido:', error.message);
       }
       break;
     }
@@ -297,16 +344,18 @@ export const stripeWebhooks = async (request, response) => {
       console.log(`ℹ️ Evento não tratado: ${event.type}`);
       break;
   }
-
   response.json({ received: true });
 };
 
 // =============================================================================
-// GET USER ORDERS
+// GET USER ORDERS - HÍBRIDO (funciona com GET e POST)
 // =============================================================================
 export const getUserOrders = async (req, res) => {
   try {
-    const userId = req.user?.id || req.user?._id || req.query.userId || req.body.userId;
+    const userId =
+      req.user?.id || req.user?._id || req.query.userId || req.body.userId;
+
+    console.log('🔍 Buscando pedidos para userId:', userId);
 
     if (!userId) {
       return res.json({ success: false, message: 'User ID is required' });
@@ -322,13 +371,16 @@ export const getUserOrders = async (req, res) => {
       })
       .populate({
         path: 'address',
-        select: 'firstName lastName street city state zipcode country email phone',
+        select:
+          'firstName lastName street city state zipcode country email phone',
       })
       .sort({ createdAt: -1 });
 
+    console.log(`📋 ${orders.length} pedidos encontrados`);
+
     res.json({ success: true, orders });
   } catch (error) {
-    console.error('❌ Error fetching user orders:', error);
+    console.error('❌ Erro ao buscar pedidos:', error);
     res.json({ success: false, message: error.message });
   }
 };
@@ -403,7 +455,7 @@ export const updateOrderStatus = async (req, res) => {
       newStatus: status,
     });
 
-    // Se entregue e COD, marcar como pago
+    // Se o status for "Delivered" e for COD, marcar como pago
     if (status === 'Delivered' && order.paymentType === 'COD') {
       await Order.findByIdAndUpdate(orderId, { isPaid: true });
       console.log('✅ Pedido COD marcado como pago (entregue)');
