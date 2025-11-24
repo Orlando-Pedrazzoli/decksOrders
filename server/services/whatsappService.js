@@ -1,5 +1,8 @@
 // server/services/whatsappService.js
 // Serviço de notificação WhatsApp via CallMeBot (GRATUITO)
+// CORRIGIDO: Usando https nativo para compatibilidade com Node.js
+
+import https from 'https';
 
 /**
  * Envia mensagem WhatsApp via CallMeBot
@@ -7,52 +10,66 @@
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 export const sendWhatsAppNotification = async (message) => {
-  try {
-    // ✅ CONFIGURAÇÃO - Substitua pela sua API Key do CallMeBot
-    const PHONE_NUMBER = process.env.ADMIN_WHATSAPP_NUMBER || '351912164220';
-    const API_KEY = process.env.CALLMEBOT_API_KEY; // Você vai adicionar no Vercel
+  return new Promise((resolve) => {
+    try {
+      const PHONE_NUMBER = process.env.ADMIN_WHATSAPP_NUMBER || '351912164220';
+      const API_KEY = process.env.CALLMEBOT_API_KEY;
 
-    if (!API_KEY) {
-      console.error('❌ CALLMEBOT_API_KEY não configurada no .env');
-      return { success: false, error: 'API Key não configurada' };
+      console.log('📱 Configuração WhatsApp:', {
+        phone: PHONE_NUMBER,
+        apiKeyExists: !!API_KEY,
+      });
+
+      if (!API_KEY) {
+        console.error('❌ CALLMEBOT_API_KEY não configurada no .env');
+        resolve({ success: false, error: 'API Key não configurada' });
+        return;
+      }
+
+      // Encode da mensagem para URL
+      const encodedMessage = encodeURIComponent(message);
+
+      // URL da API do CallMeBot
+      const url = `https://api.callmebot.com/whatsapp.php?phone=${PHONE_NUMBER}&text=${encodedMessage}&apikey=${API_KEY}`;
+
+      console.log('📱 Enviando notificação WhatsApp...');
+
+      // Fazer requisição usando https nativo
+      https.get(url, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            console.log('✅ WhatsApp enviado com sucesso!');
+            console.log('📱 Resposta:', data);
+            resolve({ success: true });
+          } else {
+            console.error('❌ Erro no CallMeBot. Status:', res.statusCode);
+            console.error('❌ Resposta:', data);
+            resolve({ success: false, error: `Status ${res.statusCode}: ${data}` });
+          }
+        });
+
+      }).on('error', (error) => {
+        console.error('❌ Erro na requisição WhatsApp:', error.message);
+        resolve({ success: false, error: error.message });
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao enviar WhatsApp:', error.message);
+      resolve({ success: false, error: error.message });
     }
-
-    // Encode da mensagem para URL
-    const encodedMessage = encodeURIComponent(message);
-
-    // URL da API do CallMeBot
-    const url = `https://api.callmebot.com/whatsapp.php?phone=${PHONE_NUMBER}&text=${encodedMessage}&apikey=${API_KEY}`;
-
-    console.log('📱 Enviando notificação WhatsApp...');
-
-    // Fazer requisição
-    const response = await fetch(url);
-    const responseText = await response.text();
-
-    if (response.ok) {
-      console.log('✅ WhatsApp enviado com sucesso!');
-      console.log('📱 Resposta:', responseText);
-      return { success: true };
-    } else {
-      console.error('❌ Erro no CallMeBot:', responseText);
-      return { success: false, error: responseText };
-    }
-  } catch (error) {
-    console.error('❌ Erro ao enviar WhatsApp:', error.message);
-    return { success: false, error: error.message };
-  }
+  });
 };
 
 /**
  * Formata mensagem de novo pedido para WhatsApp
- * @param {Object} order - Pedido
- * @param {Object} user - Usuário
- * @param {Array} products - Lista de produtos
- * @param {Object} address - Endereço
- * @returns {string} - Mensagem formatada
  */
 export const formatNewOrderMessage = (order, user, products, address) => {
-  // Criar lista de itens
   const itemsList = order.items
     .map(item => {
       const product = products.find(p => p._id.toString() === item.product.toString());
@@ -62,17 +79,14 @@ export const formatNewOrderMessage = (order, user, products, address) => {
     .filter(Boolean)
     .join('\n');
 
-  // Tipo de pagamento
   const paymentType = order.paymentType === 'COD' 
     ? '💰 Pagamento na Entrega' 
     : '💳 Stripe (Pago)';
 
-  // Desconto se houver
   const discountInfo = order.promoCode 
     ? `\n🎫 Código: ${order.promoCode} (-${order.discountPercentage}%)`
     : '';
 
-  // Montar mensagem
   const message = `
 🛒 *NOVO PEDIDO - ELITE SURFING*
 
