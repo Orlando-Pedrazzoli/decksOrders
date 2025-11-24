@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
@@ -9,8 +9,6 @@ axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL;
 // ⭐ DEBUG - Mas apenas em desenvolvimento
 if (import.meta.env.DEV) {
   console.log('🔧 Backend URL:', import.meta.env.VITE_BACKEND_URL);
-  console.log('🔧 Environment:', import.meta.env.MODE);
-  console.log('🔧 All env vars:', import.meta.env);
 }
 
 export const AppContext = createContext();
@@ -19,13 +17,18 @@ export const AppContextProvider = ({ children }) => {
   const currency = import.meta.env.VITE_CURRENCY;
 
   const navigate = useNavigate();
+  const location = useLocation();
+  
   const [user, setUser] = useState(null);
   const [isSeller, setIsSeller] = useState(false);
   const [showUserLogin, setShowUserLogin] = useState(false);
   const [products, setProducts] = useState([]);
   const [cartItems, setCartItems] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  
+  // ✅ OTIMIZADO: isLoading começa false - site carrega imediato
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSellerLoading, setIsSellerLoading] = useState(true);
 
   // Token management functions
   const setAuthToken = token => {
@@ -94,15 +97,9 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // ✅ Enhanced fetch user function with better error handling
+  // ✅ OTIMIZADO: fetchUser sem setIsLoading global
   const fetchUser = async () => {
     try {
-      console.log(
-        '🔍 Fazendo request para:',
-        axios.defaults.baseURL + '/api/user/is-auth'
-      );
-      setIsLoading(true);
-
       // First, try to get user with existing session/cookie
       let response = await axios.get('/api/user/is-auth');
 
@@ -112,21 +109,17 @@ export const AppContextProvider = ({ children }) => {
         saveUserToStorage(response.data.user);
         saveCartToStorage(response.data.user.cartItems || {});
 
-        // If we have a token but no auth header, set it
         const token = getStoredToken();
         if (token && !axios.defaults.headers.common['Authorization']) {
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         }
-
         return;
       }
 
       // If cookie auth failed, try with stored token
       const storedToken = getStoredToken();
       if (storedToken) {
-        axios.defaults.headers.common[
-          'Authorization'
-        ] = `Bearer ${storedToken}`;
+        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
 
         try {
           response = await axios.get('/api/user/is-auth');
@@ -139,33 +132,25 @@ export const AppContextProvider = ({ children }) => {
             return;
           }
         } catch (tokenError) {
-          console.log('Token validation failed:', tokenError);
+          console.log('Token validation failed');
         }
       }
 
-      // If both methods failed, try to load from localStorage as fallback
+      // Try to load from localStorage as fallback
       const savedUser = loadUserFromStorage();
       const savedCart = loadCartFromStorage();
 
       if (savedUser) {
         setUser(savedUser);
         setCartItems(savedCart);
-
-        // Try to refresh the session in background
-        setTimeout(() => {
-          fetchUser();
-        }, 2000);
       } else {
-        // No user found anywhere, clear everything
         setUser(null);
         setCartItems({});
         clearStoredData();
       }
     } catch (error) {
       console.error('❌ Erro no fetchUser:', error);
-      console.error('❌ URL tentada:', axios.defaults.baseURL);
 
-      // Try to use stored data as fallback
       const savedUser = loadUserFromStorage();
       const savedCart = loadCartFromStorage();
 
@@ -177,35 +162,61 @@ export const AppContextProvider = ({ children }) => {
         setCartItems({});
         clearStoredData();
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 
   // Enhanced logout function
   const logoutUser = async () => {
     try {
-      // Try to logout from server
       await axios.get('/api/user/logout');
     } catch (error) {
       console.log('Server logout failed:', error);
     } finally {
-      // Always clear local data
       setUser(null);
       setCartItems({});
       clearStoredData();
       navigate('/');
-      toast.success('Logged out successfully');
+      toast.success('Sessão terminada com sucesso');
     }
   };
 
-  // Fetch Seller Status
+  // ✅ OTIMIZADO: Logout do Seller centralizado
+  const logoutSeller = async () => {
+    try {
+      await axios.get('/api/seller/logout');
+    } catch (error) {
+      console.log('Seller logout request failed:', error);
+    } finally {
+      setIsSeller(false);
+      sessionStorage.removeItem('seller_just_logged_in');
+      navigate('/');
+      toast.success('Logout do Admin realizado com sucesso');
+    }
+  };
+
+  // ✅ OTIMIZADO: Fetch Seller só quando necessário
   const fetchSeller = async () => {
     try {
+      setIsSellerLoading(true);
       const { data } = await axios.get('/api/seller/is-auth');
-      setIsSeller(data.success);
+      
+      if (data.success) {
+        const isInSellerArea = window.location.pathname.startsWith('/seller');
+        const justLoggedIn = sessionStorage.getItem('seller_just_logged_in');
+        
+        if (isInSellerArea || justLoggedIn) {
+          setIsSeller(true);
+          sessionStorage.removeItem('seller_just_logged_in');
+        } else {
+          setIsSeller(false);
+        }
+      } else {
+        setIsSeller(false);
+      }
     } catch (error) {
       setIsSeller(false);
+    } finally {
+      setIsSellerLoading(false);
     }
   };
 
@@ -215,12 +226,9 @@ export const AppContextProvider = ({ children }) => {
       const { data } = await axios.get('/api/product/list');
       if (data.success) {
         setProducts(data.products);
-      } else {
-        toast.error(data.message);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
-      toast.error('Erro ao carregar produtos');
     }
   };
 
@@ -236,9 +244,8 @@ export const AppContextProvider = ({ children }) => {
 
     setCartItems(newCartItems);
     saveCartToStorage(newCartItems);
-    toast.success('Added to Cart');
+    toast.success('Adicionado ao carrinho');
 
-    // Sync with server if user is logged in
     if (user) {
       try {
         await axios.post('/api/cart/update', { cartItems: newCartItems });
@@ -262,7 +269,6 @@ export const AppContextProvider = ({ children }) => {
     setCartItems(newCartItems);
     saveCartToStorage(newCartItems);
 
-    // Sync with server if user is logged in
     if (user) {
       try {
         await axios.post('/api/cart/update', { cartItems: newCartItems });
@@ -284,9 +290,8 @@ export const AppContextProvider = ({ children }) => {
 
     setCartItems(newCartItems);
     saveCartToStorage(newCartItems);
-    toast.success('Removed from Cart');
+    toast.success('Removido do carrinho');
 
-    // Sync with server if user is logged in
     if (user) {
       try {
         await axios.post('/api/cart/update', { cartItems: newCartItems });
@@ -296,12 +301,10 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Clear search query
   const clearSearchQuery = () => {
     setSearchQuery('');
   };
 
-  // Get Cart Item Count
   const getCartCount = () => {
     let totalCount = 0;
     for (const item in cartItems) {
@@ -310,7 +313,6 @@ export const AppContextProvider = ({ children }) => {
     return totalCount;
   };
 
-  // Get Cart Total Amount
   const getCartAmount = () => {
     let totalAmount = 0;
     for (const items in cartItems) {
@@ -322,7 +324,7 @@ export const AppContextProvider = ({ children }) => {
     return Math.floor(totalAmount * 100) / 100;
   };
 
-  // Enhanced axios interceptor for token refresh
+  // Axios interceptors
   useEffect(() => {
     const requestInterceptor = axios.interceptors.request.use(
       config => {
@@ -332,19 +334,15 @@ export const AppContextProvider = ({ children }) => {
         }
         return config;
       },
-      error => {
-        return Promise.reject(error);
-      }
+      error => Promise.reject(error)
     );
 
     const responseInterceptor = axios.interceptors.response.use(
       response => response,
       async error => {
         if (error.response?.status === 401) {
-          // Token expired or invalid
-          console.log('Authentication failed, clearing stored data');
           setUser(null);
-          setCartItems(loadCartFromStorage()); // Keep cart but clear user
+          setCartItems(loadCartFromStorage());
           clearStoredData();
         }
         return Promise.reject(error);
@@ -357,25 +355,46 @@ export const AppContextProvider = ({ children }) => {
     };
   }, []);
 
-  // Initialize app
+  // ✅ OTIMIZADO: Inicialização rápida
   useEffect(() => {
     const initializeApp = async () => {
-      // Set token if available
+      // 1. Carregar dados locais IMEDIATAMENTE (sem await)
       const token = getStoredToken();
       if (token) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       }
 
-      // Load cart from storage immediately
       const savedCart = loadCartFromStorage();
       setCartItems(savedCart);
 
-      // Fetch data
-      await Promise.all([fetchUser(), fetchSeller(), fetchProducts()]);
+      const savedUser = loadUserFromStorage();
+      if (savedUser) {
+        setUser(savedUser);
+      }
+
+      // 2. Buscar produtos (não bloqueia)
+      fetchProducts();
+
+      // 3. Verificar usuário em background
+      fetchUser();
+
+      // 4. Só verificar seller se estiver na área de seller
+      if (window.location.pathname.startsWith('/seller')) {
+        fetchSeller();
+      } else {
+        setIsSellerLoading(false);
+      }
     };
 
     initializeApp();
   }, []);
+
+  // ✅ Verificar seller quando navegar para área de seller
+  useEffect(() => {
+    if (location.pathname.startsWith('/seller')) {
+      fetchSeller();
+    }
+  }, [location.pathname]);
 
   // Auto-sync cart with server when user changes
   useEffect(() => {
@@ -390,14 +409,14 @@ export const AppContextProvider = ({ children }) => {
     };
 
     syncCartWithServer();
-  }, [user]); // Only when user changes
+  }, [user]);
 
   const value = {
     navigate,
     user,
     setUser,
-    isSeller, // ✅ Exportar isSeller
-    setIsSeller, // ✅ CRÍTICO: Exportar setIsSeller
+    isSeller,
+    setIsSeller,
     showUserLogin,
     setShowUserLogin,
     products,
@@ -413,11 +432,13 @@ export const AppContextProvider = ({ children }) => {
     getCartCount,
     axios,
     fetchProducts,
-    fetchSeller, // ✅ Exportar fetchSeller também
+    fetchSeller,
     setCartItems,
     logoutUser,
+    logoutSeller,
     setAuthToken,
     isLoading,
+    isSellerLoading,
     saveCartToStorage,
     loadCartFromStorage,
     saveUserToStorage,

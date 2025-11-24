@@ -29,15 +29,15 @@ import CookieConsent from 'react-cookie-consent';
 
 const App = () => {
   const isSellerPath = useLocation().pathname.includes('seller');
-  const { showUserLogin, isSeller, isLoading } = useAppContext();
+  const { showUserLogin, isSeller, isSellerLoading } = useAppContext();
 
-  // Show loading spinner while authentication is being verified
-  if (isLoading) {
+  // ✅ OTIMIZADO: Loading APENAS na área de seller
+  if (isSellerPath && isSellerLoading) {
     return (
       <div className='flex justify-center items-center h-screen bg-white'>
         <div className='text-center'>
-          <div className='animate-spin rounded-full h-24 w-24 border-4 border-gray-300 border-t-primary mx-auto'></div>
-          <p className='mt-4 text-gray-600'>Loading...</p>
+          <div className='animate-spin rounded-full h-16 w-16 border-4 border-gray-300 border-t-primary mx-auto'></div>
+          <p className='mt-4 text-gray-600'>A carregar...</p>
         </div>
       </div>
     );
@@ -120,7 +120,7 @@ const App = () => {
         declineButtonText='Recusar'
         enableDeclineButton
         buttonStyle={{
-          background: '#3B82F6', // cinza médio
+          background: '#3B82F6',
           color: '#fff',
           fontSize: '14px',
           border: 'none',
@@ -130,7 +130,7 @@ const App = () => {
           cursor: 'pointer',
         }}
         declineButtonStyle={{
-          background: '#6e6e6e', // cinza um pouco mais claro
+          background: '#6e6e6e',
           color: '#fff',
           fontSize: '14px',
           border: 'none',
