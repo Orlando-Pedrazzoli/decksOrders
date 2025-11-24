@@ -1,7 +1,4 @@
 import logo from './logo.svg';
-import banner02 from './banner02.png';
-import banner05 from './banner05.png';
-import banner02img from './banner02image.png';
 import logo_es from './logoes.png';
 import search_icon from './search_icon.svg';
 import remove_icon from './remove_icon.svg';
@@ -29,12 +26,6 @@ import trust_icon from './trust_icon.svg';
 import empty_cart from './empty_cart.svg';
 import black_arrow_icon from './black_arrow_icon.svg';
 import white_arrow_icon from './white_arrow_icon.svg';
-import main_banner_bg from './main_banner_bg.png';
-import main_banner_bg_sm from './main_banner_bg_sm.png';
-import water_video from './water_video.mp4';
-import pastori_video from './pastori_video.mp4';
-import bottom_banner_image from './bottom_banner_image.png';
-import bottom_banner_image_sm from './bottom_banner_image_sm.png';
 import add_address_iamge from './add_address_image.svg';
 import deck_noronha from './noronhastroke.png';
 import deck_saquarema from './SAQUAREMA.png';
@@ -46,9 +37,6 @@ import fuwaxImg from './fuwax.jpg';
 
 export const assets = {
   logo,
-  banner02,
-  banner05,
-  banner02img,
   logo_es,
   search_icon,
   remove_icon,
@@ -70,12 +58,6 @@ export const assets = {
   trust_icon,
   black_arrow_icon,
   white_arrow_icon,
-  main_banner_bg,
-  main_banner_bg_sm,
-  water_video,
-  pastori_video,
-  bottom_banner_image,
-  bottom_banner_image_sm,
   add_address_iamge,
   box_icon,
   deck_Jbay,
