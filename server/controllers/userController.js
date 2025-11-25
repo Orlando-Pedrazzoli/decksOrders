@@ -2,6 +2,15 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
+// ✅ MOBILE-FRIENDLY: Configuração de cookie SEM domain
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
+  // ✅ SEM domain - deixa o browser decidir automaticamente (funciona em mobile)
+});
+
 // Register User : /api/user/register
 export const register = async (req, res) => {
   try {
@@ -24,13 +33,8 @@ export const register = async (req, res) => {
       expiresIn: '7d',
     });
 
-    // Set HTTP-only cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    // ✅ Set cookie mobile-friendly
+    res.cookie('token', token, getCookieOptions());
 
     return res.json({
       success: true,
@@ -40,7 +44,7 @@ export const register = async (req, res) => {
         name: user.name,
         cartItems: user.cartItems || {},
       },
-      token, // Also send token for localStorage storage
+      token, // Token para localStorage (fallback)
     });
   } catch (error) {
     console.log(error.message);
@@ -74,15 +78,8 @@ export const login = async (req, res) => {
       expiresIn: '7d',
     });
 
-    // Set HTTP-only cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // true apenas em produção
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' para produção
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
-      domain:
-        process.env.NODE_ENV === 'production' ? '.elitesurfing.pt' : undefined, // permite subdomínios
-    });
+    // ✅ Set cookie mobile-friendly
+    res.cookie('token', token, getCookieOptions());
 
     return res.json({
       success: true,
@@ -92,7 +89,7 @@ export const login = async (req, res) => {
         name: user.name,
         cartItems: user.cartItems || {},
       },
-      token, // Also send token for localStorage storage
+      token, // Token para localStorage (fallback)
     });
   } catch (error) {
     console.log(error.message);
@@ -128,13 +125,9 @@ export const isAuth = async (req, res) => {
 // Logout User : /api/user/logout
 export const logout = async (req, res) => {
   try {
-    res.clearCookie('token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      domain:
-        process.env.NODE_ENV === 'production' ? '.elitesurfing.pt' : undefined,
-    });
+    // ✅ Clear cookie com mesmas opções
+    res.clearCookie('token', getCookieOptions());
+    
     return res.json({ success: true, message: 'Logged Out' });
   } catch (error) {
     console.log(error.message);
