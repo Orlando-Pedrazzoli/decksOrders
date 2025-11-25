@@ -27,6 +27,7 @@ import FAQ from './pages/FAQ';
 import Terms from './pages/Terms';
 import ScrollToTop from './components/ScrollToTop';
 import HealthCheck from './components/HealthCheck';
+import WhatsAppButton from './components/WhatsAppButton';
 
 // ✅ Importa o CookieConsent
 import CookieConsent from 'react-cookie-consent';
@@ -109,6 +110,9 @@ const App = () => {
       </div>
       {!isSellerPath && <Footer />}
       <HealthCheck />
+
+      {/* ✅ WhatsApp Button - Aparece em todas as páginas exceto seller */}
+      {!isSellerPath && <WhatsAppButton />}
 
       {/* ✅ Cookie Consent RGPD-Compliant (Portugal/UE) */}
       <CookieConsent
