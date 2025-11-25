@@ -25,6 +25,7 @@ export const AppContextProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
   const [cartItems, setCartItems] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCartSidebar, setShowCartSidebar] = useState(false);
   
   // ✅ OTIMIZADO: isLoading começa false - site carrega imediato
   const [isLoading, setIsLoading] = useState(false);
@@ -260,6 +261,9 @@ export const AppContextProvider = ({ children }) => {
     setCartItems(newCartItems);
     saveCartToStorage(newCartItems);
     toast.success('Adicionado ao carrinho');
+    
+    // ✅ Abrir sidebar do carrinho
+    setShowCartSidebar(true);
 
     if (user) {
       try {
@@ -453,6 +457,8 @@ export const AppContextProvider = ({ children }) => {
     setIsSeller,
     showUserLogin,
     setShowUserLogin,
+    showCartSidebar,
+    setShowCartSidebar,
     products,
     currency,
     addToCart,

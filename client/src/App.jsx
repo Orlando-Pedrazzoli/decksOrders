@@ -28,6 +28,7 @@ import Terms from './pages/Terms';
 import ScrollToTop from './components/ScrollToTop';
 import HealthCheck from './components/HealthCheck';
 import WhatsAppButton from './components/WhatsAppButton';
+import CartSidebar from './components/CartSidebar';
 
 // ✅ Importa o CookieConsent
 import CookieConsent from 'react-cookie-consent';
@@ -113,6 +114,9 @@ const App = () => {
 
       {/* ✅ WhatsApp Button - Aparece em todas as páginas exceto seller */}
       {!isSellerPath && <WhatsAppButton />}
+
+      {/* ✅ Cart Sidebar - Aparece em todas as páginas exceto seller */}
+      {!isSellerPath && <CartSidebar />}
 
       {/* ✅ Cookie Consent RGPD-Compliant (Portugal/UE) */}
       <CookieConsent

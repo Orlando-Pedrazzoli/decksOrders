@@ -18,6 +18,7 @@ const Navbar = () => {
     logoutUser,
     logoutSeller,
     isSeller,
+    setShowCartSidebar,
   } = useAppContext();
 
   useEffect(() => {
@@ -96,6 +97,11 @@ const Navbar = () => {
   const handleAdminAccess = () => {
     setOpen(false);
     navigate('/seller');
+  };
+
+  // ✅ Abrir Cart Sidebar
+  const handleCartClick = () => {
+    setShowCartSidebar(true);
   };
 
   const renderSearchInput = (isMobile = false) => (
@@ -212,9 +218,9 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Cart Icon - Desktop */}
+        {/* Cart Icon - Desktop - ✅ Abre Sidebar */}
         <div
-          onClick={() => navigate('/cart')}
+          onClick={handleCartClick}
           className='relative cursor-pointer'
         >
           <img
@@ -268,11 +274,11 @@ const Navbar = () => {
         )}
       </div>
 
-      {/* Mobile - Apenas Cart e Menu (✅ SEM ícone de cadeado) */}
+      {/* Mobile - Apenas Cart e Menu */}
       <div className='flex items-center gap-4 sm:hidden'>
-        {/* Cart Icon - Mobile */}
+        {/* Cart Icon - Mobile - ✅ Abre Sidebar */}
         <div
-          onClick={() => navigate('/cart')}
+          onClick={handleCartClick}
           className='relative cursor-pointer'
         >
           <img
@@ -295,7 +301,7 @@ const Navbar = () => {
         </button>
       </div>
 
-      {/* ✅ Mobile Menu Panel - MELHORADO com scroll */}
+      {/* Mobile Menu Panel */}
       {open && (
         <div
           className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden'
@@ -305,7 +311,7 @@ const Navbar = () => {
             className='absolute top-0 right-0 h-full w-3/4 bg-white shadow-lg flex flex-col overflow-hidden'
             onClick={e => e.stopPropagation()}
           >
-            {/* ✅ Header fixo */}
+            {/* Header fixo */}
             <div className='p-6 pb-4 border-b border-gray-100 bg-white'>
               <button
                 onClick={() => setOpen(false)}
@@ -332,7 +338,7 @@ const Navbar = () => {
               <div className='mt-2'>{renderSearchInput(true)}</div>
             </div>
 
-            {/* ✅ Conteúdo scrollável */}
+            {/* Conteúdo scrollável */}
             <div className='flex-1 overflow-y-auto p-6 space-y-4'>
               {/* Navegação */}
               <NavLink
@@ -371,7 +377,7 @@ const Navbar = () => {
                 Contacto
               </NavLink>
 
-              {/* ✅ Área Admin (agora dentro do menu) */}
+              {/* Área Admin */}
               <button
                 onClick={handleAdminAccess}
                 className='flex items-center gap-2 w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100'
@@ -385,7 +391,7 @@ const Navbar = () => {
                 )}
               </button>
 
-              {/* ✅ Logout Admin (se estiver logado) */}
+              {/* Logout Admin */}
               {isSeller && (
                 <button
                   onClick={handleSellerLogout}
@@ -441,7 +447,7 @@ const Navbar = () => {
                     ⭐ Escrever Reviews
                   </NavLink>
 
-                  {/* ✅ Logout Button - Mais acessível e visível */}
+                  {/* Logout Button */}
                   <button
                     onClick={handleLogout}
                     className='w-full flex items-center justify-center gap-2 px-6 py-3.5 mt-4 mb-4 bg-red-50 hover:bg-red-100 border-2 border-red-200 text-red-600 rounded-lg text-base font-semibold transition-colors active:scale-95'
