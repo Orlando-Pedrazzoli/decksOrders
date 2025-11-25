@@ -16,7 +16,7 @@ const Navbar = () => {
     searchQuery,
     getCartCount,
     logoutUser,
-    logoutSeller, // ✅ Usar logoutSeller do contexto
+    logoutSeller,
     isSeller,
   } = useAppContext();
 
@@ -56,7 +56,6 @@ const Navbar = () => {
     await logoutUser();
   };
 
-  // ✅ Usar logoutSeller do contexto
   const handleSellerLogout = () => {
     setOpen(false);
     logoutSeller();
@@ -183,7 +182,7 @@ const Navbar = () => {
 
         <div className='hidden lg:flex items-center'>{renderSearchInput()}</div>
 
-        {/* Admin Icon com Dropdown */}
+        {/* Admin Icon com Dropdown - Desktop */}
         <div className='relative group'>
           <button
             onClick={handleAdminAccess}
@@ -213,7 +212,7 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Cart Icon */}
+        {/* Cart Icon - Desktop */}
         <div
           onClick={() => navigate('/cart')}
           className='relative cursor-pointer'
@@ -228,7 +227,7 @@ const Navbar = () => {
           </button>
         </div>
 
-        {/* User Login/Profile */}
+        {/* User Login/Profile - Desktop */}
         {!user ? (
           <button
             onClick={() => setShowUserLogin(true)}
@@ -261,27 +260,17 @@ const Navbar = () => {
                 onClick={handleLogout}
                 className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 border-t border-gray-100 mt-1'
               >
-                <span className='text-red-500'>🚪</span>
-                Sair
+                <LogOut className='w-4 h-4 text-red-500' />
+                <span>Sair</span>
               </li>
             </ul>
           </div>
         )}
       </div>
 
-      {/* Mobile elements */}
+      {/* Mobile - Apenas Cart e Menu (✅ SEM ícone de cadeado) */}
       <div className='flex items-center gap-4 sm:hidden'>
-        <button
-          onClick={handleAdminAccess}
-          className='relative p-1.5 hover:bg-gray-100 rounded-lg transition-all duration-200'
-          aria-label='Área de Administração'
-        >
-          <Lock className='w-5 h-5 text-gray-600' />
-          {isSeller && (
-            <span className='absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-white'></span>
-          )}
-        </button>
-
+        {/* Cart Icon - Mobile */}
         <div
           onClick={() => navigate('/cart')}
           className='relative cursor-pointer'
@@ -296,6 +285,7 @@ const Navbar = () => {
           </button>
         </div>
 
+        {/* Menu Icon - Mobile */}
         <button
           onClick={() => setOpen(!open)}
           aria-label='Menu'
@@ -305,153 +295,173 @@ const Navbar = () => {
         </button>
       </div>
 
-      {/* Mobile Menu Panel */}
+      {/* ✅ Mobile Menu Panel - MELHORADO com scroll */}
       {open && (
         <div
           className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden'
           onClick={() => setOpen(false)}
         >
           <div
-            className='absolute top-0 right-0 h-full w-3/4 sm:w-1/2 bg-white shadow-lg p-6 flex flex-col items-start gap-6'
+            className='absolute top-0 right-0 h-full w-3/4 bg-white shadow-lg flex flex-col overflow-hidden'
             onClick={e => e.stopPropagation()}
           >
-            <button
-              onClick={() => setOpen(false)}
-              className='self-end text-gray-500 hover:text-gray-800'
-            >
-              <svg
-                xmlns='http://www.w3.org/2000/svg'
-                className='h-7 w-7'
-                fill='none'
-                viewBox='0 0 24 24'
-                stroke='currentColor'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth={2}
-                  d='M6 18L18 6M6 6l12 12'
-                />
-              </svg>
-            </button>
-
-            <div className='w-full mb-4'>{renderSearchInput(true)}</div>
-
-            <NavLink
-              to='/'
-              className={({ isActive }) =>
-                `block w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100 ${
-                  isActive ? 'text-primary' : ''
-                }`
-              }
-              onClick={() => handleNavLinkClick('/')}
-            >
-              Home
-            </NavLink>
-            <NavLink
-              to='/products'
-              className={({ isActive }) =>
-                `block w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100 ${
-                  isActive ? 'text-primary' : ''
-                }`
-              }
-              onClick={() => handleNavLinkClick('/products')}
-            >
-              Produtos
-            </NavLink>
-            <NavLink
-              to='/contact'
-              className={({ isActive }) =>
-                `block w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100 ${
-                  isActive ? 'text-primary' : ''
-                }`
-              }
-              onClick={() => handleNavLinkClick('/contact')}
-            >
-              Contacto
-            </NavLink>
-
-            <button
-              onClick={handleAdminAccess}
-              className='flex items-center gap-2 w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100'
-            >
-              <Lock className='w-5 h-5' />
-              <span>Área Admin</span>
-              {isSeller && (
-                <span className='ml-auto text-xs bg-green-500 text-white px-2 py-0.5 rounded-full'>
-                  Ativo
-                </span>
-              )}
-            </button>
-
-            {isSeller && (
+            {/* ✅ Header fixo */}
+            <div className='p-6 pb-4 border-b border-gray-100 bg-white'>
               <button
-                onClick={handleSellerLogout}
-                className='flex items-center gap-2 w-full text-left py-2 px-3 bg-red-50 text-red-600 hover:bg-red-100 text-base font-medium rounded-lg border border-red-200'
+                onClick={() => setOpen(false)}
+                className='float-right text-gray-500 hover:text-gray-800 -mt-2'
               >
-                <LogOut className='w-5 h-5' />
-                <span>Logout Admin</span>
+                <svg
+                  xmlns='http://www.w3.org/2000/svg'
+                  className='h-7 w-7'
+                  fill='none'
+                  viewBox='0 0 24 24'
+                  stroke='currentColor'
+                >
+                  <path
+                    strokeLinecap='round'
+                    strokeLinejoin='round'
+                    strokeWidth={2}
+                    d='M6 18L18 6M6 6l12 12'
+                  />
+                </svg>
               </button>
-            )}
+              <div className='clear-both'></div>
 
-            {user ? (
-              <>
-                <div className='w-full p-3 bg-primary/5 rounded-lg border border-primary/20 mb-2'>
-                  <div className='flex items-center gap-3'>
-                    <img
-                      src={assets.profile_icon}
-                      className='w-8 h-8'
-                      alt='profile'
-                    />
-                    <div>
-                      <p className='font-semibold text-gray-800 text-base'>
-                        Olá, {user.name}!
-                      </p>
-                      <p className='text-xs text-gray-500'>Usuário logado</p>
+              {/* Search no header */}
+              <div className='mt-2'>{renderSearchInput(true)}</div>
+            </div>
+
+            {/* ✅ Conteúdo scrollável */}
+            <div className='flex-1 overflow-y-auto p-6 space-y-4'>
+              {/* Navegação */}
+              <NavLink
+                to='/'
+                className={({ isActive }) =>
+                  `block w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100 ${
+                    isActive ? 'text-primary' : ''
+                  }`
+                }
+                onClick={() => handleNavLinkClick('/')}
+              >
+                Home
+              </NavLink>
+
+              <NavLink
+                to='/products'
+                className={({ isActive }) =>
+                  `block w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100 ${
+                    isActive ? 'text-primary' : ''
+                  }`
+                }
+                onClick={() => handleNavLinkClick('/products')}
+              >
+                Produtos
+              </NavLink>
+
+              <NavLink
+                to='/contact'
+                className={({ isActive }) =>
+                  `block w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100 ${
+                    isActive ? 'text-primary' : ''
+                  }`
+                }
+                onClick={() => handleNavLinkClick('/contact')}
+              >
+                Contacto
+              </NavLink>
+
+              {/* ✅ Área Admin (agora dentro do menu) */}
+              <button
+                onClick={handleAdminAccess}
+                className='flex items-center gap-2 w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100'
+              >
+                <Lock className='w-5 h-5' />
+                <span>Área Admin</span>
+                {isSeller && (
+                  <span className='ml-auto text-xs bg-green-500 text-white px-2 py-0.5 rounded-full'>
+                    Ativo
+                  </span>
+                )}
+              </button>
+
+              {/* ✅ Logout Admin (se estiver logado) */}
+              {isSeller && (
+                <button
+                  onClick={handleSellerLogout}
+                  className='flex items-center gap-2 w-full text-left py-2.5 px-3 bg-red-50 text-red-600 hover:bg-red-100 text-base font-medium rounded-lg border border-red-200'
+                >
+                  <LogOut className='w-5 h-5' />
+                  <span>Logout Admin</span>
+                </button>
+              )}
+
+              {/* User Section */}
+              {user ? (
+                <>
+                  {/* User Info Card */}
+                  <div className='w-full p-3 bg-primary/5 rounded-lg border border-primary/20 mt-4'>
+                    <div className='flex items-center gap-3'>
+                      <img
+                        src={assets.profile_icon}
+                        className='w-10 h-10'
+                        alt='profile'
+                      />
+                      <div>
+                        <p className='font-semibold text-gray-800 text-base'>
+                          {user.name}
+                        </p>
+                        <p className='text-xs text-gray-500'>Usuário logado</p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <NavLink
-                  to='/my-orders'
-                  className={({ isActive }) =>
-                    `block w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100 ${
-                      isActive ? 'text-primary' : ''
-                    }`
-                  }
-                  onClick={() => handleNavLinkClick('/my-orders')}
-                >
-                  📦 Os meus Pedidos
-                </NavLink>
-                <NavLink
-                  to='/write-review'
-                  className={({ isActive }) =>
-                    `block w-full text-left py-2 text-gray-700 hover:text-primary text-lg font-medium border-b border-gray-100 ${
-                      isActive ? 'text-primary' : ''
-                    }`
-                  }
-                  onClick={() => handleNavLinkClick('/write-review')}
-                >
-                  ⭐ Escrever Reviews
-                </NavLink>
+                  {/* User Menu Items */}
+                  <NavLink
+                    to='/my-orders'
+                    className={({ isActive }) =>
+                      `block w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100 ${
+                        isActive ? 'text-primary' : ''
+                      }`
+                    }
+                    onClick={() => handleNavLinkClick('/my-orders')}
+                  >
+                    📦 Os meus Pedidos
+                  </NavLink>
+
+                  <NavLink
+                    to='/write-review'
+                    className={({ isActive }) =>
+                      `block w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100 ${
+                        isActive ? 'text-primary' : ''
+                      }`
+                    }
+                    onClick={() => handleNavLinkClick('/write-review')}
+                  >
+                    ⭐ Escrever Reviews
+                  </NavLink>
+
+                  {/* ✅ Logout Button - Mais acessível e visível */}
+                  <button
+                    onClick={handleLogout}
+                    className='w-full flex items-center justify-center gap-2 px-6 py-3.5 mt-4 mb-4 bg-red-50 hover:bg-red-100 border-2 border-red-200 text-red-600 rounded-lg text-base font-semibold transition-colors active:scale-95'
+                  >
+                    <LogOut className='w-5 h-5' />
+                    <span>Sair</span>
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={handleLogout}
-                  className='w-full cursor-pointer px-6 py-3 mt-4 bg-primary hover:bg-primary-dull transition text-white rounded-lg text-base font-semibold flex items-center justify-center gap-2'
+                  onClick={() => {
+                    setOpen(false);
+                    setShowUserLogin(true);
+                  }}
+                  className='w-full cursor-pointer px-6 py-3.5 mt-4 mb-4 bg-primary hover:bg-primary-dull transition text-white rounded-lg text-base font-semibold active:scale-95'
                 >
-                  🚪 Sair
+                  Login
                 </button>
-              </>
-            ) : (
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  setShowUserLogin(true);
-                }}
-                className='w-full cursor-pointer px-6 py-3 mt-4 bg-primary hover:bg-primary-dull transition text-white rounded-lg text-base font-semibold'
-              >
-                Login
-              </button>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

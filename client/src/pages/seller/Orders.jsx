@@ -21,8 +21,10 @@ import {
   Loader2,
   Eye,
   X,
+  Printer,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ShippingLabel from '../../components/seller/ShippingLabel';
 
 const Orders = () => {
   const { currency, axios } = useAppContext();
@@ -33,6 +35,7 @@ const Orders = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [labelOrder, setLabelOrder] = useState(null);
 
   // Status options
   const statusOptions = [
@@ -408,6 +411,15 @@ const Orders = () => {
                         >
                           <Eye className='w-5 h-5' />
                         </button>
+
+                        {/* Print Label Button */}
+                        <button
+                          onClick={() => setLabelOrder(order)}
+                          className='p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors'
+                          title='Imprimir etiqueta de envio'
+                        >
+                          <Printer className='w-5 h-5' />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -700,6 +712,14 @@ const Orders = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Shipping Label Modal */}
+      {labelOrder && (
+        <ShippingLabel
+          order={labelOrder}
+          onClose={() => setLabelOrder(null)}
+        />
       )}
     </div>
   );

@@ -21,6 +21,7 @@ import ProductList from './pages/seller/ProductList';
 import Orders from './pages/seller/Orders';
 import Loading from './components/Loading';
 import Contact from './pages/Contact';
+import Privacy from './pages/Privacy';
 import ScrollToTop from './components/ScrollToTop';
 import HealthCheck from './components/HealthCheck';
 
@@ -86,6 +87,7 @@ const App = () => {
           <Route path='/order-success/:orderId' element={<OrderSuccess />} />
           <Route path='/my-orders' element={<MyOrders />} />
           <Route path='/contact' element={<Contact />} />
+          <Route path='/privacy' element={<Privacy />} />
           <Route path='/write-review' element={<WriteReview />} />
 
           <Route path='/loader' element={<Loading />} />
@@ -102,51 +104,172 @@ const App = () => {
       {!isSellerPath && <Footer />}
       <HealthCheck />
 
-      {/* ✅ Cookie Consent banner */}
+      {/* ✅ Cookie Consent RGPD-Compliant (Portugal/UE) */}
       <CookieConsent
         location='bottom'
         cookieName='elitesurfingCookieConsent'
+        containerClasses='cookie-consent-container'
+        contentClasses='cookie-consent-content'
+        buttonWrapperClasses='cookie-consent-buttons'
         style={{
-          background: '#121212',
-          color: '#fff',
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+          color: '#1e293b',
           fontSize: '14px',
+          padding: '20px 24px',
+          boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.12)',
+          borderTop: '1px solid #e2e8f0',
           display: 'flex',
-          justifyContent: 'space-between',
+          flexDirection: 'row',
           alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '20px',
           flexWrap: 'wrap',
-          padding: '10px 20px',
+          zIndex: 9999,
         }}
-        buttonText='Aceitar'
-        declineButtonText='Recusar'
+        buttonText='Aceitar todos'
+        declineButtonText='Rejeitar'
         enableDeclineButton
         buttonStyle={{
           background: '#3B82F6',
-          color: '#fff',
+          color: '#ffffff',
           fontSize: '14px',
+          fontWeight: '600',
           border: 'none',
-          padding: '10px 20px',
-          borderRadius: '4px',
-          marginLeft: '10px',
+          padding: '10px 24px',
+          borderRadius: '8px',
           cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
         }}
         declineButtonStyle={{
-          background: '#6e6e6e',
-          color: '#fff',
+          background: 'transparent',
+          color: '#64748b',
           fontSize: '14px',
-          border: 'none',
-          padding: '10px 20px',
-          borderRadius: '4px',
-          marginLeft: '10px',
+          fontWeight: '600',
+          border: '1px solid #cbd5e1',
+          padding: '10px 24px',
+          borderRadius: '8px',
           cursor: 'pointer',
+          transition: 'all 0.2s ease',
         }}
-        expires={150}
+        expires={365}
+        overlay={false}
       >
-        <div style={{ maxWidth: '800px' }}>
-          <strong>Este website utiliza cookies</strong> – Utilizamos cookies
-          para personalizar conteúdo e anúncios, fornecer funcionalidades de
-          redes sociais e analisar o nosso tráfego.
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '16px',
+            flex: '1',
+            minWidth: '280px',
+          }}
+        >
+          {/* Ícone de Cookie */}
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              background: '#EFF6FF',
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              width='24'
+              height='24'
+              viewBox='0 0 24 24'
+              fill='none'
+              xmlns='http://www.w3.org/2000/svg'
+            >
+              <path
+                d='M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20Z'
+                fill='#3B82F6'
+              />
+              <circle cx='8' cy='9' r='1.5' fill='#3B82F6' />
+              <circle cx='12' cy='15' r='1.5' fill='#3B82F6' />
+              <circle cx='16' cy='9' r='1.5' fill='#3B82F6' />
+            </svg>
+          </div>
+
+          {/* Texto */}
+          <div style={{ flex: '1' }}>
+            <p
+              style={{
+                margin: 0,
+                fontWeight: '600',
+                color: '#0f172a',
+                marginBottom: '6px',
+                fontSize: '15px',
+              }}
+            >
+              🍪 Este site utiliza cookies
+            </p>
+            <p
+              style={{
+                margin: 0,
+                color: '#475569',
+                fontSize: '13px',
+                lineHeight: '1.5',
+              }}
+            >
+              Utilizamos cookies essenciais para o funcionamento do site e cookies
+              de análise para melhorar a sua experiência. Ao clicar em "Aceitar
+              todos", concorda com o uso de todos os cookies de acordo com a nossa{' '}
+              <a
+                href='/privacy'
+                style={{
+                  color: '#3B82F6',
+                  textDecoration: 'underline',
+                  fontWeight: '500',
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                Política de Privacidade
+              </a>
+              .
+            </p>
+          </div>
         </div>
       </CookieConsent>
+
+      {/* ✅ Estilos customizados para hover effects */}
+      <style>{`
+        .cookie-consent-container button:hover {
+          transform: translateY(-1px);
+        }
+
+        .cookie-consent-container button:active {
+          transform: translateY(0);
+        }
+
+        /* Responsivo para mobile */
+        @media (max-width: 640px) {
+          .cookie-consent-container {
+            padding: 16px !important;
+          }
+          
+          .cookie-consent-container > div:first-child {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+          }
+
+          .cookie-consent-buttons {
+            width: 100%;
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+          }
+
+          .cookie-consent-buttons button {
+            flex: 1;
+            padding: 12px 16px !important;
+            font-size: 13px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 };
