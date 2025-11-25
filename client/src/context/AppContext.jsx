@@ -189,6 +189,7 @@ export const AppContextProvider = ({ children }) => {
     } finally {
       setIsSeller(false);
       sessionStorage.removeItem('seller_just_logged_in');
+      sessionStorage.removeItem('seller_authenticated'); // ✅ Limpar cache
       navigate('/');
       toast.success('Logout do Admin realizado com sucesso');
     }
@@ -206,15 +207,29 @@ export const AppContextProvider = ({ children }) => {
         
         if (isInSellerArea || justLoggedIn) {
           setIsSeller(true);
+          // ✅ Cachear autenticação no sessionStorage
+          sessionStorage.setItem('seller_authenticated', 'true');
           sessionStorage.removeItem('seller_just_logged_in');
         } else {
           setIsSeller(false);
+          sessionStorage.removeItem('seller_authenticated');
         }
       } else {
+        // Só desloga se a resposta do servidor for explicitamente false
         setIsSeller(false);
+        sessionStorage.removeItem('seller_authenticated');
       }
     } catch (error) {
-      setIsSeller(false);
+      console.log('❌ Erro ao verificar seller:', error.message);
+      
+      // ✅ CRÍTICO: Não desloga em erro de rede
+      // Apenas desloga se for erro 401 (não autorizado)
+      if (error.response?.status === 401) {
+        setIsSeller(false);
+        sessionStorage.removeItem('seller_authenticated');
+        sessionStorage.removeItem('seller_just_logged_in');
+      }
+      // Se for erro de rede, mantém o estado atual (não limpa o cache)
     } finally {
       setIsSellerLoading(false);
     }
@@ -378,9 +393,25 @@ export const AppContextProvider = ({ children }) => {
       // 3. Verificar usuário em background
       fetchUser();
 
-      // 4. Só verificar seller se estiver na área de seller
+      // 4. ✅ MELHORADO: Verificar seller com cache de sessionStorage
       if (window.location.pathname.startsWith('/seller')) {
-        fetchSeller();
+        // Verificar cache primeiro
+        const sellerCached = sessionStorage.getItem('seller_authenticated');
+        
+        if (sellerCached === 'true') {
+          // Restaurar estado do cache
+          setIsSeller(true);
+          setIsSellerLoading(false);
+          
+          // Verificar em background (não bloqueia)
+          fetchSeller().catch(() => {
+            // Se falhar a verificação em background, mantém o cache por enquanto
+            console.log('⚠️ Verificação de seller falhou, mantendo sessão');
+          });
+        } else {
+          // Não há cache, precisa verificar
+          fetchSeller();
+        }
       } else {
         setIsSellerLoading(false);
       }
@@ -389,9 +420,12 @@ export const AppContextProvider = ({ children }) => {
     initializeApp();
   }, []);
 
-  // ✅ Verificar seller quando navegar para área de seller
+  // ✅ Verificar seller apenas na primeira vez que entra na área de seller
   useEffect(() => {
-    if (location.pathname.startsWith('/seller')) {
+    // Só verifica se:
+    // 1. Está na área de seller
+    // 2. Ainda não verificou (isSellerLoading é true) OU não está logado como seller
+    if (location.pathname.startsWith('/seller') && !isSeller && isSellerLoading) {
       fetchSeller();
     }
   }, [location.pathname]);

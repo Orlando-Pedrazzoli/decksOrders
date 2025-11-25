@@ -22,6 +22,9 @@ import Orders from './pages/seller/Orders';
 import Loading from './components/Loading';
 import Contact from './pages/Contact';
 import Privacy from './pages/Privacy';
+import RefundPolicy from './pages/RefundPolicy';
+import FAQ from './pages/FAQ';
+import Terms from './pages/Terms';
 import ScrollToTop from './components/ScrollToTop';
 import HealthCheck from './components/HealthCheck';
 
@@ -88,6 +91,9 @@ const App = () => {
           <Route path='/my-orders' element={<MyOrders />} />
           <Route path='/contact' element={<Contact />} />
           <Route path='/privacy' element={<Privacy />} />
+          <Route path='/refund-policy' element={<RefundPolicy />} />
+          <Route path='/faq' element={<FAQ />} />
+          <Route path='/terms' element={<Terms />} />
           <Route path='/write-review' element={<WriteReview />} />
 
           <Route path='/loader' element={<Loading />} />
@@ -205,7 +211,7 @@ const App = () => {
                 fontSize: '15px',
               }}
             >
-              🍪 Este site utiliza cookies
+              Este site utiliza cookies
             </p>
             <p
               style={{

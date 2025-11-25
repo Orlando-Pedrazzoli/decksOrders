@@ -30,23 +30,10 @@ const MainBanner = () => {
             textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
           }}
         >
-          Surf Hard, Make History
+          Precision Meets <br/>Performance
         </h1>
 
-        <div className='flex items-center font-medium'>
-          <Link
-            to={'/products'}
-            className='group flex items-center gap-2 px-6 md:px-9 py-2.5 bg-primary hover:bg-primary-dull transition rounded text-white text-sm md:text-base cursor-pointer'
-          >
-            Ver produtos
-          </Link>
-
-          {/* Desktop arrow */}
-          <Link
-            to={'/products'}
-            className='group hidden md:flex items-center gap-2 px-9 py-3 cursor-pointer'
-          ></Link>
-        </div>
+       
       </div>
     </div>
   );
