@@ -1,5 +1,5 @@
 // server/controllers/orderController.js
-// VERSÃO RESTAURADA - EMAILS FUNCIONANDO + WHATSAPP ADICIONADO
+// VERSÃO COM SUPORTE A MB WAY E MULTIBANCO
 
 import { sendOrderConfirmationEmail } from '../services/emailService.js';
 import Order from '../models/Order.js';
@@ -125,7 +125,7 @@ export const placeOrderCOD = async (req, res) => {
 };
 
 // =============================================================================
-// PLACE ORDER STRIPE - CORRIGIDO PARA RECEBER TODOS OS CAMPOS
+// PLACE ORDER STRIPE - COM SUPORTE A MB WAY E MULTIBANCO
 // =============================================================================
 export const placeOrderStripe = async (req, res) => {
   console.log('🚀 STRIPE FUNCTION STARTED!!!');
@@ -142,6 +142,7 @@ export const placeOrderStripe = async (req, res) => {
       discountPercentage,
       promoCode,
       paymentType,
+      paymentMethod, // ✅ NOVO: 'card', 'mbway', 'multibanco'
       isPaid,
     } = req.body;
 
@@ -156,6 +157,7 @@ export const placeOrderStripe = async (req, res) => {
       discountAmount,
       discountPercentage,
       promoCode,
+      paymentMethod,
     });
 
     if (!address || items.length === 0) {
@@ -180,6 +182,7 @@ export const placeOrderStripe = async (req, res) => {
       amount,
       address,
       paymentType: 'Online',
+      paymentMethod: paymentMethod || 'card',
       isPaid: false,
       promoCode: promoCode || '',
       discountAmount: discountAmount || 0,
@@ -234,17 +237,61 @@ export const placeOrderStripe = async (req, res) => {
       };
     });
 
-    // create session
-    const session = await stripeInstance.checkout.sessions.create({
+    // ✅ CONFIGURAR MÉTODOS DE PAGAMENTO BASEADO NA ESCOLHA DO UTILIZADOR
+    let payment_method_types;
+    
+    switch (paymentMethod) {
+      case 'mbway':
+        payment_method_types = ['mb_way'];
+        console.log('💳 Método de pagamento: MB Way');
+        break;
+      case 'multibanco':
+        payment_method_types = ['multibanco'];
+        console.log('💳 Método de pagamento: Multibanco');
+        break;
+      case 'card':
+      default:
+        payment_method_types = ['card'];
+        console.log('💳 Método de pagamento: Cartão');
+        break;
+    }
+
+    // ✅ CONFIGURAR SESSION OPTIONS
+    const sessionOptions = {
       line_items,
       mode: 'payment',
-      success_url: `${origin}/order-success/${order._id}?payment=stripe`,
+      payment_method_types,
+      success_url: `${origin}/order-success/${order._id}?payment=stripe&method=${paymentMethod || 'card'}`,
       cancel_url: `${origin}/cart`,
       metadata: {
         orderId: order._id.toString(),
         userId,
+        paymentMethod: paymentMethod || 'card',
       },
-    });
+    };
+
+    // ✅ PARA MB WAY, ADICIONAR CONFIGURAÇÕES ESPECÍFICAS
+    if (paymentMethod === 'mbway') {
+      sessionOptions.payment_method_options = {
+        mb_way: {
+          // MB Way requer número de telefone - será solicitado no checkout
+        },
+      };
+    }
+
+    // ✅ PARA MULTIBANCO, ADICIONAR CONFIGURAÇÕES ESPECÍFICAS
+    if (paymentMethod === 'multibanco') {
+      sessionOptions.payment_method_options = {
+        multibanco: {
+          // Multibanco gera referência automaticamente
+        },
+      };
+    }
+
+    // create session
+    const session = await stripeInstance.checkout.sessions.create(sessionOptions);
+
+    console.log('✅ Sessão Stripe criada:', session.id);
 
     return res.json({ success: true, url: session.url });
   } catch (error) {
@@ -254,7 +301,7 @@ export const placeOrderStripe = async (req, res) => {
 };
 
 // =============================================================================
-// STRIPE WEBHOOKS
+// STRIPE WEBHOOKS - ATUALIZADO PARA MB WAY E MULTIBANCO
 // =============================================================================
 export const stripeWebhooks = async (request, response) => {
   // Stripe Gateway Initialize
@@ -276,24 +323,16 @@ export const stripeWebhooks = async (request, response) => {
 
   // Handle the event
   switch (event.type) {
-    case 'payment_intent.succeeded': {
-      const paymentIntent = event.data.object;
-      const paymentIntentId = paymentIntent.id;
-
-      console.log('💳 Pagamento Stripe confirmado:', paymentIntentId);
-
-      try {
-        // Getting Session Metadata
-        const session = await stripeInstance.checkout.sessions.list({
-          payment_intent: paymentIntentId,
-        });
-
-        if (!session.data || session.data.length === 0) {
-          console.error('❌ Sessão não encontrada');
-          break;
-        }
-
-        const { orderId, userId } = session.data[0].metadata;
+    // ✅ CHECKOUT SESSION COMPLETED - PRINCIPAL PARA TODOS OS MÉTODOS
+    case 'checkout.session.completed': {
+      const session = event.data.object;
+      console.log('✅ Checkout Session Completed:', session.id);
+      
+      const { orderId, userId, paymentMethod } = session.metadata;
+      
+      // Verificar se o pagamento foi confirmado
+      if (session.payment_status === 'paid') {
+        console.log(`💳 Pagamento ${paymentMethod} confirmado para pedido:`, orderId);
         
         // Mark Payment as Paid
         const updatedOrder = await Order.findByIdAndUpdate(
@@ -313,11 +352,58 @@ export const stripeWebhooks = async (request, response) => {
             console.error('❌ Erro no email Stripe (background):', err.message);
           });
         }
+      } else if (session.payment_status === 'unpaid' && paymentMethod === 'multibanco') {
+        // Multibanco: pagamento pendente (aguardando referência ser paga)
+        console.log('⏳ Multibanco: Aguardando pagamento da referência para pedido:', orderId);
+      }
+      break;
+    }
+
+    // ✅ PAYMENT INTENT SUCCEEDED
+    case 'payment_intent.succeeded': {
+      const paymentIntent = event.data.object;
+      const paymentIntentId = paymentIntent.id;
+
+      console.log('💳 Pagamento confirmado (payment_intent.succeeded):', paymentIntentId);
+
+      try {
+        // Getting Session Metadata
+        const session = await stripeInstance.checkout.sessions.list({
+          payment_intent: paymentIntentId,
+        });
+
+        if (!session.data || session.data.length === 0) {
+          console.error('❌ Sessão não encontrada');
+          break;
+        }
+
+        const { orderId, userId, paymentMethod } = session.data[0].metadata;
+        
+        // Mark Payment as Paid
+        const updatedOrder = await Order.findByIdAndUpdate(
+          orderId, 
+          { isPaid: true },
+          { new: true }
+        );
+        
+        console.log(`✅ Pedido ${paymentMethod} marcado como pago:`, orderId);
+        
+        // Clear user cart
+        await User.findByIdAndUpdate(userId, { cartItems: {} });
+
+        // ✅ ENVIAR EMAIL APÓS PAGAMENTO CONFIRMADO
+        if (updatedOrder) {
+          sendClientEmail(updatedOrder, userId).catch(err => {
+            console.error('❌ Erro no email Stripe (background):', err.message);
+          });
+        }
       } catch (error) {
         console.error('❌ Erro no webhook:', error.message);
       }
       break;
     }
+
+    // ✅ PAYMENT INTENT FAILED
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object;
       const paymentIntentId = paymentIntent.id;
@@ -336,6 +422,18 @@ export const stripeWebhooks = async (request, response) => {
         }
       } catch (error) {
         console.error('❌ Erro ao deletar pedido:', error.message);
+      }
+      break;
+    }
+
+    // ✅ MULTIBANCO: SOURCE CHARGEABLE (referência gerada)
+    case 'source.chargeable': {
+      const source = event.data.object;
+      if (source.type === 'multibanco') {
+        console.log('🏦 Multibanco referência gerada:', {
+          reference: source.multibanco?.reference,
+          entity: source.multibanco?.entity,
+        });
       }
       break;
     }

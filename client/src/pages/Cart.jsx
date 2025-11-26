@@ -26,6 +26,7 @@ const Cart = () => {
   const [showAddress, setShowAddress] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [paymentOption, setPaymentOption] = useState('COD');
+  const [paymentMethod, setPaymentMethod] = useState('card'); // ✅ NOVO: card, mbway, multibanco
   const [promoCode, setPromoCode] = useState('');
   const [discountApplied, setDiscountApplied] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -95,7 +96,7 @@ const Cart = () => {
     return Math.max(0, totalBeforeDiscount).toFixed(2);
   };
 
-  // ✅ FUNÇÃO handlePlaceOrder CORRIGIDA - REDIRECIONA PARA ORDER-SUCCESS
+  // ✅ FUNÇÃO handlePlaceOrder ATUALIZADA COM MB WAY E MULTIBANCO
   const handlePlaceOrder = async () => {
     if (!requireLogin('fazer a encomenda')) return;
     if (!selectedAddress) {
@@ -127,6 +128,7 @@ const Cart = () => {
         discountPercentage: discountApplied ? 30 : 0,
         promoCode: discountApplied ? promoCode.toUpperCase() : '',
         paymentType: paymentOption === 'COD' ? 'COD' : 'Online',
+        paymentMethod: paymentMethod, // ✅ NOVO: card, mbway, multibanco
         isPaid: false,
       };
 
@@ -151,8 +153,8 @@ const Cart = () => {
           toast.error(response.data.message || 'Falha ao fazer a encomenda.');
         }
       } else {
-        // ✅ STRIPE PAYMENT FLOW
-        console.log('💳 Iniciando processo de pagamento Stripe...');
+        // ✅ STRIPE PAYMENT FLOW (Card, MB Way, Multibanco)
+        console.log(`💳 Iniciando processo de pagamento ${paymentMethod}...`);
 
         response = await axios.post('/api/order/stripe', orderData);
 
@@ -223,6 +225,22 @@ const Cart = () => {
     setPromoCode('');
     setDiscountApplied(false);
     toast('Código promocional removido.');
+  };
+
+  // ✅ FUNÇÃO PARA OBTER TEXTO DO BOTÃO DE PAGAMENTO
+  const getPaymentButtonText = () => {
+    if (isProcessing) return 'A Processar...';
+    if (paymentOption === 'COD') return 'Efetuar Encomenda';
+    
+    switch (paymentMethod) {
+      case 'mbway':
+        return '📱 Pagar com MB Way';
+      case 'multibanco':
+        return '🏦 Gerar Referência Multibanco';
+      case 'card':
+      default:
+        return '💳 Pagar com Cartão';
+    }
   };
 
   // If cart is empty
@@ -464,6 +482,7 @@ const Cart = () => {
               </h3>
 
               <div className='space-y-3'>
+                {/* Pagamento na Entrega */}
                 <label className='flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors duration-200'>
                   <input
                     type='radio'
@@ -478,11 +497,13 @@ const Cart = () => {
                     className='text-primary focus:ring-primary mr-3'
                   />
                   <div className='flex items-center'>
+                    <span className='text-xl mr-2'>💰</span>
                     <span className='font-medium'>Pagamento na Entrega</span>
                     <span className='ml-2 text-sm text-gray-500'>(COD)</span>
                   </div>
                 </label>
 
+                {/* Pagamento Online */}
                 <label className='flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors duration-200'>
                   <input
                     type='radio'
@@ -497,14 +518,81 @@ const Cart = () => {
                     className='text-primary focus:ring-primary mr-3'
                   />
                   <div className='flex items-center'>
-                    <span className='font-medium'>
-                      Cartão de Crédito/Débito
-                    </span>
+                    <span className='text-xl mr-2'>💳</span>
+                    <span className='font-medium'>Pagamento Online</span>
                     <span className='ml-2 text-sm text-gray-500'>(Stripe)</span>
                   </div>
                 </label>
               </div>
 
+              {/* ✅ SUB-OPÇÕES DE PAGAMENTO ONLINE */}
+              {paymentOption === 'Online' && (
+                <div className='mt-4 ml-6 space-y-2'>
+                  <p className='text-sm font-medium text-gray-600 mb-2'>
+                    Escolha o método:
+                  </p>
+                  
+                  {/* Cartão */}
+                  <label className='flex items-center p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors duration-200'>
+                    <input
+                      type='radio'
+                      name='paymentMethod'
+                      value='card'
+                      checked={paymentMethod === 'card'}
+                      onChange={e => setPaymentMethod(e.target.value)}
+                      className='text-indigo-600 focus:ring-indigo-500 mr-3'
+                    />
+                    <div className='flex items-center flex-1'>
+                      <span className='text-lg mr-2'>💳</span>
+                      <span className='font-medium text-sm'>Cartão de Crédito/Débito</span>
+                    </div>
+                    <div className='flex gap-1'>
+                      <span className='text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded'>Visa</span>
+                      <span className='text-xs bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded'>MC</span>
+                    </div>
+                  </label>
+
+                  {/* MB Way */}
+                  <label className='flex items-center p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-red-50 transition-colors duration-200'>
+                    <input
+                      type='radio'
+                      name='paymentMethod'
+                      value='mbway'
+                      checked={paymentMethod === 'mbway'}
+                      onChange={e => setPaymentMethod(e.target.value)}
+                      className='text-red-600 focus:ring-red-500 mr-3'
+                    />
+                    <div className='flex items-center flex-1'>
+                      <span className='text-lg mr-2'>📱</span>
+                      <span className='font-medium text-sm'>MB Way</span>
+                    </div>
+                    <span className='text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full'>
+                      Portugal
+                    </span>
+                  </label>
+
+                  {/* Multibanco */}
+                  <label className='flex items-center p-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors duration-200'>
+                    <input
+                      type='radio'
+                      name='paymentMethod'
+                      value='multibanco'
+                      checked={paymentMethod === 'multibanco'}
+                      onChange={e => setPaymentMethod(e.target.value)}
+                      className='text-blue-600 focus:ring-blue-500 mr-3'
+                    />
+                    <div className='flex items-center flex-1'>
+                      <span className='text-lg mr-2'>🏦</span>
+                      <span className='font-medium text-sm'>Multibanco</span>
+                    </div>
+                    <span className='text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full'>
+                      Referência
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {/* Mensagens Informativas */}
               {paymentOption === 'COD' && (
                 <div className='mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg'>
                   <p className='text-sm text-blue-700'>
@@ -513,11 +601,27 @@ const Cart = () => {
                 </div>
               )}
 
-              {paymentOption === 'Online' && (
+              {paymentOption === 'Online' && paymentMethod === 'card' && (
                 <div className='mt-3 p-3 bg-green-50 border border-green-200 rounded-lg'>
                   <p className='text-sm text-green-700'>
                     🔒 Pagamento seguro processado pela Stripe. Aceitamos Visa,
                     Mastercard, e outros.
+                  </p>
+                </div>
+              )}
+
+              {paymentOption === 'Online' && paymentMethod === 'mbway' && (
+                <div className='mt-3 p-3 bg-red-50 border border-red-200 rounded-lg'>
+                  <p className='text-sm text-red-700'>
+                    📱 Receberá uma notificação no seu telemóvel para confirmar o pagamento via MB Way.
+                  </p>
+                </div>
+              )}
+
+              {paymentOption === 'Online' && paymentMethod === 'multibanco' && (
+                <div className='mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg'>
+                  <p className='text-sm text-blue-700'>
+                    🏦 Será gerada uma referência Multibanco. Tem até 7 dias para efetuar o pagamento em qualquer ATM ou homebanking.
                   </p>
                 </div>
               )}
@@ -563,6 +667,10 @@ const Cart = () => {
                 ${
                   isProcessing || !selectedAddress || cartArray.length === 0
                     ? 'bg-gray-400 cursor-not-allowed'
+                    : paymentOption === 'Online' && paymentMethod === 'mbway'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : paymentOption === 'Online' && paymentMethod === 'multibanco'
+                    ? 'bg-blue-600 hover:bg-blue-700'
                     : paymentOption === 'Online'
                     ? 'bg-indigo-600 hover:bg-indigo-700'
                     : 'bg-primary hover:bg-primary-dull'
@@ -588,17 +696,19 @@ const Cart = () => {
                   </svg>
                   <span>A Processar...</span>
                 </>
-              ) : paymentOption === 'COD' ? (
-                'Efetuar Encomenda'
               ) : (
-                <>🔒 Pagar com Stripe</>
+                getPaymentButtonText()
               )}
             </button>
 
             {paymentOption === 'Online' && !isProcessing && (
               <div className='mt-3 text-center'>
                 <p className='text-xs text-gray-500'>
-                  Será redirecionado para a página segura de pagamento da Stripe
+                  {paymentMethod === 'mbway'
+                    ? 'Será redirecionado para introduzir o seu número de telemóvel'
+                    : paymentMethod === 'multibanco'
+                    ? 'Será gerada uma referência para pagamento'
+                    : 'Será redirecionado para a página segura de pagamento da Stripe'}
                 </p>
               </div>
             )}
