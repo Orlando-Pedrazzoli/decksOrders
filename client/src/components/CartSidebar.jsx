@@ -16,25 +16,34 @@ const CartSidebar = () => {
     navigate,
   } = useAppContext();
 
-  // Estado para animação e swipe
-  const [isClosing, setIsClosing] = useState(false);
-  const [dragX, setDragX] = useState(0);
+  // Estados
+  const [isVisible, setIsVisible] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const sidebarRef = useRef(null);
+  
+  // Refs para touch
   const startXRef = useRef(0);
-  const currentXRef = useRef(0);
+
+  // Controlar animação de entrada
+  useEffect(() => {
+    if (showCartSidebar) {
+      // Pequeno delay para garantir que o componente está montado antes da animação
+      requestAnimationFrame(() => {
+        setIsVisible(true);
+      });
+    }
+  }, [showCartSidebar]);
 
   // Fechar com animação
   const handleClose = () => {
-    setIsClosing(true);
+    setIsVisible(false);
+    setDragOffset(0);
     setTimeout(() => {
       setShowCartSidebar(false);
-      setIsClosing(false);
-      setDragX(0);
     }, 300);
   };
 
-  // Fechar com ESC
+  // Fechar com ESC e bloquear scroll
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === 'Escape') handleClose();
@@ -54,31 +63,29 @@ const CartSidebar = () => {
   // Touch handlers para swipe
   const handleTouchStart = (e) => {
     startXRef.current = e.touches[0].clientX;
-    currentXRef.current = e.touches[0].clientX;
     setIsDragging(true);
   };
 
   const handleTouchMove = (e) => {
     if (!isDragging) return;
     
-    currentXRef.current = e.touches[0].clientX;
-    const diff = currentXRef.current - startXRef.current;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - startXRef.current;
     
     // Só permite arrastar para a direita (fechar)
     if (diff > 0) {
-      setDragX(diff);
+      setDragOffset(Math.min(diff, 300)); // Máximo 300px
     }
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
     
-    // Se arrastou mais de 100px, fecha
-    if (dragX > 100) {
+    // Se arrastou mais de 80px, fecha
+    if (dragOffset > 80) {
       handleClose();
     } else {
-      // Volta à posição original com animação
-      setDragX(0);
+      setDragOffset(0);
     }
   };
 
@@ -108,33 +115,32 @@ const CartSidebar = () => {
   if (!showCartSidebar) return null;
 
   return (
-    <>
-      {/* Overlay - clicável para fechar */}
+    <div className='fixed inset-0 z-50'>
+      {/* Overlay */}
       <div
-        className={`fixed inset-0 bg-black/50 z-50 transition-opacity duration-300 ${
-          isClosing ? 'opacity-0' : 'opacity-100'
-        }`}
         onClick={handleClose}
+        className={`absolute inset-0 bg-black transition-opacity duration-300 ${
+          isVisible ? 'opacity-50' : 'opacity-0'
+        }`}
       />
 
-      {/* Sidebar */}
+      {/* Sidebar Container */}
       <div
-        ref={sidebarRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className={`fixed top-0 right-0 h-full w-[85%] sm:w-[420px] bg-white z-50 shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
-          isClosing ? 'translate-x-full' : 'translate-x-0'
-        }`}
+        className='absolute top-0 right-0 h-full w-[85%] sm:w-[420px] bg-white shadow-2xl flex flex-col'
         style={{
-          transform: isClosing 
-            ? 'translateX(100%)' 
-            : `translateX(${dragX}px)`,
-          transition: isDragging ? 'none' : 'transform 0.3s ease-out'
+          transform: dragOffset > 0 
+            ? `translateX(${dragOffset}px)` 
+            : isVisible 
+              ? 'translateX(0)' 
+              : 'translateX(100%)',
+          transition: isDragging ? 'none' : 'transform 300ms ease-out'
         }}
       >
         {/* Indicador de swipe (mobile) */}
-        <div className='sm:hidden absolute left-0 top-1/2 -translate-y-1/2 w-1 h-16 bg-gray-300 rounded-r-full opacity-50' />
+        <div className='sm:hidden absolute left-1 top-1/2 -translate-y-1/2 w-1 h-12 bg-gray-300 rounded-full opacity-40' />
         
         {/* Header */}
         <div className='flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-gray-50'>
@@ -149,7 +155,7 @@ const CartSidebar = () => {
           </div>
           <button
             onClick={handleClose}
-            className='p-2 hover:bg-gray-200 rounded-full transition-colors'
+            className='p-2 hover:bg-gray-200 rounded-full transition-colors cursor-pointer'
             aria-label='Fechar carrinho'
           >
             <X className='w-5 h-5 text-gray-600' />
@@ -172,7 +178,7 @@ const CartSidebar = () => {
               </p>
               <button
                 onClick={handleContinueShopping}
-                className='px-6 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-dull transition-colors'
+                className='px-6 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-dull transition-colors cursor-pointer'
               >
                 Explorar Produtos
               </button>
@@ -216,7 +222,7 @@ const CartSidebar = () => {
                                 updateCartItem(product._id, product.quantity - 1);
                               }
                             }}
-                            className='p-1.5 hover:bg-gray-100 transition-colors disabled:opacity-50'
+                            className='p-1.5 hover:bg-gray-100 transition-colors disabled:opacity-50 cursor-pointer'
                             disabled={product.quantity <= 1}
                           >
                             <Minus className='w-3.5 h-3.5 text-gray-600' />
@@ -226,7 +232,7 @@ const CartSidebar = () => {
                           </span>
                           <button
                             onClick={() => updateCartItem(product._id, product.quantity + 1)}
-                            className='p-1.5 hover:bg-gray-100 transition-colors'
+                            className='p-1.5 hover:bg-gray-100 transition-colors cursor-pointer'
                           >
                             <Plus className='w-3.5 h-3.5 text-gray-600' />
                           </button>
@@ -235,7 +241,7 @@ const CartSidebar = () => {
                         {/* Botão Remover */}
                         <button
                           onClick={() => updateCartItem(product._id, 0)}
-                          className='p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors'
+                          className='p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer'
                           aria-label='Remover produto'
                         >
                           <Trash2 className='w-4 h-4' />
@@ -269,7 +275,7 @@ const CartSidebar = () => {
               {/* Botão Principal - Finalizar Compra */}
               <button
                 onClick={handleCheckout}
-                className='w-full py-3.5 bg-primary text-white rounded-lg font-bold hover:bg-primary-dull transition-all duration-200 flex items-center justify-center gap-2 shadow-md active:scale-[0.98]'
+                className='w-full py-3.5 bg-primary text-white rounded-lg font-bold hover:bg-primary-dull transition-all duration-200 flex items-center justify-center gap-2 shadow-md active:scale-[0.98] cursor-pointer'
               >
                 Finalizar Compra
                 <ArrowRight className='w-5 h-5' />
@@ -278,30 +284,24 @@ const CartSidebar = () => {
               {/* Botão Secundário - Continuar a Comprar */}
               <button
                 onClick={handleContinueShopping}
-                className='w-full py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors'
+                className='w-full py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors cursor-pointer'
               >
                 Continuar a Comprar
               </button>
             </div>
 
-            {/* Link para ver carrinho detalhado (opcional) */}
+            {/* Link para ver carrinho detalhado */}
             <button
               onClick={handleCheckout}
-              className='w-full text-center text-sm text-primary hover:underline flex items-center justify-center gap-1'
+              className='w-full text-center text-sm text-primary hover:underline flex items-center justify-center gap-1 cursor-pointer'
             >
               Ver carrinho completo
               <ChevronRight className='w-4 h-4' />
             </button>
           </div>
         )}
-
-        {/* Dica de swipe (mobile only) */}
-        <div className='sm:hidden absolute bottom-32 left-1/2 -translate-x-1/2 text-xs text-gray-400 flex items-center gap-1 pointer-events-none'>
-          <span>Arraste para fechar</span>
-          <ArrowRight className='w-3 h-3' />
-        </div>
       </div>
-    </>
+    </div>
   );
 };
 
