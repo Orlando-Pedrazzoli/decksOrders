@@ -1,101 +1,25 @@
-# ═══════════════════════════════════════════════════════════════════════════
-# ROBOTS.TXT - Elite Surfing Portugal
-# https://www.elitesurfing.pt/robots.txt
-# ═══════════════════════════════════════════════════════════════════════════
+# Elite Surfing Portugal - robots.txt
+# https://elitesurfing.pt
 
-# Permitir todos os crawlers principais
 User-agent: *
 Allow: /
 
-# Páginas para não indexar (privadas/admin)
-Disallow: /seller/
+# Páginas privadas - não indexar
+Disallow: /seller
 Disallow: /seller/*
-Disallow: /api/
-Disallow: /api/*
-Disallow: /*.json$
-Disallow: /*?*
+Disallow: /my-orders
+Disallow: /add-address
+Disallow: /write-review
+Disallow: /write-review/*
+Disallow: /order-success
 
-# Permitir assets importantes
-Allow: /og-image.jpg
-Allow: /logo.png
-Allow: /favicon.ico
-Allow: /*.css
-Allow: /*.js
+# Assets que não precisam ser indexados
+Disallow: /assets/
+Disallow: /*.js$
+Disallow: /*.css$
 
-# ═══════════════════════════════════════════════════════════════════════════
-# GOOGLEBOT ESPECÍFICO
-# ═══════════════════════════════════════════════════════════════════════════
-User-agent: Googlebot
-Allow: /
-Disallow: /seller/
-Disallow: /api/
+# Sitemap
+Sitemap: https://elitesurfing.pt/sitemap.xml
 
-User-agent: Googlebot-Image
-Allow: /
-Allow: /*.jpg
-Allow: /*.jpeg
-Allow: /*.png
-Allow: /*.webp
-Allow: /*.svg
-
-# ═══════════════════════════════════════════════════════════════════════════
-# BINGBOT
-# ═══════════════════════════════════════════════════════════════════════════
-User-agent: Bingbot
-Allow: /
-Disallow: /seller/
-Disallow: /api/
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SOCIAL MEDIA BOTS (para previews)
-# ═══════════════════════════════════════════════════════════════════════════
-User-agent: facebookexternalhit
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: LinkedInBot
-Allow: /
-
-User-agent: WhatsApp
-Allow: /
-
-User-agent: TelegramBot
-Allow: /
-
-User-agent: Pinterest
-Allow: /
-
-# ═══════════════════════════════════════════════════════════════════════════
-# BLOQUEAR BOTS MALICIOSOS/SPAM
-# ═══════════════════════════════════════════════════════════════════════════
-User-agent: AhrefsBot
-Disallow: /
-
-User-agent: SemrushBot
-Disallow: /
-
-User-agent: MJ12bot
-Disallow: /
-
-User-agent: DotBot
-Disallow: /
-
-User-agent: BLEXBot
-Disallow: /
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SITEMAP
-# ═══════════════════════════════════════════════════════════════════════════
-Sitemap: https://www.elitesurfing.pt/sitemap.xml
-
-# ═══════════════════════════════════════════════════════════════════════════
-# CRAWL-DELAY (opcional - para servidores com recursos limitados)
-# ═══════════════════════════════════════════════════════════════════════════
-# Crawl-delay: 1
-
-# ═══════════════════════════════════════════════════════════════════════════
-# HOST (URL principal - ajuda com www vs non-www)
-# ═══════════════════════════════════════════════════════════════════════════
-Host: https://www.elitesurfing.pt
+# Crawl delay (opcional, para não sobrecarregar servidor)
+Crawl-delay: 1

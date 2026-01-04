@@ -3,398 +3,45 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         SEO META TAGS PRINCIPAIS
-    ════════════════════════════════════════════════════════════════════════ -->
-    <title>Elite Surfing Portugal - Loja Online de Acessórios de Surf Premium</title>
-    <meta
-      name="description"
-      content="Elite Surfing - A melhor loja online de acessórios de surf em Portugal. Pranchas, fatos, leashes, wax e equipamentos premium. Envio grátis para Portugal Continental. Garantia de 24 meses."
-    />
-    <meta
-      name="keywords"
-      content="elite surfing, surf portugal, loja surf online, acessórios surf, pranchas surf, fatos surf, wetsuit portugal, leashes surf, wax surf, surf shop portugal, equipamento surf, loja surf lisboa, surf accessories, surfboards portugal, decks surf, quilhas surf"
-    />
-    <meta name="author" content="Elite Surfing Portugal" />
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <meta name="googlebot" content="index, follow" />
-    <meta name="language" content="pt-PT" />
-    <meta name="revisit-after" content="3 days" />
-    <meta name="rating" content="general" />
-    <meta name="distribution" content="global" />
-    <meta name="coverage" content="Worldwide" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         CANONICAL URL - IMPORTANTE PARA SEO
-    ════════════════════════════════════════════════════════════════════════ -->
-    <link rel="canonical" href="https://www.elitesurfing.pt/" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         OPEN GRAPH / FACEBOOK / WHATSAPP - CRÍTICO PARA COMPARTILHAMENTO
-    ════════════════════════════════════════════════════════════════════════ -->
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
+    
+    <!-- Base Meta Tags (serão sobrescritas pelo react-helmet-async) -->
+    <title>Elite Surfing Portugal - Equipamento de Surf</title>
+    <meta name="description" content="Loja online de equipamento de surf em Portugal. Decks, leashes, quilhas, capas, wax e acessórios. Entregas em Portugal Continental." />
+    
+    <!-- Canonical -->
+    <link rel="canonical" href="https://elitesurfing.pt" />
+    
+    <!-- Open Graph base -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.elitesurfing.pt/" />
-    <meta property="og:title" content="Elite Surfing Portugal - Acessórios Premium de Surf" />
-    <meta property="og:description" content="🏄‍♂️ Descubra os melhores acessórios de surf em Portugal. Produtos premium, envio grátis, garantia de 24 meses. Compre online com segurança!" />
     <meta property="og:site_name" content="Elite Surfing Portugal" />
     <meta property="og:locale" content="pt_PT" />
+    <meta property="og:image" content="https://elitesurfing.pt/og-image.jpg" />
     
-    <!-- ✅ IMAGEM PARA WHATSAPP - DEVE EXISTIR NO SERVIDOR! -->
-    <!-- Dimensões recomendadas: 1200x630px, formato JPG ou PNG -->
-    <meta property="og:image" content="https://www.elitesurfing.pt/og-image.jpg" />
-    <meta property="og:image:secure_url" content="https://www.elitesurfing.pt/og-image.jpg" />
-    <meta property="og:image:type" content="image/jpeg" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Elite Surfing - Loja de Surf Premium em Portugal" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         TWITTER CARDS
-    ════════════════════════════════════════════════════════════════════════ -->
+    <!-- Twitter Card base -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@elitesurfingpt" />
-    <meta name="twitter:creator" content="@elitesurfingpt" />
-    <meta name="twitter:url" content="https://www.elitesurfing.pt/" />
-    <meta name="twitter:title" content="Elite Surfing Portugal - Loja de Surf Online" />
-    <meta name="twitter:description" content="🏄‍♂️ Acessórios premium de surf com envio grátis para Portugal. Pranchas, fatos, leashes e mais." />
-    <meta name="twitter:image" content="https://www.elitesurfing.pt/og-image.jpg" />
-    <meta name="twitter:image:alt" content="Elite Surfing - Loja de Surf Premium em Portugal" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         GEO TAGS (Local SEO Portugal)
-    ════════════════════════════════════════════════════════════════════════ -->
-    <meta name="geo.region" content="PT" />
-    <meta name="geo.placename" content="Lisboa, Portugal" />
-    <meta name="geo.position" content="38.7223;-9.1393" />
-    <meta name="ICBM" content="38.7223, -9.1393" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         VERIFICAÇÃO DE PROPRIEDADE - SUBSTITUA PELOS SEUS CÓDIGOS REAIS
-    ════════════════════════════════════════════════════════════════════════ -->
-    <!-- Google Search Console -->
-    <meta name="google-site-verification" content="SEU_CODIGO_GOOGLE_AQUI" />
-    <!-- Bing Webmaster Tools -->
-    <meta name="msvalidate.01" content="SEU_CODIGO_BING_AQUI" />
-    <!-- Pinterest -->
-    <meta name="p:domain_verify" content="SEU_CODIGO_PINTEREST_AQUI" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         THEME COLOR & PWA
-    ════════════════════════════════════════════════════════════════════════ -->
-    <meta name="theme-color" content="#358f61" />
-    <meta name="msapplication-TileColor" content="#358f61" />
-    <meta name="msapplication-navbutton-color" content="#358f61" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Elite Surfing" />
-    <meta name="application-name" content="Elite Surfing" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="format-detection" content="telephone=no" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         FAVICONS - TODOS OS TAMANHOS
-    ════════════════════════════════════════════════════════════════════════ -->
-    <!-- Favicon principal -->
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="shortcut icon" href="/favicon.ico" />
     
-    <!-- PNG favicons para diferentes tamanhos -->
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png" />
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#0ea5e9" />
+    <meta name="msapplication-TileColor" content="#0ea5e9" />
     
-    <!-- Apple Touch Icons -->
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png" />
-    <link rel="apple-touch-icon" sizes="60x60" href="/apple-touch-icon-60x60.png" />
-    <link rel="apple-touch-icon" sizes="72x72" href="/apple-touch-icon-72x72.png" />
-    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon-76x76.png" />
-    <link rel="apple-touch-icon" sizes="114x114" href="/apple-touch-icon-114x114.png" />
-    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png" />
-    <link rel="apple-touch-icon" sizes="144x144" href="/apple-touch-icon-144x144.png" />
-    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
+    <!-- Geo Tags -->
+    <meta name="geo.region" content="PT-15" />
+    <meta name="geo.placename" content="Oeiras, Portugal" />
     
-    <!-- Microsoft Tiles -->
-    <meta name="msapplication-TileImage" content="/mstile-144x144.png" />
-    <meta name="msapplication-square70x70logo" content="/mstile-70x70.png" />
-    <meta name="msapplication-square150x150logo" content="/mstile-150x150.png" />
-    <meta name="msapplication-wide310x150logo" content="/mstile-310x150.png" />
-    <meta name="msapplication-square310x310logo" content="/mstile-310x310.png" />
+    <!-- Verification (adiciona os teus códigos) -->
+    <!-- <meta name="google-site-verification" content="SEU_CODIGO_AQUI" /> -->
     
-    <!-- SVG Fallback -->
-    <link rel="icon" type="image/svg+xml" href="/ES_Icon.svg" />
-    
-    <!-- Manifest para PWA -->
-    <link rel="manifest" href="/site.webmanifest" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         STRUCTURED DATA - SCHEMA.ORG (E-commerce Store)
-    ════════════════════════════════════════════════════════════════════════ -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Store",
-        "@id": "https://www.elitesurfing.pt/#store",
-        "name": "Elite Surfing Portugal",
-        "alternateName": "Elite Surfing",
-        "description": "Loja online especializada em acessórios premium de surf em Portugal. Pranchas, fatos, leashes, wax e equipamentos de alta qualidade.",
-        "url": "https://www.elitesurfing.pt",
-        "logo": {
-          "@type": "ImageObject",
-          "url": "https://www.elitesurfing.pt/logo.png",
-          "width": 512,
-          "height": 512
-        },
-        "image": [
-          "https://www.elitesurfing.pt/og-image.jpg",
-          "https://www.elitesurfing.pt/store-image-1.jpg",
-          "https://www.elitesurfing.pt/store-image-2.jpg"
-        ],
-        "telephone": "+351912345678",
-        "email": "suporte@elitesurfing.pt",
-        "address": {
-          "@type": "PostalAddress",
-          "streetAddress": "Rua do Surf, 123",
-          "addressLocality": "Lisboa",
-          "addressRegion": "Lisboa",
-          "postalCode": "1000-001",
-          "addressCountry": "PT"
-        },
-        "geo": {
-          "@type": "GeoCoordinates",
-          "latitude": 38.7223,
-          "longitude": -9.1393
-        },
-        "openingHoursSpecification": [
-          {
-            "@type": "OpeningHoursSpecification",
-            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-            "opens": "09:00",
-            "closes": "18:00"
-          },
-          {
-            "@type": "OpeningHoursSpecification",
-            "dayOfWeek": "Saturday",
-            "opens": "10:00",
-            "closes": "14:00"
-          }
-        ],
-        "priceRange": "€€",
-        "paymentAccepted": ["Cash", "Credit Card", "Debit Card", "Stripe", "MB Way"],
-        "currenciesAccepted": "EUR",
-        "areaServed": {
-          "@type": "Country",
-          "name": "Portugal"
-        },
-        "hasOfferCatalog": {
-          "@type": "OfferCatalog",
-          "name": "Catálogo de Produtos de Surf",
-          "itemListElement": [
-            {
-              "@type": "OfferCatalog",
-              "name": "Decks & Grips"
-            },
-            {
-              "@type": "OfferCatalog",
-              "name": "Leashes"
-            },
-            {
-              "@type": "OfferCatalog",
-              "name": "Quilhas"
-            },
-            {
-              "@type": "OfferCatalog",
-              "name": "Wax & Acessórios"
-            }
-          ]
-        },
-        "sameAs": [
-          "https://www.facebook.com/elitesurfingpt",
-          "https://www.instagram.com/elitesurfingpt",
-          "https://www.youtube.com/@elitesurfingpt",
-          "https://www.tiktok.com/@elitesurfingpt"
-        ],
-        "potentialAction": {
-          "@type": "SearchAction",
-          "target": {
-            "@type": "EntryPoint",
-            "urlTemplate": "https://www.elitesurfing.pt/products?search={search_term_string}"
-          },
-          "query-input": "required name=search_term_string"
-        }
-      }
-    </script>
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         ORGANIZATION SCHEMA
-    ════════════════════════════════════════════════════════════════════════ -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        "@id": "https://www.elitesurfing.pt/#organization",
-        "name": "Elite Surfing",
-        "url": "https://www.elitesurfing.pt",
-        "logo": "https://www.elitesurfing.pt/logo.png",
-        "description": "Elite Surfing - Loja online de acessórios premium de surf em Portugal",
-        "foundingDate": "2024",
-        "contactPoint": [
-          {
-            "@type": "ContactPoint",
-            "telephone": "+351912345678",
-            "contactType": "customer service",
-            "areaServed": "PT",
-            "availableLanguage": ["Portuguese", "English"],
-            "hoursAvailable": {
-              "@type": "OpeningHoursSpecification",
-              "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-              "opens": "09:00",
-              "closes": "18:00"
-            }
-          },
-          {
-            "@type": "ContactPoint",
-            "telephone": "+351912345678",
-            "contactType": "sales",
-            "areaServed": "PT",
-            "availableLanguage": ["Portuguese", "English"]
-          }
-        ],
-        "sameAs": [
-          "https://www.facebook.com/elitesurfingpt",
-          "https://www.instagram.com/elitesurfingpt"
-        ]
-      }
-    </script>
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         WEBSITE SCHEMA
-    ════════════════════════════════════════════════════════════════════════ -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "@id": "https://www.elitesurfing.pt/#website",
-        "url": "https://www.elitesurfing.pt",
-        "name": "Elite Surfing Portugal",
-        "description": "Loja online de acessórios premium de surf em Portugal",
-        "publisher": {
-          "@id": "https://www.elitesurfing.pt/#organization"
-        },
-        "potentialAction": {
-          "@type": "SearchAction",
-          "target": {
-            "@type": "EntryPoint",
-            "urlTemplate": "https://www.elitesurfing.pt/products?search={search_term_string}"
-          },
-          "query-input": "required name=search_term_string"
-        },
-        "inLanguage": "pt-PT"
-      }
-    </script>
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         BREADCRUMB SCHEMA (Homepage)
-    ════════════════════════════════════════════════════════════════════════ -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        "itemListElement": [
-          {
-            "@type": "ListItem",
-            "position": 1,
-            "name": "Home",
-            "item": "https://www.elitesurfing.pt"
-          }
-        ]
-      }
-    </script>
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         LOCAL BUSINESS SCHEMA (Para aparecer no Google Maps)
-    ════════════════════════════════════════════════════════════════════════ -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "LocalBusiness",
-        "@id": "https://www.elitesurfing.pt/#localbusiness",
-        "name": "Elite Surfing Portugal",
-        "image": "https://www.elitesurfing.pt/og-image.jpg",
-        "telephone": "+351912345678",
-        "email": "suporte@elitesurfing.pt",
-        "url": "https://www.elitesurfing.pt",
-        "address": {
-          "@type": "PostalAddress",
-          "streetAddress": "Rua do Surf, 123",
-          "addressLocality": "Lisboa",
-          "addressRegion": "Lisboa",
-          "postalCode": "1000-001",
-          "addressCountry": "PT"
-        },
-        "geo": {
-          "@type": "GeoCoordinates",
-          "latitude": 38.7223,
-          "longitude": -9.1393
-        },
-        "priceRange": "€€",
-        "openingHoursSpecification": [
-          {
-            "@type": "OpeningHoursSpecification",
-            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-            "opens": "09:00",
-            "closes": "18:00"
-          }
-        ]
-      }
-    </script>
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         PRECONNECT & DNS PREFETCH (Performance)
-    ════════════════════════════════════════════════════════════════════════ -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Preconnect para performance -->
+    <link rel="preconnect" href="https://elitesurfingeu-backend.vercel.app" />
     <link rel="preconnect" href="https://res.cloudinary.com" />
-    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
     <link rel="dns-prefetch" href="https://res.cloudinary.com" />
-    <link rel="dns-prefetch" href="https://www.google-analytics.com" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         ALTERNATE LANGUAGES (Hreflang)
-    ════════════════════════════════════════════════════════════════════════ -->
-    <link rel="alternate" hreflang="pt-PT" href="https://www.elitesurfing.pt/" />
-    <link rel="alternate" hreflang="pt" href="https://www.elitesurfing.pt/" />
-    <link rel="alternate" hreflang="x-default" href="https://www.elitesurfing.pt/" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         SECURITY HEADERS (CSP pode ser configurado no servidor)
-    ════════════════════════════════════════════════════════════════════════ -->
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="referrer" content="strict-origin-when-cross-origin" />
   </head>
-
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-
-    <!-- ═══════════════════════════════════════════════════════════════════════
-         NOSCRIPT FALLBACK (SEO para crawlers sem JS)
-    ════════════════════════════════════════════════════════════════════════ -->
-    <noscript>
-      <div style="text-align: center; padding: 50px; font-family: Arial, sans-serif; background: linear-gradient(135deg, #358f61 0%, #2a7049 100%); min-height: 100vh; color: white;">
-        <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">🏄‍♂️ Elite Surfing Portugal</h1>
-        <p style="font-size: 1.2rem; margin-bottom: 2rem;">A melhor loja online de acessórios de surf em Portugal</p>
-        <p style="margin-bottom: 1rem;">JavaScript é necessário para usar este site.</p>
-        <p>Por favor, ative o JavaScript no seu navegador.</p>
-        <div style="margin-top: 2rem; padding: 1rem; background: rgba(255,255,255,0.1); border-radius: 8px;">
-          <p><strong>Contacto:</strong></p>
-          <p>📧 suporte@elitesurfing.pt</p>
-          <p>📞 +351 912 164 220</p>
-        </div>
-      </div>
-    </noscript>
   </body>
 </html>
