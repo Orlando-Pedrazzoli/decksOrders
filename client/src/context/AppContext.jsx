@@ -6,6 +6,7 @@ import axios from 'axios';
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL;
 
+// ⭐ DEBUG - Mas apenas em desenvolvimento
 if (import.meta.env.DEV) {
   console.log('🔧 Backend URL:', import.meta.env.VITE_BACKEND_URL);
 }
@@ -26,6 +27,7 @@ export const AppContextProvider = ({ children }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCartSidebar, setShowCartSidebar] = useState(false);
   
+  // ✅ OTIMIZADO: isLoading começa false - site carrega imediato
   const [isLoading, setIsLoading] = useState(false);
   const [isSellerLoading, setIsSellerLoading] = useState(true);
 
@@ -40,9 +42,11 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  const getStoredToken = () => localStorage.getItem('auth_token');
+  const getStoredToken = () => {
+    return localStorage.getItem('auth_token');
+  };
 
-  // Cart storage functions
+  // Save cart to localStorage
   const saveCartToStorage = cartData => {
     try {
       localStorage.setItem('cart_items', JSON.stringify(cartData));
@@ -51,6 +55,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
+  // Load cart from localStorage
   const loadCartFromStorage = () => {
     try {
       const savedCart = localStorage.getItem('cart_items');
@@ -61,7 +66,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // User storage functions
+  // Clear all stored data
   const clearStoredData = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('cart_items');
@@ -69,6 +74,7 @@ export const AppContextProvider = ({ children }) => {
     delete axios.defaults.headers.common['Authorization'];
   };
 
+  // Save user data to localStorage
   const saveUserToStorage = userData => {
     try {
       if (userData) {
@@ -81,6 +87,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
+  // Load user data from localStorage
   const loadUserFromStorage = () => {
     try {
       const savedUser = localStorage.getItem('user_data');
@@ -91,9 +98,10 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Fetch user
+  // ✅ OTIMIZADO: fetchUser sem setIsLoading global
   const fetchUser = async () => {
     try {
+      // First, try to get user with existing session/cookie
       let response = await axios.get('/api/user/is-auth');
 
       if (response.data.success) {
@@ -109,6 +117,7 @@ export const AppContextProvider = ({ children }) => {
         return;
       }
 
+      // If cookie auth failed, try with stored token
       const storedToken = getStoredToken();
       if (storedToken) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
@@ -128,6 +137,7 @@ export const AppContextProvider = ({ children }) => {
         }
       }
 
+      // Try to load from localStorage as fallback
       const savedUser = loadUserFromStorage();
       const savedCart = loadCartFromStorage();
 
@@ -156,7 +166,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Logout functions
+  // Enhanced logout function
   const logoutUser = async () => {
     try {
       await axios.get('/api/user/logout');
@@ -171,6 +181,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
+  // ✅ OTIMIZADO: Logout do Seller centralizado
   const logoutSeller = async () => {
     try {
       await axios.get('/api/seller/logout');
@@ -179,13 +190,13 @@ export const AppContextProvider = ({ children }) => {
     } finally {
       setIsSeller(false);
       sessionStorage.removeItem('seller_just_logged_in');
-      sessionStorage.removeItem('seller_authenticated');
+      sessionStorage.removeItem('seller_authenticated'); // ✅ Limpar cache
       navigate('/');
       toast.success('Logout do Admin realizado com sucesso');
     }
   };
 
-  // Fetch seller
+  // ✅ OTIMIZADO: Fetch Seller só quando necessário
   const fetchSeller = async () => {
     try {
       setIsSellerLoading(true);
@@ -197,6 +208,7 @@ export const AppContextProvider = ({ children }) => {
         
         if (isInSellerArea || justLoggedIn) {
           setIsSeller(true);
+          // ✅ Cachear autenticação no sessionStorage
           sessionStorage.setItem('seller_authenticated', 'true');
           sessionStorage.removeItem('seller_just_logged_in');
         } else {
@@ -204,23 +216,27 @@ export const AppContextProvider = ({ children }) => {
           sessionStorage.removeItem('seller_authenticated');
         }
       } else {
+        // Só desloga se a resposta do servidor for explicitamente false
         setIsSeller(false);
         sessionStorage.removeItem('seller_authenticated');
       }
     } catch (error) {
       console.log('❌ Erro ao verificar seller:', error.message);
       
+      // ✅ CRÍTICO: Não desloga em erro de rede
+      // Apenas desloga se for erro 401 (não autorizado)
       if (error.response?.status === 401) {
         setIsSeller(false);
         sessionStorage.removeItem('seller_authenticated');
         sessionStorage.removeItem('seller_just_logged_in');
       }
+      // Se for erro de rede, mantém o estado atual (não limpa o cache)
     } finally {
       setIsSellerLoading(false);
     }
   };
 
-  // Fetch products
+  // Fetch All Products
   const fetchProducts = async () => {
     try {
       const { data } = await axios.get('/api/product/list');
@@ -232,48 +248,23 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // 🎯 HELPER: Obter stock disponível
-  const getAvailableStock = (productId) => {
-    const product = products.find(p => p._id === productId);
-    return product?.stock || 0;
-  };
+  // Enhanced cart operations with localStorage backup
+  const addToCart = async itemId => {
+    const newCartItems = { ...cartItems };
 
-  // 🎯 CART: Adicionar ao carrinho (SIMPLIFICADO - sem variantes)
-  const addToCart = async (productId) => {
-    // Validar stock primeiro
-    const availableStock = getAvailableStock(productId);
-    
-    if (availableStock === 0) {
-      toast.error('Produto esgotado');
-      return false;
-    }
-    
-    const currentQuantity = cartItems[productId] || 0;
-    
-    if (currentQuantity >= availableStock) {
-      toast.error(`Apenas ${availableStock} unidade(s) disponível(eis)`);
-      return false;
+    if (newCartItems[itemId]) {
+      newCartItems[itemId] += 1;
+    } else {
+      newCartItems[itemId] = 1;
     }
 
-    // Criar novo objeto de carrinho
-    const newCartItems = { 
-      ...cartItems,
-      [productId]: currentQuantity + 1 
-    };
-
-    // Atualizar estado e storage
     setCartItems(newCartItems);
     saveCartToStorage(newCartItems);
-    
-    // Mostrar toast e abrir sidebar após um pequeno delay para garantir re-render
     toast.success('Adicionado ao carrinho');
     
-    // Usar setTimeout para garantir que o state foi atualizado antes de abrir
-    setTimeout(() => {
-      setShowCartSidebar(true);
-    }, 10);
+    // ✅ Abrir sidebar do carrinho
+    setShowCartSidebar(true);
 
-    // Sync com servidor em background
     if (user) {
       try {
         await axios.post('/api/cart/update', { cartItems: newCartItems });
@@ -281,26 +272,16 @@ export const AppContextProvider = ({ children }) => {
         console.error('Error syncing cart with server:', error);
       }
     }
-    
-    return true;
   };
 
-  // 🎯 CART: Atualizar item no carrinho
-  const updateCartItem = async (productId, quantity) => {
+  const updateCartItem = async (itemId, quantity) => {
     const newCartItems = { ...cartItems };
 
     if (quantity <= 0) {
-      delete newCartItems[productId];
+      delete newCartItems[itemId];
       toast.success('Produto removido do carrinho');
     } else {
-      const availableStock = getAvailableStock(productId);
-      
-      if (quantity > availableStock) {
-        toast.error(`Apenas ${availableStock} unidade(s) disponível(eis)`);
-        return false;
-      }
-      
-      newCartItems[productId] = quantity;
+      newCartItems[itemId] = quantity;
       toast.success('Carrinho atualizado');
     }
 
@@ -314,18 +295,15 @@ export const AppContextProvider = ({ children }) => {
         console.error('Error syncing cart with server:', error);
       }
     }
-    
-    return true;
   };
 
-  // 🎯 CART: Remover do carrinho
-  const removeFromCart = async (productId) => {
+  const removeFromCart = async itemId => {
     const newCartItems = { ...cartItems };
 
-    if (newCartItems[productId]) {
-      newCartItems[productId] -= 1;
-      if (newCartItems[productId] === 0) {
-        delete newCartItems[productId];
+    if (newCartItems[itemId]) {
+      newCartItems[itemId] -= 1;
+      if (newCartItems[itemId] === 0) {
+        delete newCartItems[itemId];
       }
     }
 
@@ -342,7 +320,9 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  const clearSearchQuery = () => setSearchQuery('');
+  const clearSearchQuery = () => {
+    setSearchQuery('');
+  };
 
   const getCartCount = () => {
     let totalCount = 0;
@@ -354,35 +334,13 @@ export const AppContextProvider = ({ children }) => {
 
   const getCartAmount = () => {
     let totalAmount = 0;
-    
-    for (const productId in cartItems) {
-      if (cartItems[productId] <= 0) continue;
-      
-      const product = products.find(p => p._id === productId);
-      if (!product) continue;
-      
-      totalAmount += product.offerPrice * cartItems[productId];
+    for (const items in cartItems) {
+      let itemInfo = products.find(product => product._id === items);
+      if (itemInfo && cartItems[items] > 0) {
+        totalAmount += itemInfo.offerPrice * cartItems[items];
+      }
     }
-    
     return Math.floor(totalAmount * 100) / 100;
-  };
-
-  // 🎯 VALIDAR CARRINHO COMPLETO
-  const validateCart = async () => {
-    if (Object.keys(cartItems).length === 0) {
-      return { valid: true, errors: [] };
-    }
-    
-    try {
-      const response = await axios.post('/api/cart/validate', { cartItems });
-      return {
-        valid: response.data.valid,
-        errors: response.data.results?.filter(r => !r.valid) || [],
-      };
-    } catch (error) {
-      console.error('Error validating cart:', error);
-      return { valid: false, errors: [{ message: 'Erro ao validar carrinho' }] };
-    }
   };
 
   // Axios interceptors
@@ -416,9 +374,10 @@ export const AppContextProvider = ({ children }) => {
     };
   }, []);
 
-  // Initialize app
+  // ✅ OTIMIZADO: Inicialização rápida
   useEffect(() => {
     const initializeApp = async () => {
+      // 1. Carregar dados locais IMEDIATAMENTE (sem await)
       const token = getStoredToken();
       if (token) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -432,19 +391,29 @@ export const AppContextProvider = ({ children }) => {
         setUser(savedUser);
       }
 
+      // 2. Buscar produtos (não bloqueia)
       fetchProducts();
+
+      // 3. Verificar usuário em background
       fetchUser();
 
+      // 4. ✅ MELHORADO: Verificar seller com cache de sessionStorage
       if (window.location.pathname.startsWith('/seller')) {
+        // Verificar cache primeiro
         const sellerCached = sessionStorage.getItem('seller_authenticated');
         
         if (sellerCached === 'true') {
+          // Restaurar estado do cache
           setIsSeller(true);
           setIsSellerLoading(false);
+          
+          // Verificar em background (não bloqueia)
           fetchSeller().catch(() => {
+            // Se falhar a verificação em background, mantém o cache por enquanto
             console.log('⚠️ Verificação de seller falhou, mantendo sessão');
           });
         } else {
+          // Não há cache, precisa verificar
           fetchSeller();
         }
       } else {
@@ -455,14 +424,17 @@ export const AppContextProvider = ({ children }) => {
     initializeApp();
   }, []);
 
-  // Check seller on route change
+  // ✅ Verificar seller apenas na primeira vez que entra na área de seller
   useEffect(() => {
+    // Só verifica se:
+    // 1. Está na área de seller
+    // 2. Ainda não verificou (isSellerLoading é true) OU não está logado como seller
     if (location.pathname.startsWith('/seller') && !isSeller && isSellerLoading) {
       fetchSeller();
     }
   }, [location.pathname]);
 
-  // Auto-sync cart with server
+  // Auto-sync cart with server when user changes
   useEffect(() => {
     const syncCartWithServer = async () => {
       if (user && Object.keys(cartItems).length > 0) {
@@ -510,8 +482,6 @@ export const AppContextProvider = ({ children }) => {
     saveCartToStorage,
     loadCartFromStorage,
     saveUserToStorage,
-    getAvailableStock,
-    validateCart,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

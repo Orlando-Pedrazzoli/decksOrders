@@ -1,170 +1,61 @@
-import User from "../models/User.js";
-import Product from "../models/Product.js";
+import User from '../models/User.js';
 
-// Update User Cart
-const updateCart = async (req, res) => {
+// Update User CartData : /api/cart/update
+export const updateCart = async (req, res) => {
   try {
-    const { cartItems } = req.body;
-    const userId = req.userId;
+    const { userId, cartItems } = req.body;
 
-    // 🎯 Validar stock antes de atualizar
-    const stockErrors = [];
-    
-    for (const [productId, quantity] of Object.entries(cartItems)) {
-      if (quantity <= 0) continue;
-      
-      const product = await Product.findById(productId);
-      
-      if (!product) {
-        stockErrors.push({
-          productId,
-          message: `Produto não encontrado`
-        });
-        continue;
-      }
-      
-      const availableStock = product.stock || 0;
-      
-      if (quantity > availableStock) {
-        stockErrors.push({
-          productId,
-          productName: product.name,
-          requested: quantity,
-          available: availableStock,
-          message: `${product.name}: apenas ${availableStock} disponível`
-        });
-      }
+    if (!userId) {
+      return res.json({ success: false, message: 'User ID is required' });
     }
 
-    // Se há erros de stock, retornar mas ainda atualizar o carrinho
-    // (o frontend decide o que fazer)
-    await User.findByIdAndUpdate(userId, { cartItems });
-
-    if (stockErrors.length > 0) {
-      return res.json({ 
-        success: false, 
-        message: "Alguns produtos excedem o stock disponível",
-        stockErrors,
-        cartItems 
-      });
+    if (!cartItems || typeof cartItems !== 'object') {
+      return res.json({ success: false, message: 'Invalid cart data' });
     }
 
-    res.json({ success: true, message: "Carrinho atualizado" });
-  } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
-  }
-};
-
-// Get User Cart
-const getCart = async (req, res) => {
-  try {
-    const userId = req.userId;
+    // Find user and update cart
     const user = await User.findById(userId);
 
     if (!user) {
-      return res.json({ success: false, message: "Usuário não encontrado" });
+      return res.json({ success: false, message: 'User not found' });
     }
 
-    res.json({ success: true, cartItems: user.cartItems || {} });
-  } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
-  }
-};
+    // Update cart items
+    user.cartItems = cartItems;
+    await user.save();
 
-// 🆕 Verificar stock de um produto
-const checkStock = async (req, res) => {
-  try {
-    const { productId, quantity = 1 } = req.body;
-
-    const product = await Product.findById(productId);
-    
-    if (!product) {
-      return res.json({ 
-        success: false, 
-        available: false,
-        message: "Produto não encontrado" 
-      });
-    }
-
-    const availableStock = product.stock || 0;
-    const isAvailable = availableStock >= quantity;
-
-    res.json({ 
-      success: true, 
-      available: isAvailable,
-      stock: availableStock,
-      requested: quantity,
-      message: isAvailable 
-        ? "Stock disponível" 
-        : `Apenas ${availableStock} unidade(s) disponível(eis)`
+    res.json({
+      success: true,
+      message: 'Cart Updated',
+      cartItems: user.cartItems,
     });
   } catch (error) {
-    console.log(error.message);
+    console.log('Cart update error:', error.message);
     res.json({ success: false, message: error.message });
   }
 };
 
-// 🆕 Validar carrinho completo antes do checkout
-const validateCart = async (req, res) => {
+// Get User Cart : /api/cart/get
+export const getCart = async (req, res) => {
   try {
-    const { cartItems } = req.body;
-    
-    if (!cartItems || Object.keys(cartItems).length === 0) {
-      return res.json({ 
-        success: true, 
-        valid: true, 
-        message: "Carrinho vazio" 
-      });
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.json({ success: false, message: 'User ID is required' });
     }
 
-    const results = [];
-    let allValid = true;
+    const user = await User.findById(userId).select('cartItems');
 
-    for (const [productId, quantity] of Object.entries(cartItems)) {
-      if (quantity <= 0) continue;
-
-      const product = await Product.findById(productId);
-      
-      if (!product) {
-        results.push({
-          productId,
-          valid: false,
-          message: "Produto não encontrado"
-        });
-        allValid = false;
-        continue;
-      }
-
-      const availableStock = product.stock || 0;
-      const isValid = availableStock >= quantity;
-
-      if (!isValid) {
-        allValid = false;
-      }
-
-      results.push({
-        productId,
-        productName: product.name,
-        requested: quantity,
-        available: availableStock,
-        valid: isValid,
-        message: isValid 
-          ? "OK" 
-          : `Apenas ${availableStock} unidade(s) disponível(eis)`
-      });
+    if (!user) {
+      return res.json({ success: false, message: 'User not found' });
     }
 
-    res.json({ 
-      success: true, 
-      valid: allValid,
-      results 
+    res.json({
+      success: true,
+      cartItems: user.cartItems || {},
     });
   } catch (error) {
-    console.log(error.message);
+    console.log('Get cart error:', error.message);
     res.json({ success: false, message: error.message });
   }
 };
-
-export { updateCart, getCart, checkStock, validateCart };
