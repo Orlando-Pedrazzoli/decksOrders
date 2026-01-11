@@ -248,15 +248,90 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Enhanced cart operations with localStorage backup
-  const addToCart = async itemId => {
-    const newCartItems = { ...cartItems };
+  // 🎯 HELPER: Extrair productId e variantId de uma cartKey
+  const parseCartKey = (cartKey) => {
+    const parts = cartKey.split('_');
+    return {
+      productId: parts[0],
+      variantId: parts[1] || null,
+    };
+  };
 
-    if (newCartItems[itemId]) {
-      newCartItems[itemId] += 1;
-    } else {
-      newCartItems[itemId] = 1;
+  // 🎯 HELPER: Criar cartKey a partir de productId e variantId
+  const createCartKey = (productId, variantId = null) => {
+    return variantId ? `${productId}_${variantId}` : productId;
+  };
+
+  // 🎯 HELPER: Obter informações do produto e variante
+  const getProductInfo = (cartKey) => {
+    const { productId, variantId } = parseCartKey(cartKey);
+    const product = products.find(p => p._id === productId);
+    
+    if (!product) return null;
+    
+    let variant = null;
+    if (variantId && product.variants && product.variants.length > 0) {
+      variant = product.variants.find(v => v._id === variantId);
     }
+    
+    return { product, variant, productId, variantId };
+  };
+
+  // 🎯 HELPER: Obter stock disponível para um item do carrinho
+  const getAvailableStock = (cartKey) => {
+    const info = getProductInfo(cartKey);
+    if (!info) return 0;
+    
+    const { product, variant } = info;
+    
+    if (variant) {
+      return variant.stock || 0;
+    }
+    
+    // Se tem variantes mas nenhuma selecionada, retornar stock total
+    if (product.variants && product.variants.length > 0) {
+      return product.variants.reduce((total, v) => total + (v.stock || 0), 0);
+    }
+    
+    return product.stock || 0;
+  };
+
+  // 🆕 ATUALIZADO: addToCart aceita tanto cartKey como (productId, variantId)
+  // Formatos aceitos:
+  // - addToCart('productId') - produto sem variante
+  // - addToCart('productId_variantId') - produto com variante (cartKey)
+  // - addToCart('productId', 'variantId') - produto com variante (dois args)
+  const addToCart = async (productIdOrCartKey, variantId = null) => {
+    let cartKey;
+    
+    // Detectar se é cartKey (contém _) ou productId simples
+    if (variantId) {
+      // Dois argumentos: productId e variantId
+      cartKey = createCartKey(productIdOrCartKey, variantId);
+    } else if (productIdOrCartKey.includes('_')) {
+      // Um argumento com _ : é um cartKey completo
+      cartKey = productIdOrCartKey;
+    } else {
+      // Um argumento sem _ : é um productId simples
+      cartKey = productIdOrCartKey;
+    }
+    const newCartItems = { ...cartItems };
+    const currentQuantity = newCartItems[cartKey] || 0;
+    
+    // 🎯 VALIDAR STOCK
+    const availableStock = getAvailableStock(cartKey);
+    
+    if (availableStock === 0) {
+      toast.error('Produto esgotado');
+      return false;
+    }
+    
+    if (currentQuantity >= availableStock) {
+      toast.error(`Apenas ${availableStock} unidade(s) disponível(eis)`);
+      return false;
+    }
+
+    newCartItems[cartKey] = currentQuantity + 1;
 
     setCartItems(newCartItems);
     saveCartToStorage(newCartItems);
@@ -267,21 +342,43 @@ export const AppContextProvider = ({ children }) => {
 
     if (user) {
       try {
-        await axios.post('/api/cart/update', { cartItems: newCartItems });
+        const response = await axios.post('/api/cart/update', { cartItems: newCartItems });
+        
+        // 🎯 Verificar se o servidor reportou erros de stock
+        if (!response.data.success && response.data.stockErrors) {
+          // Reverter alteração local
+          setCartItems(cartItems);
+          saveCartToStorage(cartItems);
+          
+          const error = response.data.stockErrors[0];
+          toast.error(error.message);
+          return false;
+        }
       } catch (error) {
         console.error('Error syncing cart with server:', error);
       }
     }
+    
+    return true;
   };
 
-  const updateCartItem = async (itemId, quantity) => {
+  // 🆕 ATUALIZADO: updateCartItem com validação de stock
+  const updateCartItem = async (cartKey, quantity) => {
     const newCartItems = { ...cartItems };
 
     if (quantity <= 0) {
-      delete newCartItems[itemId];
+      delete newCartItems[cartKey];
       toast.success('Produto removido do carrinho');
     } else {
-      newCartItems[itemId] = quantity;
+      // 🎯 VALIDAR STOCK
+      const availableStock = getAvailableStock(cartKey);
+      
+      if (quantity > availableStock) {
+        toast.error(`Apenas ${availableStock} unidade(s) disponível(eis)`);
+        return false;
+      }
+      
+      newCartItems[cartKey] = quantity;
       toast.success('Carrinho atualizado');
     }
 
@@ -290,20 +387,33 @@ export const AppContextProvider = ({ children }) => {
 
     if (user) {
       try {
-        await axios.post('/api/cart/update', { cartItems: newCartItems });
+        const response = await axios.post('/api/cart/update', { cartItems: newCartItems });
+        
+        if (!response.data.success && response.data.stockErrors) {
+          // Reverter alteração local
+          setCartItems(cartItems);
+          saveCartToStorage(cartItems);
+          
+          const error = response.data.stockErrors[0];
+          toast.error(error.message);
+          return false;
+        }
       } catch (error) {
         console.error('Error syncing cart with server:', error);
       }
     }
+    
+    return true;
   };
 
-  const removeFromCart = async itemId => {
+  // 🆕 ATUALIZADO: removeFromCart suporta cartKey com variante
+  const removeFromCart = async (cartKey) => {
     const newCartItems = { ...cartItems };
 
-    if (newCartItems[itemId]) {
-      newCartItems[itemId] -= 1;
-      if (newCartItems[itemId] === 0) {
-        delete newCartItems[itemId];
+    if (newCartItems[cartKey]) {
+      newCartItems[cartKey] -= 1;
+      if (newCartItems[cartKey] === 0) {
+        delete newCartItems[cartKey];
       }
     }
 
@@ -332,15 +442,43 @@ export const AppContextProvider = ({ children }) => {
     return totalCount;
   };
 
+  // 🆕 ATUALIZADO: getCartAmount suporta cartKeys com variantes
   const getCartAmount = () => {
     let totalAmount = 0;
-    for (const items in cartItems) {
-      let itemInfo = products.find(product => product._id === items);
-      if (itemInfo && cartItems[items] > 0) {
-        totalAmount += itemInfo.offerPrice * cartItems[items];
-      }
+    
+    for (const cartKey in cartItems) {
+      if (cartItems[cartKey] <= 0) continue;
+      
+      const info = getProductInfo(cartKey);
+      if (!info) continue;
+      
+      const { product, variant } = info;
+      
+      // Usar preço da variante se existir, senão usar preço do produto
+      const price = variant?.offerPrice || variant?.price || product.offerPrice;
+      
+      totalAmount += price * cartItems[cartKey];
     }
+    
     return Math.floor(totalAmount * 100) / 100;
+  };
+
+  // 🆕 NOVO: Validar todo o carrinho antes do checkout
+  const validateCart = async () => {
+    if (Object.keys(cartItems).length === 0) {
+      return { valid: true, errors: [] };
+    }
+    
+    try {
+      const response = await axios.post('/api/cart/validate', { cartItems });
+      return {
+        valid: response.data.valid,
+        errors: response.data.results?.filter(r => !r.valid) || [],
+      };
+    } catch (error) {
+      console.error('Error validating cart:', error);
+      return { valid: false, errors: [{ message: 'Erro ao validar carrinho' }] };
+    }
   };
 
   // Axios interceptors
@@ -482,6 +620,12 @@ export const AppContextProvider = ({ children }) => {
     saveCartToStorage,
     loadCartFromStorage,
     saveUserToStorage,
+    // 🆕 NOVOS EXPORTS
+    parseCartKey,
+    createCartKey,
+    getProductInfo,
+    getAvailableStock,
+    validateCart,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

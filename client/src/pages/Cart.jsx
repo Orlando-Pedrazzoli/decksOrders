@@ -21,6 +21,11 @@ const Cart = () => {
     setShowUserLogin,
     isMobile,
     saveCartToStorage,
+    // 🆕 Novas funções do contexto
+    parseCartKey,
+    getProductInfo,
+    getAvailableStock,
+    validateCart,
   } = useAppContext();
 
   const [cartArray, setCartArray] = useState([]);
@@ -53,13 +58,46 @@ const Cart = () => {
     return true;
   };
 
+  // 🆕 ATUALIZADO: Suporta cartKeys com variantes
   const updateCartArray = () => {
     const tempArray = Object.keys(cartItems)
-      .map(key => {
-        const product = products.find(item => item._id === key);
-        return product ? { ...product, quantity: cartItems[key] } : null;
+      .map(cartKey => {
+        if (cartItems[cartKey] <= 0) return null;
+        
+        const info = getProductInfo(cartKey);
+        if (!info) return null;
+        
+        const { product, variant, productId, variantId } = info;
+        
+        // Calcular preço (usar da variante se existir)
+        const price = variant?.price || product.price;
+        const offerPrice = variant?.offerPrice || product.offerPrice;
+        
+        // Obter imagem (usar da variante se existir)
+        const image = (variant?.images && variant.images.length > 0) 
+          ? variant.images 
+          : product.image;
+        
+        // Stock disponível
+        const availableStock = getAvailableStock(cartKey);
+        
+        return {
+          ...product,
+          cartKey,
+          productId,
+          variantId,
+          variant,
+          quantity: cartItems[cartKey],
+          displayPrice: price,
+          displayOfferPrice: offerPrice,
+          displayImage: image,
+          availableStock,
+          colorName: variant?.color || null,
+          colorCode: variant?.colorCode || null,
+        };
       })
       .filter(Boolean);
+    
     setCartArray(tempArray);
   };
 
@@ -97,7 +135,7 @@ const Cart = () => {
     return Math.max(0, totalBeforeDiscount).toFixed(2);
   };
 
-  // ✅ FUNÇÃO handlePlaceOrder - APENAS PAGAMENTO ONLINE
+  // 🆕 ATUALIZADO: handlePlaceOrder com suporte a variantes
   const handlePlaceOrder = async () => {
     if (!requireLogin('fazer a encomenda')) return;
     if (!selectedAddress) {
@@ -110,17 +148,35 @@ const Cart = () => {
     }
 
     setIsProcessing(true);
+    
     try {
+      // 🎯 VALIDAR STOCK ANTES DE PROSSEGUIR
+      const validation = await validateCart();
+      
+      if (!validation.valid) {
+        const errorMessages = validation.errors
+          .map(e => e.message)
+          .join('\n');
+        toast.error(`Alguns produtos não têm stock suficiente:\n${errorMessages}`);
+        setIsProcessing(false);
+        return;
+      }
+
       // ✅ CALCULAR VALORES PARA MODELO Order COMPLETO
       const subtotal = parseFloat(getCartAmount());
       const discountAmount = discountApplied ? subtotal * 0.3 : 0;
       const finalAmount = subtotal - discountAmount;
 
+      // 🆕 Items agora incluem variantId
       const orderData = {
         userId: user._id,
         items: cartArray.map(item => ({
-          product: item._id,
+          product: item.productId,
+          variantId: item.variantId || null,
           quantity: item.quantity,
+          // Incluir dados extras para referência
+          colorName: item.colorName || null,
+          priceAtPurchase: item.displayOfferPrice,
         })),
         address: selectedAddress._id,
         originalAmount: subtotal,
@@ -291,34 +347,55 @@ const Cart = () => {
             </div>
 
             <div className='bg-white rounded-xl shadow-lg overflow-hidden divide-y divide-gray-200'>
-              {cartArray.map(product => (
+              {cartArray.map(item => (
                 <div
-                  key={product._id}
+                  key={item.cartKey}
                   className='flex flex-col sm:flex-row items-center p-4 sm:p-6'
                 >
                   <div className='flex items-center w-full sm:w-2/3 mb-4 sm:mb-0'>
+                    {/* 🆕 Usar imagem da variante se existir */}
                     <img
-                      src={product.image[0]}
-                      alt={product.name}
+                      src={item.displayImage[0]}
+                      alt={item.name}
                       className='w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border border-gray-200 shadow-sm cursor-pointer transition-transform duration-200 hover:scale-[1.02]'
                       onClick={() =>
                         navigate(
-                          `/products/${product.category.toLowerCase()}/${
-                            product._id
-                          }`
+                          `/products/${item.category.toLowerCase()}/${item.productId}`
                         )
                       }
                     />
                     <div className='ml-4 flex-grow'>
                       <h3 className='font-semibold text-lg text-gray-800'>
-                        {product.name}
+                        {item.name}
                       </h3>
+                      
+                      {/* 🆕 Mostrar cor selecionada se for variante */}
+                      {item.colorName && (
+                        <div className='flex items-center gap-2 mt-1'>
+                          <div 
+                            className='w-4 h-4 rounded-full border border-gray-300'
+                            style={{ backgroundColor: item.colorCode }}
+                          />
+                          <span className='text-sm text-gray-600'>
+                            {item.colorName}
+                          </span>
+                        </div>
+                      )}
+                      
                       <p className='text-sm text-gray-500 mt-1'>
-                        Peso: {product.weight || 'N/A'}
+                        Peso: {item.weight || 'N/A'}
                       </p>
+                      
+                      {/* 🆕 Indicador de stock baixo */}
+                      {item.availableStock <= 3 && item.availableStock > 0 && (
+                        <p className='text-xs text-orange-600 mt-1'>
+                          ⚠️ Apenas {item.availableStock} em stock
+                        </p>
+                      )}
+                      
                       <p className='font-medium text-gray-700 mt-2 text-base sm:hidden'>
                         {currency}{' '}
-                        {(product.offerPrice * product.quantity).toFixed(2)}
+                        {(item.displayOfferPrice * item.quantity).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -326,14 +403,15 @@ const Cart = () => {
                   <div className='flex justify-between items-center w-full sm:w-1/3 sm:justify-end sm:gap-8'>
                     <div className='flex items-center'>
                       <span className='mr-2 text-gray-600'>Qtd:</span>
+                      {/* 🆕 Limitar seleção ao stock disponível */}
                       <select
-                        value={cartItems[product._id]}
+                        value={item.quantity}
                         onChange={e =>
-                          updateCartItem(product._id, Number(e.target.value))
+                          updateCartItem(item.cartKey, Number(e.target.value))
                         }
                         className='border border-gray-300 rounded-md p-1 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 outline-none cursor-pointer'
                       >
-                        {[...Array(20).keys()].map(num => (
+                        {[...Array(Math.min(20, item.availableStock || 20)).keys()].map(num => (
                           <option key={num + 1} value={num + 1}>
                             {num + 1}
                           </option>
@@ -345,12 +423,13 @@ const Cart = () => {
                       <p className='font-bold text-lg text-gray-800 flex items-baseline justify-end'>
                         <span className='mr-0.5'>{currency}</span>
                         <span>
-                          {(product.offerPrice * product.quantity).toFixed(2)}
+                          {(item.displayOfferPrice * item.quantity).toFixed(2)}
                         </span>
                       </p>
                     </div>
+                    {/* 🆕 Usar cartKey para remover */}
                     <button
-                      onClick={() => removeFromCart(product._id)}
+                      onClick={() => removeFromCart(item.cartKey)}
                       className='text-red-500 hover:text-red-700 text-sm font-medium transition-colors duration-200 ml-4 cursor-pointer'
                     >
                       Remover

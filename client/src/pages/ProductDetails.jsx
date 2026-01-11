@@ -1,11 +1,12 @@
 import '../styles/ProductDetails.css';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Link, useParams } from 'react-router-dom';
 import { assets } from '../assets/assets';
 import ProductCard from '../components/ProductCard';
 import ProductReviews from '../components/ProductReviews';
 import { SEO, ProductSchema, BreadcrumbSchema } from '../components/seo';
+import toast from 'react-hot-toast';
 
 const ProductDetails = () => {
   const {
@@ -31,7 +32,10 @@ const ProductDetails = () => {
     loading: true,
   });
 
-  // 🎯 NOVO: Estados para o modal melhorado
+  // 🎯 NOVO: Estado para variante selecionada
+  const [selectedVariant, setSelectedVariant] = useState(null);
+
+  // Estados para o modal melhorado
   const [modalImageIndex, setModalImageIndex] = useState(0);
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
@@ -49,38 +53,97 @@ const ProductDetails = () => {
 
   const product = products.find(item => item._id === id);
 
-  // 🎯 NOVO: Verificação de produto inativo
-  const isInactive = !product?.inStock;
+  // 🎯 CÁLCULOS DE STOCK E VARIANTES
+  const hasVariants = product?.variants && product.variants.length > 0;
+  
+  const totalStock = useMemo(() => {
+    if (!product) return 0;
+    if (hasVariants) {
+      return product.variants.reduce((total, v) => total + (v.stock || 0), 0);
+    }
+    return product.stock || 0;
+  }, [product, hasVariants]);
 
-  // 🎯 SEO: Função para gerar descrição SEO do produto
-  const generateProductDescription = (product) => {
-    if (!product) return '';
-    const desc = Array.isArray(product.description) 
-      ? product.description[0] 
-      : product.description;
-    // Limitar a ~155 caracteres para meta description
-    return desc?.substring(0, 155) + (desc?.length > 155 ? '...' : '') || 
-      `${product.name} - Compre na Elite Surfing Portugal. Envio rápido para todo Portugal.`;
-  };
+  // Stock da variante selecionada ou stock total
+  const currentStock = useMemo(() => {
+    if (!product) return 0;
+    if (selectedVariant && hasVariants) {
+      const variant = product.variants.find(v => v._id === selectedVariant);
+      return variant?.stock || 0;
+    }
+    return hasVariants ? totalStock : (product.stock || 0);
+  }, [product, selectedVariant, hasVariants, totalStock]);
 
-  // 🎯 SEO: Gerar breadcrumbs para o produto
-  const getBreadcrumbs = () => {
+  // Imagens a exibir baseado na variante
+  const displayImages = useMemo(() => {
     if (!product) return [];
-    return [
-      { name: 'Home', url: '/' },
-      { name: 'Produtos', url: '/products' },
-      { name: product.category, url: `/products/${product.category?.toLowerCase()}` },
-      { name: product.name }
-    ];
-  };
+    if (selectedVariant && hasVariants) {
+      const variant = product.variants.find(v => v._id === selectedVariant);
+      if (variant?.images && variant.images.length > 0) {
+        return variant.images;
+      }
+    }
+    return product.image;
+  }, [product, selectedVariant, hasVariants]);
+
+  // Preço da variante (se tiver preço específico)
+  const currentPrice = useMemo(() => {
+    if (!product) return { price: 0, offerPrice: 0 };
+    if (selectedVariant && hasVariants) {
+      const variant = product.variants.find(v => v._id === selectedVariant);
+      if (variant?.offerPrice) {
+        return {
+          price: variant.price || product.price,
+          offerPrice: variant.offerPrice,
+        };
+      }
+    }
+    return {
+      price: product.price,
+      offerPrice: product.offerPrice,
+    };
+  }, [product, selectedVariant, hasVariants]);
+
+  // Variante selecionada (objeto completo)
+  const selectedVariantData = useMemo(() => {
+    if (!selectedVariant || !hasVariants) return null;
+    return product.variants.find(v => v._id === selectedVariant);
+  }, [product, selectedVariant, hasVariants]);
+
+  // Key do carrinho
+  const cartKey = selectedVariant ? `${product?._id}_${selectedVariant}` : product?._id;
+  const cartQuantity = cartItems[cartKey] || 0;
+
+  // Verificar se está inativo
+  const isInactive = totalStock === 0;
+  const isCurrentVariantOutOfStock = currentStock === 0;
+
+  // Reset quando muda de produto
+  useEffect(() => {
+    setSelectedVariant(null);
+    setCurrentImageIndex(0);
+    setThumbStartIndex(0);
+    setQuantity(1);
+  }, [id]);
+
+  // Auto-selecionar primeira variante com stock se todas as imagens principais estiverem vazias
+  useEffect(() => {
+    if (hasVariants && !selectedVariant) {
+      const firstAvailable = product.variants.find(v => v.stock > 0);
+      if (firstAvailable) {
+        // Não auto-selecionar, deixar o usuário escolher
+        // setSelectedVariant(firstAvailable._id);
+      }
+    }
+  }, [product, hasVariants, selectedVariant]);
 
   // Sincronização com cartItems
   useEffect(() => {
     if (product) {
-      const cartQuantity = cartItems[product._id] || 0;
-      setQuantity(Math.max(1, cartQuantity));
+      const qty = cartItems[cartKey] || 0;
+      setQuantity(Math.max(1, qty));
     }
-  }, [product, cartItems]);
+  }, [product, cartItems, cartKey]);
 
   useEffect(() => {
     if (product && products.length > 0) {
@@ -88,7 +151,7 @@ const ProductDetails = () => {
         item =>
           product.category === item.category &&
           item._id !== product._id &&
-          item.inStock // 🎯 NOVO: Filtrar apenas produtos ativos
+          (item.stock > 0 || (item.variants && item.variants.some(v => v.stock > 0)))
       );
       setRelatedProducts(productsCopy);
     }
@@ -132,10 +195,42 @@ const ProductDetails = () => {
     }
   };
 
-  // 🎯 NOVO: Abrir modal com índice correto (desabilitado para produtos inativos)
+  // 🎯 SEO
+  const generateProductDescription = (product) => {
+    if (!product) return '';
+    const desc = Array.isArray(product.description) 
+      ? product.description[0] 
+      : product.description;
+    return desc?.substring(0, 155) + (desc?.length > 155 ? '...' : '') || 
+      `${product.name} - Compre na Elite Surfing Portugal. Envio rápido para todo Portugal.`;
+  };
+
+  const getBreadcrumbs = () => {
+    if (!product) return [];
+    return [
+      { name: 'Home', url: '/' },
+      { name: 'Produtos', url: '/products' },
+      { name: product.category, url: `/products/${product.category?.toLowerCase()}` },
+      { name: product.name }
+    ];
+  };
+
+  // 🎯 HANDLER PARA SELEÇÃO DE COR
+  const handleColorSelect = (variantId) => {
+    if (variantId === selectedVariant) {
+      // Deselecionar
+      setSelectedVariant(null);
+    } else {
+      setSelectedVariant(variantId);
+    }
+    setCurrentImageIndex(0);
+    setThumbStartIndex(0);
+  };
+
+  // Modal handlers
   const openModal = useCallback(
     index => {
-      if (isInactive) return; // Não abrir modal para produtos inativos
+      if (isInactive && !selectedVariant) return;
       setModalImageIndex(index || currentImageIndex);
       setIsModalOpen(true);
       setIsZoomed(false);
@@ -143,10 +238,9 @@ const ProductDetails = () => {
       setImagePosition({ x: 0, y: 0 });
       document.body.style.overflow = 'hidden';
     },
-    [currentImageIndex, isInactive]
+    [currentImageIndex, isInactive, selectedVariant]
   );
 
-  // 🎯 NOVO: Fechar modal
   const closeModal = useCallback(() => {
     setIsModalOpen(false);
     setIsZoomed(false);
@@ -155,7 +249,7 @@ const ProductDetails = () => {
     document.body.style.overflow = 'auto';
   }, []);
 
-  // 🎯 NOVO: Handlers de touch para swipe
+  // Touch handlers
   const minSwipeDistance = 50;
 
   const onTouchStart = useCallback(
@@ -182,22 +276,22 @@ const ProductDetails = () => {
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
-    if (isLeftSwipe && product) {
+    if (isLeftSwipe && displayImages.length > 0) {
       const nextIndex =
-        modalImageIndex < product.image.length - 1 ? modalImageIndex + 1 : 0;
+        modalImageIndex < displayImages.length - 1 ? modalImageIndex + 1 : 0;
       setModalImageIndex(nextIndex);
       setCurrentImageIndex(nextIndex);
     }
 
-    if (isRightSwipe && product) {
+    if (isRightSwipe && displayImages.length > 0) {
       const prevIndex =
-        modalImageIndex > 0 ? modalImageIndex - 1 : product.image.length - 1;
+        modalImageIndex > 0 ? modalImageIndex - 1 : displayImages.length - 1;
       setModalImageIndex(prevIndex);
       setCurrentImageIndex(prevIndex);
     }
-  }, [touchStart, touchEnd, modalImageIndex, product, isZoomed]);
+  }, [touchStart, touchEnd, modalImageIndex, displayImages, isZoomed]);
 
-  // 🎯 NOVO: Double tap para zoom
+  // Double tap zoom
   const lastTap = useRef(0);
   const handleDoubleTap = useCallback(
     e => {
@@ -220,7 +314,7 @@ const ProductDetails = () => {
     [isZoomed]
   );
 
-  // 🎯 NOVO: Pinch to zoom para mobile
+  // Pinch zoom
   const handlePinch = useCallback(
     e => {
       if (e.touches.length === 2) {
@@ -248,7 +342,7 @@ const ProductDetails = () => {
     pinchStartDistance.current = 0;
   }, []);
 
-  // 🎯 NOVO: Arrastar imagem com zoom
+  // Drag handlers
   const handleMouseDown = useCallback(
     e => {
       if (!isZoomed) return;
@@ -276,32 +370,32 @@ const ProductDetails = () => {
     setIsDragging(false);
   }, []);
 
-  // Navegação do modal
+  // Modal navigation
   const nextModalImage = useCallback(() => {
-    if (!product) return;
+    if (displayImages.length === 0) return;
     setIsImageLoading(true);
     const newIndex =
-      modalImageIndex < product.image.length - 1 ? modalImageIndex + 1 : 0;
+      modalImageIndex < displayImages.length - 1 ? modalImageIndex + 1 : 0;
     setModalImageIndex(newIndex);
     setCurrentImageIndex(newIndex);
     setIsZoomed(false);
     setZoomLevel(1);
     setImagePosition({ x: 0, y: 0 });
-  }, [modalImageIndex, product]);
+  }, [modalImageIndex, displayImages]);
 
   const prevModalImage = useCallback(() => {
-    if (!product) return;
+    if (displayImages.length === 0) return;
     setIsImageLoading(true);
     const newIndex =
-      modalImageIndex > 0 ? modalImageIndex - 1 : product.image.length - 1;
+      modalImageIndex > 0 ? modalImageIndex - 1 : displayImages.length - 1;
     setModalImageIndex(newIndex);
     setCurrentImageIndex(newIndex);
     setIsZoomed(false);
     setZoomLevel(1);
     setImagePosition({ x: 0, y: 0 });
-  }, [modalImageIndex, product]);
+  }, [modalImageIndex, displayImages]);
 
-  // Navegação com teclado
+  // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = e => {
       if (!isModalOpen) return;
@@ -321,7 +415,7 @@ const ProductDetails = () => {
     }
   }, [isModalOpen, nextModalImage, prevModalImage, closeModal]);
 
-  // Scroll programático para o carousel mobile principal
+  // Scroll for mobile carousel
   useEffect(() => {
     if (imageScrollRef.current && window.innerWidth < 640) {
       const scrollContainer = imageScrollRef.current;
@@ -330,48 +424,93 @@ const ProductDetails = () => {
     }
   }, [currentImageIndex]);
 
+  // 🎯 QUANTITY HANDLERS COM VALIDAÇÃO DE STOCK
   const increaseQuantity = () => {
-    if (isInactive) return; // Não permitir se inativo
-    const currentCartQuantity = cartItems[product._id] || 0;
-    const newQuantity = Math.max(1, currentCartQuantity) + 1;
+    if (isInactive || isCurrentVariantOutOfStock) return;
+    
+    // Verificar se tem variantes e nenhuma selecionada
+    if (hasVariants && !selectedVariant) {
+      toast.error('Por favor, selecione uma cor');
+      return;
+    }
+    
+    const newQuantity = quantity + 1;
+    if (newQuantity > currentStock) {
+      toast.error(`Apenas ${currentStock} unidade(s) disponível(eis)`);
+      return;
+    }
+    
     setQuantity(newQuantity);
-    updateCartItem(product._id, newQuantity);
+    if (cartQuantity > 0) {
+      updateCartItem(cartKey, newQuantity);
+    }
   };
 
   const decreaseQuantity = () => {
-    if (isInactive) return; // Não permitir se inativo
-    const currentCartQuantity = cartItems[product._id] || 0;
-    if (currentCartQuantity > 1) {
-      const newQuantity = currentCartQuantity - 1;
+    if (isInactive || isCurrentVariantOutOfStock) return;
+    if (quantity > 1) {
+      const newQuantity = quantity - 1;
       setQuantity(newQuantity);
-      updateCartItem(product._id, newQuantity);
+      if (cartQuantity > 0) {
+        updateCartItem(cartKey, newQuantity);
+      }
     }
   };
 
   const handleAddToCart = () => {
-    if (isInactive) return; // Não permitir se inativo
-    addToCart(product._id);
+    if (isInactive || isCurrentVariantOutOfStock) return;
+    
+    // Verificar se tem variantes e nenhuma selecionada
+    if (hasVariants && !selectedVariant) {
+      toast.error('Por favor, selecione uma cor');
+      return;
+    }
+    
+    // Verificar stock
+    if (quantity > currentStock) {
+      toast.error(`Apenas ${currentStock} unidade(s) disponível(eis)`);
+      return;
+    }
+    
+    for (let i = 0; i < quantity; i++) {
+      addToCart(cartKey);
+    }
+    toast.success('Adicionado ao carrinho!');
   };
 
   const handleBuyNow = () => {
-    if (isInactive) return; // Não permitir se inativo
-    if (!cartItems[product._id]) {
+    if (isInactive || isCurrentVariantOutOfStock) return;
+    
+    // Verificar se tem variantes e nenhuma selecionada
+    if (hasVariants && !selectedVariant) {
+      toast.error('Por favor, selecione uma cor');
+      return;
+    }
+    
+    // Verificar stock
+    if (quantity > currentStock) {
+      toast.error(`Apenas ${currentStock} unidade(s) disponível(eis)`);
+      return;
+    }
+    
+    if (!cartQuantity) {
       for (let i = 0; i < quantity; i++) {
-        addToCart(product._id);
+        addToCart(cartKey);
       }
     }
     navigate('/cart');
   };
 
+  // Image navigation
   const changeImage = newIndex => {
-    if (isInactive) return; // Desabilitar navegação para produtos inativos
+    if (isInactive && !selectedVariant) return;
     setIsTransitioning(true);
     setCurrentImageIndex(newIndex);
 
     if (window.innerWidth >= 640) {
       if (newIndex >= thumbStartIndex + 5) {
         setThumbStartIndex(prev =>
-          Math.min(prev + 1, Math.max(0, product.image.length - 5))
+          Math.min(prev + 1, Math.max(0, displayImages.length - 5))
         );
       } else if (newIndex < thumbStartIndex) {
         setThumbStartIndex(prev => Math.max(prev - 1, 0));
@@ -382,34 +521,34 @@ const ProductDetails = () => {
   };
 
   const nextImage = () => {
-    if (isInactive) return;
-    const newIndex = (currentImageIndex + 1) % product.image.length;
+    if (isInactive && !selectedVariant) return;
+    const newIndex = (currentImageIndex + 1) % displayImages.length;
     changeImage(newIndex);
   };
 
   const prevImage = () => {
-    if (isInactive) return;
+    if (isInactive && !selectedVariant) return;
     const newIndex =
-      (currentImageIndex - 1 + product.image.length) % product.image.length;
+      (currentImageIndex - 1 + displayImages.length) % displayImages.length;
     changeImage(newIndex);
   };
 
   const scrollThumbsLeft = () => {
-    if (isInactive) return;
+    if (isInactive && !selectedVariant) return;
     const newIndex = thumbStartIndex - 1;
     setThumbStartIndex(
-      newIndex < 0 ? Math.max(0, product.image.length - 5) : newIndex
+      newIndex < 0 ? Math.max(0, displayImages.length - 5) : newIndex
     );
   };
 
   const scrollThumbsRight = () => {
-    if (isInactive) return;
+    if (isInactive && !selectedVariant) return;
     const newIndex = thumbStartIndex + 1;
-    setThumbStartIndex(newIndex > product.image.length - 5 ? 0 : newIndex);
+    setThumbStartIndex(newIndex > displayImages.length - 5 ? 0 : newIndex);
   };
 
   const selectThumbnail = index => {
-    if (isInactive) return;
+    if (isInactive && !selectedVariant) return;
     changeImage(index);
   };
 
@@ -425,6 +564,17 @@ const ProductDetails = () => {
     }
   };
 
+  // Helper para verificar cor clara
+  const isLightColor = (hexColor) => {
+    if (!hexColor) return false;
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.7;
+  };
+
   if (!product) {
     return (
       <div className='flex items-center justify-center min-h-[50vh]'>
@@ -438,11 +588,11 @@ const ProductDetails = () => {
 
   return (
     <>
-      {/* 🎯 SEO - Meta tags dinâmicas do produto */}
+      {/* SEO */}
       <SEO 
         title={product.name}
         description={generateProductDescription(product)}
-        image={product.image?.[0]}
+        image={displayImages[0]}
         url={`/products/${category || product.category?.toLowerCase()}/${id}`}
         type="product"
       >
@@ -457,14 +607,13 @@ const ProductDetails = () => {
       </SEO>
 
       <div className='mt-12 px-4 sm:px-6 md:px-16 lg:px-24 xl:px-32'>
-        {/* 🎯 MODAL MELHORADO COM SWIPE, ZOOM E GESTURES */}
+        {/* MODAL */}
         {isModalOpen && (
           <div
             className='fixed inset-0 bg-black z-50 flex items-center justify-center'
             onClick={closeModal}
             style={{ touchAction: isZoomed ? 'none' : 'pan-y' }}
           >
-            {/* Close button */}
             <button
               className='absolute top-4 right-4 text-white text-4xl hover:text-gray-300 transition-all duration-300 z-50 bg-black/50 rounded-full w-12 h-12 flex items-center justify-center'
               onClick={closeModal}
@@ -473,19 +622,16 @@ const ProductDetails = () => {
               ×
             </button>
 
-            {/* Image counter */}
             <div className='absolute top-4 left-4 text-white bg-black/50 px-3 py-1 rounded-full text-sm z-50'>
-              {modalImageIndex + 1} / {product.image.length}
+              {modalImageIndex + 1} / {displayImages.length}
             </div>
 
-            {/* Zoom indicator */}
             {isZoomed && (
               <div className='absolute bottom-20 left-1/2 transform -translate-x-1/2 text-white bg-black/50 px-3 py-1 rounded-full text-sm z-50'>
                 Zoom: {Math.round(zoomLevel * 100)}%
               </div>
             )}
 
-            {/* Main image container */}
             <div
               className='relative w-full h-full flex items-center justify-center'
               onClick={e => e.stopPropagation()}
@@ -503,17 +649,15 @@ const ProductDetails = () => {
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-              {/* Loading spinner */}
               {isImageLoading && (
                 <div className='absolute inset-0 flex items-center justify-center bg-black/50 z-40'>
                   <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-white'></div>
                 </div>
               )}
 
-              {/* Product image */}
               <img
                 ref={modalImageRef}
-                src={product.image[modalImageIndex]}
+                src={displayImages[modalImageIndex]}
                 alt={`${product.name} - Imagem ${modalImageIndex + 1}`}
                 className='max-w-full max-h-full object-contain transition-transform duration-300'
                 style={{
@@ -534,8 +678,7 @@ const ProductDetails = () => {
                 draggable={false}
               />
 
-              {/* Navigation arrows - hidden when zoomed */}
-              {!isZoomed && product.image.length > 1 && (
+              {!isZoomed && displayImages.length > 1 && (
                 <>
                   <button
                     onClick={e => {
@@ -568,11 +711,10 @@ const ProductDetails = () => {
                 </>
               )}
 
-              {/* Thumbnail strip at bottom */}
-              {!isZoomed && product.image.length > 1 && (
+              {!isZoomed && displayImages.length > 1 && (
                 <div className='absolute bottom-0 left-0 right-0 bg-black/70 p-2 sm:p-4'>
                   <div className='flex gap-2 justify-center overflow-x-auto scrollbar-hide max-w-full'>
-                    {product.image.map((image, index) => (
+                    {displayImages.map((image, index) => (
                       <button
                         key={index}
                         onClick={e => {
@@ -599,7 +741,6 @@ const ProductDetails = () => {
               )}
             </div>
 
-            {/* Instructions for mobile */}
             {!isZoomed && (
               <div className='absolute bottom-24 left-1/2 transform -translate-x-1/2 text-white text-xs bg-black/50 px-3 py-1 rounded-full opacity-75 sm:hidden'>
                 Deslize ou toque duplo para zoom
@@ -646,22 +787,21 @@ const ProductDetails = () => {
                 onScroll={() => handleImageScroll(imageScrollRef)}
                 className='flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide sm:hidden border border-gray-200 rounded-xl shadow-sm relative'
               >
-                {product.image.map((image, index) => (
+                {displayImages.map((image, index) => (
                   <img
                     key={index}
                     src={image}
                     alt={`Product image ${index + 1}`}
                     className={`w-full h-full object-contain flex-shrink-0 snap-center transition-all duration-300 ${
-                      isInactive
+                      isInactive && !selectedVariant
                         ? 'blur-sm grayscale cursor-default'
                         : 'cursor-pointer'
                     }`}
-                    onClick={() => !isInactive && openModal(index)}
+                    onClick={() => !(isInactive && !selectedVariant) && openModal(index)}
                   />
                 ))}
 
-                {/* 🎯 NOVO: Overlay de indisponível para mobile */}
-                {isInactive && (
+                {isInactive && !selectedVariant && (
                   <div className='absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px] pointer-events-none rounded-xl'>
                     <div className='bg-red-500 text-white px-6 py-3 rounded-xl font-bold text-lg shadow-2xl border-2 border-white/30 transform rotate-[-5deg] animate-pulse'>
                       INDISPONÍVEL
@@ -673,20 +813,19 @@ const ProductDetails = () => {
               {/* Desktop Main Image */}
               <div className='relative border border-gray-200 w-full h-full rounded-xl overflow-hidden hidden sm:block shadow-sm'>
                 <img
-                  src={product.image[currentImageIndex]}
+                  src={displayImages[currentImageIndex]}
                   alt='Selected product'
                   className={`w-full h-full object-contain transition-all duration-300 ${
                     isTransitioning ? 'opacity-70' : 'opacity-100'
                   } ${
-                    isInactive
+                    isInactive && !selectedVariant
                       ? 'blur-sm grayscale cursor-default'
                       : 'cursor-pointer'
                   }`}
-                  onClick={() => !isInactive && openModal(currentImageIndex)}
+                  onClick={() => !(isInactive && !selectedVariant) && openModal(currentImageIndex)}
                 />
 
-                {/* 🎯 NOVO: Overlay de indisponível para desktop */}
-                {isInactive && (
+                {isInactive && !selectedVariant && (
                   <div className='absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px] rounded-xl pointer-events-none'>
                     <div className='bg-red-500 text-white px-6 py-3 rounded-xl font-bold text-lg shadow-2xl border-2 border-white/30 transform rotate-[-5deg] animate-pulse'>
                       INDISPONÍVEL
@@ -694,15 +833,13 @@ const ProductDetails = () => {
                   </div>
                 )}
 
-                {/* Zoom hint - apenas para produtos ativos */}
-                {!isInactive && (
+                {!(isInactive && !selectedVariant) && (
                   <div className='absolute top-2 right-2 bg-black/50 text-white p-2 rounded-lg text-xs opacity-0 hover:opacity-100 transition-opacity'>
                     🔍 Clique para ampliar
                   </div>
                 )}
 
-                {/* Desktop Navigation Arrows - desabilitadas para produtos inativos */}
-                {!isInactive && product.image.length > 1 && (
+                {!(isInactive && !selectedVariant) && displayImages.length > 1 && (
                   <>
                     <button
                       onClick={e => {
@@ -736,28 +873,27 @@ const ProductDetails = () => {
 
               {/* Mobile Dots */}
               <div className='flex justify-center gap-2 mt-4 sm:hidden'>
-                {product.image.map((_, index) => (
+                {displayImages.map((_, index) => (
                   <button
                     key={index}
-                    onClick={() => !isInactive && changeImage(index)}
-                    disabled={isInactive}
+                    onClick={() => !(isInactive && !selectedVariant) && changeImage(index)}
+                    disabled={isInactive && !selectedVariant}
                     className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
                       currentImageIndex === index
                         ? 'bg-primary scale-110'
                         : 'bg-gray-300 hover:bg-gray-400'
-                    } ${isInactive ? 'cursor-not-allowed opacity-50' : ''}`}
+                    } ${(isInactive && !selectedVariant) ? 'cursor-not-allowed opacity-50' : ''}`}
                     aria-label={`Go to image ${index + 1}`}
                   ></button>
                 ))}
               </div>
             </div>
 
-            {/* Horizontal Thumbnail Carousel for Desktop */}
-            {!isInactive && (
+            {/* Thumbnail Carousel for Desktop */}
+            {!(isInactive && !selectedVariant) && (
               <div className='hidden sm:flex justify-center'>
                 <div className='flex items-center gap-2 max-w-[550px]'>
-                  {/* Left Arrow */}
-                  {product.image.length > 5 && (
+                  {displayImages.length > 5 && (
                     <button
                       onClick={scrollThumbsLeft}
                       className='p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 active:scale-90 flex-shrink-0'
@@ -770,9 +906,8 @@ const ProductDetails = () => {
                     </button>
                   )}
 
-                  {/* Thumbnail Container */}
                   <div className='flex gap-3 overflow-hidden'>
-                    {product.image
+                    {displayImages
                       .slice(thumbStartIndex, thumbStartIndex + 5)
                       .map((image, index) => (
                         <div
@@ -795,8 +930,7 @@ const ProductDetails = () => {
                       ))}
                   </div>
 
-                  {/* Right Arrow */}
-                  {product.image.length > 5 && (
+                  {displayImages.length > 5 && (
                     <button
                       onClick={scrollThumbsRight}
                       className='p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 active:scale-90 flex-shrink-0'
@@ -812,7 +946,7 @@ const ProductDetails = () => {
               </div>
             )}
 
-            {/* Accordion below horizontal carousel */}
+            {/* Accordion - Desktop */}
             <div className='hidden sm:flex justify-center'>
               <div className='w-full max-w-[550px]'>
                 <button
@@ -912,19 +1046,96 @@ const ProductDetails = () => {
               </div>
             </div>
 
+            {/* 🎯 SELETOR DE CORES */}
+            {hasVariants && (
+              <div className='bg-gray-50 p-4 rounded-lg'>
+                <div className='flex items-center justify-between mb-3'>
+                  <h3 className='text-sm font-semibold text-gray-900'>
+                    Cor: {selectedVariantData?.color || 'Selecione uma cor'}
+                  </h3>
+                  {selectedVariantData && (
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                      selectedVariantData.stock > 0 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {selectedVariantData.stock > 0 
+                        ? `${selectedVariantData.stock} em stock` 
+                        : 'Esgotado'}
+                    </span>
+                  )}
+                </div>
+                
+                <div className='flex items-center gap-3 flex-wrap'>
+                  {product.variants.map((variant) => {
+                    const variantOutOfStock = variant.stock === 0;
+                    const isSelected = selectedVariant === variant._id;
+                    
+                    return (
+                      <button
+                        key={variant._id}
+                        onClick={() => handleColorSelect(variant._id)}
+                        title={`${variant.color}${variantOutOfStock ? ' (Esgotado)' : ` - ${variant.stock} unidades`}`}
+                        className={`
+                          relative w-10 h-10 md:w-12 md:h-12 rounded-full transition-all duration-200
+                          ${isSelected 
+                            ? 'ring-4 ring-offset-2 ring-primary scale-110 shadow-lg' 
+                            : 'hover:scale-105 shadow-md'
+                          }
+                          ${variantOutOfStock && !isSelected ? 'opacity-50' : ''}
+                        `}
+                        style={{ backgroundColor: variant.colorCode }}
+                      >
+                        {/* X para variantes esgotadas */}
+                        {variantOutOfStock && (
+                          <span className='absolute inset-0 flex items-center justify-center'>
+                            <svg className='w-6 h-6 text-white drop-shadow-lg' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={3} d='M6 18L18 6M6 6l12 12' />
+                            </svg>
+                          </span>
+                        )}
+                        {/* Check para variante selecionada */}
+                        {isSelected && !variantOutOfStock && (
+                          <span className='absolute inset-0 flex items-center justify-center'>
+                            <svg className='w-5 h-5 text-white drop-shadow-lg' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={3} d='M5 13l4 4L19 7' />
+                            </svg>
+                          </span>
+                        )}
+                        {/* Borda para cores claras */}
+                        <span 
+                          className='absolute inset-0 rounded-full border-2'
+                          style={{ 
+                            borderColor: isLightColor(variant.colorCode) ? '#d1d5db' : 'transparent' 
+                          }}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                {/* Aviso se nenhuma cor selecionada */}
+                {!selectedVariant && !isInactive && (
+                  <p className='text-xs text-orange-600 mt-2'>
+                    ⚠️ Por favor, selecione uma cor para continuar
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Price Section */}
             <div className='bg-gray-50 p-3 md:p-4 rounded-lg'>
               <div className='space-y-1'>
                 <p className='text-gray-500 text-sm line-through'>
                   De:{' '}
-                  {product.price.toLocaleString('pt-PT', {
+                  {currentPrice.price.toLocaleString('pt-PT', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{' '}
                   {currency}
                 </p>
                 <p className='text-xl md:text-2xl font-bold text-gray-900'>
-                  {product.offerPrice.toLocaleString('pt-PT', {
+                  {currentPrice.offerPrice.toLocaleString('pt-PT', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{' '}
@@ -934,7 +1145,7 @@ const ProductDetails = () => {
               </div>
             </div>
 
-            {/* Product Description - Mobile/Tablet only */}
+            {/* Description - Mobile */}
             <div className='sm:hidden'>
               <button
                 onClick={() => setIsDescriptionOpen(!isDescriptionOpen)}
@@ -976,35 +1187,50 @@ const ProductDetails = () => {
               )}
             </div>
 
-            {/* 🎯 ATUALIZADO: Quantity Selector com verificação de inativo */}
+            {/* Quantity Selector */}
             <div
               className={`bg-white border p-3 md:p-4 rounded-lg transition-all duration-300 ${
-                isInactive ? 'border-red-200 bg-red-50/30' : 'border-gray-200'
+                isInactive || isCurrentVariantOutOfStock ? 'border-red-200 bg-red-50/30' : 'border-gray-200'
               }`}
             >
               <div className='space-y-3'>
                 {/* Stock Status */}
-                <div className='flex items-center gap-2'>
-                  <div
-                    className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
-                      isInactive
-                        ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50'
-                        : 'bg-green-500 shadow-lg shadow-green-500/50'
-                    }`}
-                  ></div>
-                  <span
-                    className={`text-sm font-medium transition-colors duration-300 ${
-                      isInactive ? 'text-red-700' : 'text-green-700'
-                    }`}
-                  >
-                    {isInactive
-                      ? 'Produto Indisponível'
-                      : 'Em Stock - Pronto para envio'}
-                  </span>
+                <div className='flex items-center justify-between'>
+                  <div className='flex items-center gap-2'>
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
+                        isInactive || isCurrentVariantOutOfStock
+                          ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50'
+                          : 'bg-green-500 shadow-lg shadow-green-500/50'
+                      }`}
+                    ></div>
+                    <span
+                      className={`text-sm font-medium transition-colors duration-300 ${
+                        isInactive || isCurrentVariantOutOfStock ? 'text-red-700' : 'text-green-700'
+                      }`}
+                    >
+                      {isInactive || isCurrentVariantOutOfStock
+                        ? 'Produto Indisponível'
+                        : 'Em Stock - Pronto para envio'}
+                    </span>
+                  </div>
+                  
+                  {/* 🎯 INDICADOR DE STOCK */}
+                  {!isInactive && !isCurrentVariantOutOfStock && currentStock > 0 && (
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                      currentStock <= 3 
+                        ? 'bg-orange-100 text-orange-700' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {currentStock <= 3 
+                        ? `Últimas ${currentStock} unidades!` 
+                        : `${currentStock} disponíveis`}
+                    </span>
+                  )}
                 </div>
 
-                {/* Quantity Selector - Apenas se produto estiver ativo */}
-                {!isInactive && (
+                {/* Quantity Selector */}
+                {!isInactive && !isCurrentVariantOutOfStock && (
                   <div>
                     <label className='block text-sm font-semibold text-gray-900 mb-2'>
                       Quantidade
@@ -1013,7 +1239,7 @@ const ProductDetails = () => {
                       <button
                         onClick={decreaseQuantity}
                         className='w-10 h-10 flex items-center justify-center border border-gray-300 rounded-l-lg hover:bg-gray-50 transition-colors duration-200 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed'
-                        disabled={quantity <= 1 && !cartItems[product._id]}
+                        disabled={quantity <= 1}
                       >
                         −
                       </button>
@@ -1022,37 +1248,45 @@ const ProductDetails = () => {
                       </div>
                       <button
                         onClick={increaseQuantity}
-                        className='w-10 h-10 flex items-center justify-center border border-gray-300 rounded-r-lg hover:bg-gray-50 transition-colors duration-200 text-lg font-medium'
+                        disabled={quantity >= currentStock}
+                        className={`w-10 h-10 flex items-center justify-center border border-gray-300 rounded-r-lg hover:bg-gray-50 transition-colors duration-200 text-lg font-medium ${
+                          quantity >= currentStock ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
                       >
                         +
                       </button>
                     </div>
-                    {cartItems[product._id] && (
+                    {cartQuantity > 0 && (
                       <p className='text-xs text-primary mt-1'>
-                        {cartItems[product._id]}{' '}
-                        {cartItems[product._id] === 1 ? 'item' : 'itens'} no
-                        carrinho
+                        {cartQuantity}{' '}
+                        {cartQuantity === 1 ? 'item' : 'itens'} no carrinho
+                      </p>
+                    )}
+                    {quantity >= currentStock && (
+                      <p className='text-xs text-orange-600 mt-1'>
+                        Quantidade máxima disponível
                       </p>
                     )}
                   </div>
                 )}
 
-                {/* Mensagem quando produto está inativo */}
-                {isInactive && (
+                {/* Mensagem quando indisponível */}
+                {(isInactive || isCurrentVariantOutOfStock) && (
                   <div className='bg-red-50 border border-red-200 rounded-lg p-3'>
                     <p className='text-sm text-red-700 text-center'>
-                      Este produto está temporariamente indisponível
+                      {hasVariants && !selectedVariant 
+                        ? 'Selecione uma cor para ver a disponibilidade'
+                        : 'Este produto está temporariamente indisponível'}
                     </p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* 🎯 ATUALIZADO: Action Buttons com verificação de inativo */}
+            {/* Action Buttons */}
             <div className='space-y-3'>
-              {isInactive ? (
+              {isInactive || isCurrentVariantOutOfStock ? (
                 <>
-                  {/* Alerta de Indisponibilidade */}
                   <div className='bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-5 text-center transform transition-all duration-300 hover:scale-[1.02]'>
                     <div className='flex items-center justify-center gap-3 mb-3'>
                       <svg
@@ -1067,17 +1301,18 @@ const ProductDetails = () => {
                         />
                       </svg>
                       <span className='text-red-700 font-bold text-xl'>
-                        PRODUTO INDISPONÍVEL
+                        {hasVariants && !selectedVariant 
+                          ? 'SELECIONE UMA COR' 
+                          : 'PRODUTO INDISPONÍVEL'}
                       </span>
                     </div>
                     <p className='text-red-600 text-sm leading-relaxed'>
-                      Este produto está temporariamente indisponível. <br />
-                      Entre em contacto connosco para saber quando voltará ao
-                      stock.
+                      {hasVariants && !selectedVariant 
+                        ? 'Por favor, selecione uma cor disponível para adicionar ao carrinho.'
+                        : 'Este produto está temporariamente indisponível. Entre em contacto connosco para saber quando voltará ao stock.'}
                     </p>
                   </div>
 
-                  {/* Botões Desabilitados */}
                   <button
                     disabled
                     className='w-full py-3.5 px-4 text-base font-semibold bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed opacity-70 flex items-center justify-center gap-2'
@@ -1118,7 +1353,6 @@ const ProductDetails = () => {
                     Comprar Agora - Indisponível
                   </button>
 
-                  {/* Botão de Contacto */}
                   <button
                     onClick={() => navigate('/contact')}
                     className='w-full py-3 px-4 text-base font-semibold bg-primary/10 text-primary border-2 border-primary rounded-lg hover:bg-primary hover:text-white transition-all duration-300 active:scale-[0.98]'
@@ -1130,30 +1364,44 @@ const ProductDetails = () => {
                 <>
                   <button
                     onClick={handleAddToCart}
-                    className='w-full py-3 px-4 text-base font-semibold bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-all duration-300 active:scale-[0.98] border border-gray-200'
+                    disabled={hasVariants && !selectedVariant}
+                    className={`w-full py-3 px-4 text-base font-semibold rounded-lg transition-all duration-300 active:scale-[0.98] border ${
+                      hasVariants && !selectedVariant
+                        ? 'bg-gray-200 text-gray-500 border-gray-300 cursor-not-allowed'
+                        : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
+                    }`}
                   >
-                    Adicionar ao Carrinho
+                    {hasVariants && !selectedVariant 
+                      ? 'Selecione uma cor primeiro' 
+                      : 'Adicionar ao Carrinho'}
                   </button>
 
                   <button
                     onClick={handleBuyNow}
-                    className='w-full py-3 px-4 text-base font-semibold bg-primary text-white rounded-lg hover:bg-primary-dull transition-all duration-300 active:scale-[0.98] shadow-lg hover:shadow-xl'
+                    disabled={hasVariants && !selectedVariant}
+                    className={`w-full py-3 px-4 text-base font-semibold rounded-lg transition-all duration-300 active:scale-[0.98] shadow-lg hover:shadow-xl ${
+                      hasVariants && !selectedVariant
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                        : 'bg-primary text-white hover:bg-primary-dull'
+                    }`}
                   >
-                    Comprar Agora
+                    {hasVariants && !selectedVariant 
+                      ? 'Selecione uma cor primeiro' 
+                      : 'Comprar Agora'}
                   </button>
                 </>
               )}
             </div>
 
-            {/* 🎯 ATUALIZADO: Additional Info com verificação de inativo */}
+            {/* Additional Info */}
             <div
               className={`p-3 md:p-4 rounded-lg transition-all duration-300 ${
-                isInactive
+                isInactive || isCurrentVariantOutOfStock
                   ? 'bg-red-50 border border-red-200'
                   : 'bg-blue-50 border border-blue-200'
               }`}
             >
-              {isInactive ? (
+              {isInactive || isCurrentVariantOutOfStock ? (
                 <div className='space-y-2 text-center'>
                   <p className='text-red-700 font-semibold'>
                     🚫 Produto Temporariamente Indisponível

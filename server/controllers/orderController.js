@@ -1,5 +1,5 @@
 // server/controllers/orderController.js
-// VERSÃO COM SUPORTE A MB WAY E MULTIBANCO
+// VERSÃO COM SUPORTE A MB WAY, MULTIBANCO E GESTÃO DE STOCK
 
 import { sendOrderConfirmationEmail } from '../services/emailService.js';
 import Order from '../models/Order.js';
@@ -19,6 +19,76 @@ try {
 } catch (error) {
   console.log('⚠️ Serviço de notificação admin não disponível:', error.message);
 }
+
+// =============================================================================
+// 🆕 FUNÇÃO PARA VALIDAR E DECREMENTAR STOCK
+// =============================================================================
+const validateAndDecrementStock = async (items) => {
+  const stockErrors = [];
+  const decrementOperations = [];
+  
+  for (const item of items) {
+    const product = await Product.findById(item.product);
+    
+    if (!product) {
+      stockErrors.push({
+        productId: item.product,
+        message: 'Produto não encontrado',
+      });
+      continue;
+    }
+    
+    // Verificar stock (considerando variante se existir)
+    let availableStock;
+    let variantId = item.variantId || null;
+    
+    if (variantId && product.variants && product.variants.length > 0) {
+      const variant = product.variants.id(variantId);
+      if (!variant) {
+        stockErrors.push({
+          productId: item.product,
+          productName: product.name,
+          message: 'Variante não encontrada',
+        });
+        continue;
+      }
+      availableStock = variant.stock;
+    } else {
+      availableStock = product.stock;
+    }
+    
+    if (item.quantity > availableStock) {
+      stockErrors.push({
+        productId: item.product,
+        productName: product.name,
+        requestedQuantity: item.quantity,
+        availableStock,
+        message: availableStock === 0 
+          ? `"${product.name}" está esgotado`
+          : `"${product.name}" tem apenas ${availableStock} unidade(s)`,
+      });
+    } else {
+      decrementOperations.push({
+        product,
+        quantity: item.quantity,
+        variantId,
+      });
+    }
+  }
+  
+  return { stockErrors, decrementOperations };
+};
+
+const executeStockDecrement = async (decrementOperations) => {
+  for (const op of decrementOperations) {
+    try {
+      await op.product.decrementStock(op.quantity, op.variantId);
+      console.log(`📦 Stock decrementado: ${op.product.name} (-${op.quantity})`);
+    } catch (error) {
+      console.error(`❌ Erro ao decrementar stock de ${op.product.name}:`, error.message);
+    }
+  }
+};
 
 // =============================================================================
 // FUNÇÃO PARA ENVIAR EMAIL AO CLIENTE (ORIGINAL QUE FUNCIONAVA)
@@ -63,7 +133,7 @@ const sendClientEmail = async (order, userId) => {
 };
 
 // =============================================================================
-// PLACE ORDER COD - USANDO MODELO Order COMPLETO
+// PLACE ORDER COD - COM VALIDAÇÃO DE STOCK
 // =============================================================================
 export const placeOrderCOD = async (req, res) => {
   try {
@@ -82,6 +152,17 @@ export const placeOrderCOD = async (req, res) => {
 
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
+    }
+
+    // 🎯 VALIDAR STOCK ANTES DE CRIAR O PEDIDO
+    const { stockErrors, decrementOperations } = await validateAndDecrementStock(items);
+    
+    if (stockErrors.length > 0) {
+      return res.json({
+        success: false,
+        message: 'Alguns produtos não têm stock suficiente',
+        stockErrors,
+      });
     }
 
     // ✅ CRIAR PEDIDO COM TODOS OS CAMPOS DO MODELO
@@ -105,6 +186,9 @@ export const placeOrderCOD = async (req, res) => {
       discountAmount: newOrder.discountAmount,
     });
 
+    // 🎯 DECREMENTAR STOCK APÓS CRIAR O PEDIDO
+    await executeStockDecrement(decrementOperations);
+
     // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
@@ -125,7 +209,7 @@ export const placeOrderCOD = async (req, res) => {
 };
 
 // =============================================================================
-// PLACE ORDER STRIPE - COM SUPORTE A MB WAY E MULTIBANCO
+// PLACE ORDER STRIPE - COM VALIDAÇÃO DE STOCK
 // =============================================================================
 export const placeOrderStripe = async (req, res) => {
   console.log('🚀 STRIPE FUNCTION STARTED!!!');
@@ -142,26 +226,25 @@ export const placeOrderStripe = async (req, res) => {
       discountPercentage,
       promoCode,
       paymentType,
-      paymentMethod, // ✅ NOVO: 'card', 'mbway', 'multibanco'
+      paymentMethod,
       isPaid,
     } = req.body;
 
     const { origin } = req.headers;
 
-    console.log('🔍 All fields extracted:', {
-      userId,
-      items,
-      address,
-      originalAmount,
-      amount,
-      discountAmount,
-      discountPercentage,
-      promoCode,
-      paymentMethod,
-    });
-
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
+    }
+
+    // 🎯 VALIDAR STOCK ANTES DE CRIAR O PEDIDO
+    const { stockErrors } = await validateAndDecrementStock(items);
+    
+    if (stockErrors.length > 0) {
+      return res.json({
+        success: false,
+        message: 'Alguns produtos não têm stock suficiente',
+        stockErrors,
+      });
     }
 
     let productData = [];
@@ -176,21 +259,7 @@ export const placeOrderStripe = async (req, res) => {
       });
     }
 
-    console.log('🔍 Creating order with:', {
-      userId,
-      items,
-      amount,
-      address,
-      paymentType: 'Online',
-      paymentMethod: paymentMethod || 'card',
-      isPaid: false,
-      promoCode: promoCode || '',
-      discountAmount: discountAmount || 0,
-      discountPercentage: discountPercentage || 0,
-      originalAmount,
-    });
-
-    // ✅ CRIAR PEDIDO COM TODOS OS CAMPOS DO MODELO
+    // ✅ CRIAR PEDIDO (stock será decrementado após confirmação do pagamento)
     const order = await Order.create({
       userId,
       items,
@@ -216,7 +285,6 @@ export const placeOrderStripe = async (req, res) => {
 
     // create line items for stripe
     const line_items = productData.map(item => {
-      // Se há desconto, aplicar proporcionalmente
       let itemPrice = item.price;
       if (discountPercentage > 0) {
         itemPrice = item.price * (1 - discountPercentage / 100);
@@ -237,7 +305,7 @@ export const placeOrderStripe = async (req, res) => {
       };
     });
 
-    // ✅ CONFIGURAR MÉTODOS DE PAGAMENTO BASEADO NA ESCOLHA DO UTILIZADOR
+    // ✅ CONFIGURAR MÉTODOS DE PAGAMENTO
     let payment_method_types;
     
     switch (paymentMethod) {
@@ -267,24 +335,24 @@ export const placeOrderStripe = async (req, res) => {
         orderId: order._id.toString(),
         userId,
         paymentMethod: paymentMethod || 'card',
+        // 🎯 Guardar items para decrementar stock no webhook
+        items: JSON.stringify(items.map(i => ({
+          product: i.product.toString(),
+          quantity: i.quantity,
+          variantId: i.variantId || null,
+        }))),
       },
     };
 
-    // ✅ PARA MB WAY, ADICIONAR CONFIGURAÇÕES ESPECÍFICAS
     if (paymentMethod === 'mbway') {
       sessionOptions.payment_method_options = {
-        mb_way: {
-          // MB Way requer número de telefone - será solicitado no checkout
-        },
+        mb_way: {},
       };
     }
 
-    // ✅ PARA MULTIBANCO, ADICIONAR CONFIGURAÇÕES ESPECÍFICAS
     if (paymentMethod === 'multibanco') {
       sessionOptions.payment_method_options = {
-        multibanco: {
-          // Multibanco gera referência automaticamente
-        },
+        multibanco: {},
       };
     }
 
@@ -301,10 +369,9 @@ export const placeOrderStripe = async (req, res) => {
 };
 
 // =============================================================================
-// STRIPE WEBHOOKS - ATUALIZADO PARA MB WAY E MULTIBANCO
+// STRIPE WEBHOOKS - COM DECREMENTO DE STOCK
 // =============================================================================
 export const stripeWebhooks = async (request, response) => {
-  // Stripe Gateway Initialize
   const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
 
   const sig = request.headers['stripe-signature'];
@@ -323,14 +390,12 @@ export const stripeWebhooks = async (request, response) => {
 
   // Handle the event
   switch (event.type) {
-    // ✅ CHECKOUT SESSION COMPLETED - PRINCIPAL PARA TODOS OS MÉTODOS
     case 'checkout.session.completed': {
       const session = event.data.object;
       console.log('✅ Checkout Session Completed:', session.id);
       
-      const { orderId, userId, paymentMethod } = session.metadata;
+      const { orderId, userId, paymentMethod, items } = session.metadata;
       
-      // Verificar se o pagamento foi confirmado
       if (session.payment_status === 'paid') {
         console.log(`💳 Pagamento ${paymentMethod} confirmado para pedido:`, orderId);
         
@@ -343,6 +408,24 @@ export const stripeWebhooks = async (request, response) => {
         
         console.log('✅ Pedido marcado como pago:', orderId);
         
+        // 🎯 DECREMENTAR STOCK APÓS PAGAMENTO CONFIRMADO
+        if (items) {
+          try {
+            const parsedItems = JSON.parse(items);
+            const { decrementOperations } = await validateAndDecrementStock(
+              parsedItems.map(i => ({
+                product: i.product,
+                quantity: i.quantity,
+                variantId: i.variantId,
+              }))
+            );
+            await executeStockDecrement(decrementOperations);
+            console.log('📦 Stock decrementado após pagamento Stripe');
+          } catch (stockError) {
+            console.error('❌ Erro ao decrementar stock:', stockError.message);
+          }
+        }
+        
         // Clear user cart
         await User.findByIdAndUpdate(userId, { cartItems: {} });
 
@@ -353,13 +436,11 @@ export const stripeWebhooks = async (request, response) => {
           });
         }
       } else if (session.payment_status === 'unpaid' && paymentMethod === 'multibanco') {
-        // Multibanco: pagamento pendente (aguardando referência ser paga)
         console.log('⏳ Multibanco: Aguardando pagamento da referência para pedido:', orderId);
       }
       break;
     }
 
-    // ✅ PAYMENT INTENT SUCCEEDED
     case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object;
       const paymentIntentId = paymentIntent.id;
@@ -367,7 +448,6 @@ export const stripeWebhooks = async (request, response) => {
       console.log('💳 Pagamento confirmado (payment_intent.succeeded):', paymentIntentId);
 
       try {
-        // Getting Session Metadata
         const session = await stripeInstance.checkout.sessions.list({
           payment_intent: paymentIntentId,
         });
@@ -377,9 +457,8 @@ export const stripeWebhooks = async (request, response) => {
           break;
         }
 
-        const { orderId, userId, paymentMethod } = session.data[0].metadata;
+        const { orderId, userId, paymentMethod, items } = session.data[0].metadata;
         
-        // Mark Payment as Paid
         const updatedOrder = await Order.findByIdAndUpdate(
           orderId, 
           { isPaid: true },
@@ -388,10 +467,11 @@ export const stripeWebhooks = async (request, response) => {
         
         console.log(`✅ Pedido ${paymentMethod} marcado como pago:`, orderId);
         
-        // Clear user cart
+        // 🎯 DECREMENTAR STOCK (pode já ter sido feito no checkout.session.completed)
+        // Verificar se já foi decrementado para evitar duplicação
+        
         await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-        // ✅ ENVIAR EMAIL APÓS PAGAMENTO CONFIRMADO
         if (updatedOrder) {
           sendClientEmail(updatedOrder, userId).catch(err => {
             console.error('❌ Erro no email Stripe (background):', err.message);
@@ -403,7 +483,6 @@ export const stripeWebhooks = async (request, response) => {
       break;
     }
 
-    // ✅ PAYMENT INTENT FAILED
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object;
       const paymentIntentId = paymentIntent.id;
@@ -417,16 +496,17 @@ export const stripeWebhooks = async (request, response) => {
 
         if (session.data && session.data.length > 0) {
           const { orderId } = session.data[0].metadata;
-          await Order.findByIdAndDelete(orderId);
-          console.log('🗑️ Pedido deletado:', orderId);
+          // 🎯 NÃO deletar o pedido, apenas marcar como cancelado
+          // O stock NÃO foi decrementado ainda (só decrementa após pagamento)
+          await Order.findByIdAndUpdate(orderId, { status: 'Cancelled' });
+          console.log('🗑️ Pedido marcado como cancelado:', orderId);
         }
       } catch (error) {
-        console.error('❌ Erro ao deletar pedido:', error.message);
+        console.error('❌ Erro ao cancelar pedido:', error.message);
       }
       break;
     }
 
-    // ✅ MULTIBANCO: SOURCE CHARGEABLE (referência gerada)
     case 'source.chargeable': {
       const source = event.data.object;
       if (source.type === 'multibanco') {
@@ -446,7 +526,7 @@ export const stripeWebhooks = async (request, response) => {
 };
 
 // =============================================================================
-// GET USER ORDERS - HÍBRIDO (funciona com GET e POST)
+// GET USER ORDERS
 // =============================================================================
 export const getUserOrders = async (req, res) => {
   try {
@@ -465,7 +545,7 @@ export const getUserOrders = async (req, res) => {
     })
       .populate({
         path: 'items.product',
-        select: 'name image category offerPrice weight',
+        select: 'name image category offerPrice weight variants',
       })
       .populate({
         path: 'address',
@@ -530,13 +610,34 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderId).populate('items.product');
 
     if (!order) {
       return res.json({
         success: false,
         message: 'Pedido não encontrado',
       });
+    }
+
+    // 🎯 SE CANCELAR, DEVOLVER STOCK
+    if (status === 'Cancelled' && order.status !== 'Cancelled') {
+      console.log('🔄 Devolvendo stock para pedido cancelado:', orderId);
+      
+      for (const item of order.items) {
+        const product = await Product.findById(item.product._id || item.product);
+        if (product) {
+          if (item.variantId && product.variants) {
+            const variant = product.variants.id(item.variantId);
+            if (variant) {
+              variant.stock += item.quantity;
+            }
+          } else {
+            product.stock += item.quantity;
+          }
+          await product.save();
+          console.log(`📦 Stock devolvido: ${product.name} (+${item.quantity})`);
+        }
+      }
     }
 
     const updatedOrder = await Order.findByIdAndUpdate(
