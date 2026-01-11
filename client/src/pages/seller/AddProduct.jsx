@@ -32,58 +32,28 @@ const AddProduct = () => {
   // 🆕 STOCK
   const [stock, setStock] = useState('');
   
-  // 🆕 VARIANTES
-  const [hasVariants, setHasVariants] = useState(false);
-  const [variants, setVariants] = useState([]);
-  const [showVariantForm, setShowVariantForm] = useState(false);
-  const [newVariant, setNewVariant] = useState({
-    color: '',
-    colorCode: '#000000',
-    stock: '',
-  });
+  // 🆕 SISTEMA DE FAMÍLIA DE PRODUTOS
+  const [productFamily, setProductFamily] = useState('');
+  const [color, setColor] = useState('');
+  const [colorCode, setColorCode] = useState('#000000');
+  const [hasColor, setHasColor] = useState(false);
 
   const { axios } = useAppContext();
 
-  // 🎯 ADICIONAR VARIANTE
-  const addVariant = () => {
-    if (!newVariant.color.trim()) {
-      toast.error('Nome da cor é obrigatório');
-      return;
-    }
-    if (!newVariant.colorCode) {
-      toast.error('Código da cor é obrigatório');
-      return;
-    }
-    
-    // Verificar duplicados
-    if (variants.some(v => v.color.toLowerCase() === newVariant.color.toLowerCase())) {
-      toast.error('Já existe uma variante com esta cor');
-      return;
-    }
-    
-    setVariants([...variants, {
-      ...newVariant,
-      stock: parseInt(newVariant.stock) || 0,
-      id: Date.now(), // ID temporário
-    }]);
-    
-    setNewVariant({ color: '', colorCode: '#000000', stock: '' });
-    setShowVariantForm(false);
-    toast.success('Variante adicionada!');
-  };
-
-  // 🎯 REMOVER VARIANTE
-  const removeVariant = (id) => {
-    setVariants(variants.filter(v => v.id !== id));
-  };
-
   // 🎯 SELECIONAR COR PRÉ-DEFINIDA
   const selectPresetColor = (preset) => {
-    setNewVariant({
-      ...newVariant,
-      color: preset.name,
-      colorCode: preset.code,
-    });
+    setColor(preset.name);
+    setColorCode(preset.code);
+  };
+
+  // 🎯 GERAR SLUG PARA FAMÍLIA
+  const generateFamilySlug = (text) => {
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
   };
 
   const onSubmitHandler = async event => {
@@ -95,388 +65,330 @@ const AddProduct = () => {
         return;
       }
 
-      // Validar stock
-      if (!hasVariants && (!stock || parseInt(stock) < 0)) {
+      if (!stock || parseInt(stock) < 0) {
         toast.error('Defina a quantidade em stock');
         return;
       }
 
-      if (hasVariants && variants.length === 0) {
-        toast.error('Adicione pelo menos uma variante de cor');
+      if (hasColor && !color.trim()) {
+        toast.error('Defina o nome da cor');
         return;
       }
 
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('images', file);
+      });
+
       const productData = {
         name,
-        description: description.split('\n'),
+        description: description.split('\n').filter(line => line.trim()),
         category,
-        price: parseFloat(price),
-        offerPrice: parseFloat(offerPrice),
-        stock: hasVariants ? 0 : parseInt(stock),
-        variants: hasVariants ? variants.map(v => ({
-          color: v.color,
-          colorCode: v.colorCode,
-          stock: parseInt(v.stock) || 0,
-          images: [], // Imagens serão adicionadas depois via upload
-        })) : [],
+        price: Number(price),
+        offerPrice: Number(offerPrice),
+        stock: parseInt(stock) || 0,
       };
 
-      const formData = new FormData();
-      formData.append('productData', JSON.stringify(productData));
-      for (let i = 0; i < files.length; i++) {
-        formData.append('images', files[i]);
+      // Adicionar dados de família/cor se definidos
+      if (productFamily.trim()) {
+        productData.productFamily = generateFamilySlug(productFamily);
       }
+      
+      if (hasColor && color.trim()) {
+        productData.color = color;
+        productData.colorCode = colorCode;
+        
+        // Se tem cor mas não tem família, usar o nome base como família
+        if (!productFamily.trim()) {
+          // Extrair nome base (sem a cor)
+          const baseName = name.replace(new RegExp(color, 'gi'), '').trim();
+          if (baseName) {
+            productData.productFamily = generateFamilySlug(baseName);
+          }
+        }
+      }
+
+      formData.append('productData', JSON.stringify(productData));
 
       const { data } = await axios.post('/api/product/add', formData);
 
       if (data.success) {
-        toast.success(data.message);
+        toast.success('Produto adicionado com sucesso!');
         // Reset form
+        setFiles([]);
         setName('');
         setDescription('');
         setCategory('');
         setPrice('');
         setOfferPrice('');
         setStock('');
-        setFiles([]);
-        setHasVariants(false);
-        setVariants([]);
+        setProductFamily('');
+        setColor('');
+        setColorCode('#000000');
+        setHasColor(false);
       } else {
-        toast.error(data.message);
+        toast.error(data.message || 'Erro ao adicionar produto');
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error('Erro:', error);
+      toast.error(error.response?.data?.message || 'Erro ao adicionar produto');
     }
   };
 
+  // Handle file selection
+  const handleFileChange = (e) => {
+    const newFiles = Array.from(e.target.files);
+    setFiles(prev => [...prev, ...newFiles]);
+  };
+
+  // Remove a file
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   return (
-    <div className='no-scrollbar flex-1 h-[95vh] overflow-y-scroll flex flex-col justify-between'>
-      <form
-        onSubmit={onSubmitHandler}
-        className='md:p-10 p-4 space-y-5 max-w-2xl'
-      >
-        {/* Imagens */}
+    <div className="no-scrollbar flex-1 h-[95vh] overflow-y-scroll flex flex-col justify-between">
+      <form onSubmit={onSubmitHandler} className="md:p-10 p-4 space-y-5 max-w-lg">
+        <h2 className="text-2xl font-semibold mb-6">Adicionar Produto</h2>
+
+        {/* Images */}
         <div>
-          <p className='text-base font-medium'>Imagens do Produto</p>
-          <div className='flex flex-wrap items-center gap-3 mt-2'>
-            {Array(8)
-              .fill('')
-              .map((_, index) => (
-                <label key={index} htmlFor={`image${index}`}>
-                  <input
-                    onChange={e => {
-                      const updatedFiles = [...files];
-                      updatedFiles[index] = e.target.files[0];
-                      setFiles(updatedFiles);
-                    }}
-                    type='file'
-                    id={`image${index}`}
-                    hidden
-                    accept='image/*'
-                  />
-                  <img
-                    className='max-w-24 cursor-pointer border border-gray-300 rounded-lg'
-                    src={
-                      files[index]
-                        ? URL.createObjectURL(files[index])
-                        : assets.upload_area
-                    }
-                    alt='uploadArea'
-                    width={100}
-                    height={100}
-                  />
-                </label>
-              ))}
+          <p className="text-base font-medium">Imagens do Produto</p>
+          <div className="flex flex-wrap gap-3 mt-2">
+            {files.map((file, index) => (
+              <div key={index} className="relative">
+                <img
+                  className="max-w-24 h-24 object-cover rounded border"
+                  src={URL.createObjectURL(file)}
+                  alt={`Preview ${index + 1}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeFile(index)}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <label htmlFor="image-upload" className="cursor-pointer">
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                multiple
+                hidden
+              />
+              <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded flex items-center justify-center hover:border-primary transition-colors">
+                <img src={assets.upload_area} alt="Upload" className="w-10 h-10 opacity-50" />
+              </div>
+            </label>
           </div>
+          <p className="text-xs text-gray-500 mt-1">
+            {files.length} imagem(ns) selecionada(s)
+          </p>
         </div>
 
-        {/* Nome */}
-        <div className='flex flex-col gap-1 max-w-md'>
-          <label className='text-base font-medium' htmlFor='product-name'>
-            Nome do Produto
-          </label>
+        {/* Name */}
+        <div className="flex flex-col gap-1">
+          <label className="text-base font-medium">Nome do Produto</label>
           <input
-            onChange={e => setName(e.target.value)}
+            type="text"
+            placeholder="Ex: Deck J-Bay Preto"
+            className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
             value={name}
-            id='product-name'
-            type='text'
-            placeholder='Ex: Deck Noronha Pro'
-            className='outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40'
+            onChange={e => setName(e.target.value)}
             required
           />
         </div>
 
-        {/* Descrição */}
-        <div className='flex flex-col gap-1 max-w-md'>
-          <label className='text-base font-medium' htmlFor='product-description'>
-            Descrição do Produto (uma especificação por linha)
-          </label>
+        {/* Description */}
+        <div className="flex flex-col gap-1">
+          <label className="text-base font-medium">Descrição / Especificações</label>
           <textarea
-            onChange={e => setDescription(e.target.value)}
-            value={description}
-            id='product-description'
             rows={4}
-            className='outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40 resize-none'
-            placeholder='Material: EVA&#10;Tamanho: 30x90cm&#10;Adesivo: 3M'
-          ></textarea>
+            placeholder="Escreva cada especificação numa linha separada"
+            className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40 resize-none"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            required
+          />
+          <p className="text-xs text-gray-500">Cada linha será um item da lista</p>
         </div>
 
-        {/* Categoria */}
-        <div className='w-full flex flex-col gap-1 max-w-md'>
-          <label className='text-base font-medium' htmlFor='category'>
-            Categoria
-          </label>
+        {/* Category */}
+        <div className="flex flex-col gap-1">
+          <label className="text-base font-medium">Categoria</label>
           <select
-            onChange={e => setCategory(e.target.value)}
+            className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
             value={category}
-            id='category'
-            className='outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40'
+            onChange={e => setCategory(e.target.value)}
             required
           >
-            <option value=''>Selecione a Categoria</option>
-            {categories.map((item, index) => (
-              <option key={index} value={item.path}>
-                {item.path}
+            <option value="">Selecionar Categoria</option>
+            {categories.map((cat, index) => (
+              <option key={index} value={cat.path}>
+                {cat.text}
               </option>
             ))}
           </select>
         </div>
 
-        {/* Preços */}
-        <div className='flex items-center gap-5 flex-wrap max-w-md'>
-          <div className='flex-1 flex flex-col gap-1 w-32'>
-            <label className='text-base font-medium' htmlFor='product-price'>
-              Preço Original (€)
-            </label>
+        {/* Price and Offer Price */}
+        <div className="flex gap-4">
+          <div className="flex flex-col gap-1 flex-1">
+            <label className="text-base font-medium">Preço Original (€)</label>
             <input
-              onChange={e => setPrice(e.target.value)}
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
               value={price}
-              id='product-price'
-              type='number'
-              step='0.01'
-              placeholder='0.00'
-              className='outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40'
+              onChange={e => setPrice(e.target.value)}
               required
             />
           </div>
-          <div className='flex-1 flex flex-col gap-1 w-32'>
-            <label className='text-base font-medium' htmlFor='offer-price'>
-              Preço de Venda (€)
-            </label>
+          <div className="flex flex-col gap-1 flex-1">
+            <label className="text-base font-medium">Preço de Venda (€)</label>
             <input
-              onChange={e => setOfferPrice(e.target.value)}
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
               value={offerPrice}
-              id='offer-price'
-              type='number'
-              step='0.01'
-              placeholder='0.00'
-              className='outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40'
+              onChange={e => setOfferPrice(e.target.value)}
               required
             />
           </div>
         </div>
 
-        {/* 🆕 TOGGLE VARIANTES */}
-        <div className='bg-gray-50 p-4 rounded-lg border border-gray-200 max-w-md'>
-          <div className='flex items-center justify-between'>
-            <div>
-              <p className='text-base font-medium'>Variantes de Cor</p>
-              <p className='text-sm text-gray-500'>
-                Este produto tem variações de cor?
-              </p>
-            </div>
-            <label className='relative inline-flex items-center cursor-pointer'>
-              <input
-                type='checkbox'
-                checked={hasVariants}
-                onChange={e => setHasVariants(e.target.checked)}
-                className='sr-only peer'
-              />
-              <div className='w-11 h-6 bg-gray-300 rounded-full peer peer-checked:bg-primary transition-colors'>
-                <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${hasVariants ? 'translate-x-5' : ''}`}></div>
-              </div>
-            </label>
-          </div>
+        {/* Stock */}
+        <div className="flex flex-col gap-1">
+          <label className="text-base font-medium">Quantidade em Stock</label>
+          <input
+            type="number"
+            min="0"
+            placeholder="0"
+            className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
+            value={stock}
+            onChange={e => setStock(e.target.value)}
+            required
+          />
         </div>
 
-        {/* 🆕 STOCK (se não tem variantes) */}
-        {!hasVariants && (
-          <div className='flex flex-col gap-1 max-w-md'>
-            <label className='text-base font-medium' htmlFor='stock'>
-              Quantidade em Stock
-            </label>
+        {/* 🆕 SISTEMA DE FAMÍLIA/COR */}
+        <div className="border-t border-gray-200 pt-5 mt-5">
+          <h3 className="text-lg font-semibold mb-4">Família de Produtos (Cores)</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Se este produto faz parte de uma família com várias cores (ex: Deck J-Bay em Preto, Azul, Vermelho), 
+            defina a família e a cor. Produtos da mesma família mostram bolinhas de cores para trocar entre eles.
+          </p>
+
+          {/* Product Family */}
+          <div className="flex flex-col gap-1 mb-4">
+            <label className="text-base font-medium">Nome da Família</label>
             <input
-              onChange={e => setStock(e.target.value)}
-              value={stock}
-              id='stock'
-              type='number'
-              min='0'
-              placeholder='0'
-              className='outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40'
-              required={!hasVariants}
+              type="text"
+              placeholder="Ex: Deck J-Bay (deixe em branco se não aplicável)"
+              className="outline-none md:py-2.5 py-2 px-3 rounded border border-gray-500/40"
+              value={productFamily}
+              onChange={e => setProductFamily(e.target.value)}
             />
-            <p className='text-xs text-gray-500'>
-              Defina 0 se o produto estiver esgotado
+            <p className="text-xs text-gray-500">
+              Produtos com o mesmo nome de família serão agrupados
             </p>
           </div>
-        )}
 
-        {/* 🆕 GESTÃO DE VARIANTES */}
-        {hasVariants && (
-          <div className='bg-blue-50 p-4 rounded-lg border border-blue-200 max-w-lg'>
-            <p className='text-base font-medium mb-3'>Variantes de Cor</p>
-            
-            {/* Lista de variantes */}
-            {variants.length > 0 && (
-              <div className='space-y-2 mb-4'>
-                {variants.map((variant) => (
-                  <div 
-                    key={variant.id}
-                    className='flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200'
-                  >
-                    <div className='flex items-center gap-3'>
-                      <div 
-                        className='w-8 h-8 rounded-full border-2 border-gray-300'
-                        style={{ backgroundColor: variant.colorCode }}
-                      />
-                      <div>
-                        <p className='font-medium text-sm'>{variant.color}</p>
-                        <p className='text-xs text-gray-500'>{variant.colorCode}</p>
-                      </div>
-                    </div>
-                    <div className='flex items-center gap-3'>
-                      <span className='text-sm bg-gray-100 px-2 py-1 rounded'>
-                        Stock: {variant.stock}
-                      </span>
-                      <button
-                        type='button'
-                        onClick={() => removeVariant(variant.id)}
-                        className='text-red-500 hover:text-red-700 p-1'
-                      >
-                        <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16' />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+          {/* Toggle Color */}
+          <div className="flex items-center gap-3 mb-4">
+            <input
+              type="checkbox"
+              id="hasColor"
+              checked={hasColor}
+              onChange={e => setHasColor(e.target.checked)}
+              className="w-4 h-4 text-primary"
+            />
+            <label htmlFor="hasColor" className="text-base font-medium cursor-pointer">
+              Este produto tem uma cor específica
+            </label>
+          </div>
+
+          {/* Color Fields */}
+          {hasColor && (
+            <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Nome da Cor</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Preto, Azul Marinho"
+                  className="outline-none py-2 px-3 rounded border border-gray-300"
+                  value={color}
+                  onChange={e => setColor(e.target.value)}
+                />
               </div>
-            )}
 
-            {/* Formulário de nova variante */}
-            {showVariantForm ? (
-              <div className='bg-white p-4 rounded-lg border border-gray-200 space-y-3'>
-                <p className='font-medium text-sm'>Nova Variante</p>
-                
-                {/* Cores pré-definidas */}
-                <div>
-                  <p className='text-xs text-gray-500 mb-2'>Cores rápidas:</p>
-                  <div className='flex flex-wrap gap-2'>
-                    {PRESET_COLORS.map((preset) => (
-                      <button
-                        key={preset.code}
-                        type='button'
-                        onClick={() => selectPresetColor(preset)}
-                        title={preset.name}
-                        className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                          newVariant.colorCode === preset.code ? 'ring-2 ring-offset-1 ring-primary' : 'border-gray-300'
-                        }`}
-                        style={{ backgroundColor: preset.code }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Nome da cor */}
-                <div>
-                  <label className='text-xs font-medium'>Nome da Cor</label>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium">Código da Cor</label>
+                <div className="flex items-center gap-3">
                   <input
-                    type='text'
-                    value={newVariant.color}
-                    onChange={e => setNewVariant({ ...newVariant, color: e.target.value })}
-                    placeholder='Ex: Azul Marinho'
-                    className='w-full mt-1 py-2 px-3 rounded border border-gray-300 text-sm'
+                    type="color"
+                    value={colorCode}
+                    onChange={e => setColorCode(e.target.value)}
+                    className="w-12 h-10 rounded border border-gray-300 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={colorCode}
+                    onChange={e => setColorCode(e.target.value)}
+                    className="outline-none py-2 px-3 rounded border border-gray-300 flex-1 font-mono"
+                    placeholder="#000000"
                   />
                 </div>
+              </div>
 
-                {/* Color picker */}
-                <div className='flex items-center gap-3'>
-                  <div>
-                    <label className='text-xs font-medium'>Código da Cor</label>
-                    <div className='flex items-center gap-2 mt-1'>
-                      <input
-                        type='color'
-                        value={newVariant.colorCode}
-                        onChange={e => setNewVariant({ ...newVariant, colorCode: e.target.value })}
-                        className='w-10 h-10 rounded cursor-pointer'
-                      />
-                      <input
-                        type='text'
-                        value={newVariant.colorCode}
-                        onChange={e => setNewVariant({ ...newVariant, colorCode: e.target.value })}
-                        className='w-24 py-2 px-3 rounded border border-gray-300 text-sm font-mono'
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Stock da variante */}
-                  <div>
-                    <label className='text-xs font-medium'>Stock</label>
-                    <input
-                      type='number'
-                      min='0'
-                      value={newVariant.stock}
-                      onChange={e => setNewVariant({ ...newVariant, stock: e.target.value })}
-                      placeholder='0'
-                      className='w-20 mt-1 py-2 px-3 rounded border border-gray-300 text-sm'
+              {/* Preset Colors */}
+              <div>
+                <p className="text-sm font-medium mb-2">Cores Rápidas:</p>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_COLORS.map((preset, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => selectPresetColor(preset)}
+                      className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
+                        colorCode === preset.code 
+                          ? 'ring-2 ring-primary ring-offset-2' 
+                          : 'border-gray-300'
+                      }`}
+                      style={{ backgroundColor: preset.code }}
+                      title={preset.name}
                     />
+                  ))}
+                </div>
+              </div>
+
+              {/* Preview */}
+              {color && (
+                <div className="flex items-center gap-3 p-3 bg-white rounded border">
+                  <div
+                    className="w-10 h-10 rounded-full border-2 border-gray-300"
+                    style={{ backgroundColor: colorCode }}
+                  />
+                  <div>
+                    <p className="font-medium">{color}</p>
+                    <p className="text-xs text-gray-500 font-mono">{colorCode}</p>
                   </div>
                 </div>
+              )}
+            </div>
+          )}
+        </div>
 
-                {/* Botões */}
-                <div className='flex gap-2'>
-                  <button
-                    type='button'
-                    onClick={addVariant}
-                    className='flex-1 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-primary/90'
-                  >
-                    Adicionar
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => setShowVariantForm(false)}
-                    className='flex-1 py-2 bg-gray-200 text-gray-700 rounded text-sm font-medium hover:bg-gray-300'
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type='button'
-                onClick={() => setShowVariantForm(true)}
-                className='w-full py-2.5 border-2 border-dashed border-blue-300 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors flex items-center justify-center gap-2'
-              >
-                <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 6v6m0 0v6m0-6h6m-6 0H6' />
-                </svg>
-                Adicionar Variante de Cor
-              </button>
-            )}
-
-            {/* Stock total */}
-            {variants.length > 0 && (
-              <div className='mt-3 p-2 bg-green-50 rounded text-sm text-green-700'>
-                <strong>Stock Total:</strong> {variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0)} unidades
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Botão de submissão */}
-        <button 
-          type='submit'
-          className='px-8 py-2.5 bg-primary text-white font-medium rounded cursor-pointer hover:bg-primary/90 transition-colors'
+        {/* Submit Button */}
+        <button
+          type="submit"
+          className="w-full py-3.5 bg-primary text-white font-medium rounded-md hover:bg-primary-dull transition-colors"
         >
           Adicionar Produto
         </button>

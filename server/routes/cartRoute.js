@@ -1,21 +1,15 @@
 import express from 'express';
 import authUser from '../middlewares/authUser.js';
-import { 
-  updateCart, 
-  getCart,
-  // 🆕 Novas funções
-  checkStock,
-  validateCart,
-} from '../controllers/cartController.js';
+import { updateCart, getCart, checkStock, validateCart } from '../controllers/cartController.js';
 
 const cartRouter = express.Router();
 
-// Rotas existentes
+// Rotas protegidas (user)
 cartRouter.post('/update', authUser, updateCart);
-cartRouter.post('/get', authUser, getCart);
+cartRouter.get('/get', authUser, getCart);
 
-// 🆕 Novas rotas para verificação de stock
-cartRouter.post('/check-stock', checkStock); // Público para verificar stock antes de adicionar
-cartRouter.post('/validate', authUser, validateCart); // Validar carrinho completo antes do checkout
+// Rotas públicas (para validação de stock)
+cartRouter.post('/check-stock', checkStock);
+cartRouter.post('/validate', validateCart);
 
 export default cartRouter;

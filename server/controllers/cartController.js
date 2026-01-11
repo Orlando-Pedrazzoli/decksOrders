@@ -1,263 +1,170 @@
-import User from '../models/User.js';
-import Product from '../models/Product.js';
+import User from "../models/User.js";
+import Product from "../models/Product.js";
 
-// Update User CartData : /api/cart/update
-export const updateCart = async (req, res) => {
+// Update User Cart
+const updateCart = async (req, res) => {
   try {
-    const { userId, cartItems } = req.body;
+    const { cartItems } = req.body;
+    const userId = req.userId;
 
-    if (!userId) {
-      return res.json({ success: false, message: 'User ID is required' });
-    }
-
-    if (!cartItems || typeof cartItems !== 'object') {
-      return res.json({ success: false, message: 'Invalid cart data' });
-    }
-
-    // 🎯 VALIDAR STOCK ANTES DE ATUALIZAR O CARRINHO
+    // 🎯 Validar stock antes de atualizar
     const stockErrors = [];
     
-    for (const [key, quantity] of Object.entries(cartItems)) {
+    for (const [productId, quantity] of Object.entries(cartItems)) {
       if (quantity <= 0) continue;
-      
-      // Key pode ser "productId" ou "productId_variantId"
-      const [productId, variantId] = key.split('_');
       
       const product = await Product.findById(productId);
       
       if (!product) {
         stockErrors.push({
           productId,
-          message: 'Produto não encontrado',
+          message: `Produto não encontrado`
         });
         continue;
       }
       
-      // Verificar stock
-      let availableStock;
-      let productName = product.name;
-      
-      if (variantId && product.variants && product.variants.length > 0) {
-        // Produto com variante
-        const variant = product.variants.id(variantId);
-        if (!variant) {
-          stockErrors.push({
-            productId: key,
-            productName,
-            message: 'Variante não encontrada',
-          });
-          continue;
-        }
-        availableStock = variant.stock;
-        productName = `${product.name} - ${variant.color}`;
-      } else {
-        // Produto sem variante
-        availableStock = product.stock;
-      }
+      const availableStock = product.stock || 0;
       
       if (quantity > availableStock) {
         stockErrors.push({
-          productId: key,
-          productName,
-          requestedQuantity: quantity,
-          availableStock,
-          message: availableStock === 0 
-            ? `"${productName}" está esgotado`
-            : `"${productName}" tem apenas ${availableStock} unidade(s) disponível(eis)`,
+          productId,
+          productName: product.name,
+          requested: quantity,
+          available: availableStock,
+          message: `${product.name}: apenas ${availableStock} disponível`
         });
       }
     }
-    
-    // Se houver erros de stock, retornar
+
+    // Se há erros de stock, retornar mas ainda atualizar o carrinho
+    // (o frontend decide o que fazer)
+    await User.findByIdAndUpdate(userId, { cartItems });
+
     if (stockErrors.length > 0) {
-      return res.json({
-        success: false,
-        message: 'Alguns produtos não têm stock suficiente',
+      return res.json({ 
+        success: false, 
+        message: "Alguns produtos excedem o stock disponível",
         stockErrors,
+        cartItems 
       });
     }
 
-    // Find user and update cart
+    res.json({ success: true, message: "Carrinho atualizado" });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// Get User Cart
+const getCart = async (req, res) => {
+  try {
+    const userId = req.userId;
     const user = await User.findById(userId);
 
     if (!user) {
-      return res.json({ success: false, message: 'User not found' });
+      return res.json({ success: false, message: "Usuário não encontrado" });
     }
 
-    // Update cart items
-    user.cartItems = cartItems;
-    await user.save();
-
-    res.json({
-      success: true,
-      message: 'Cart Updated',
-      cartItems: user.cartItems,
-    });
+    res.json({ success: true, cartItems: user.cartItems || {} });
   } catch (error) {
-    console.log('Cart update error:', error.message);
+    console.log(error.message);
     res.json({ success: false, message: error.message });
   }
 };
 
-// Get User Cart : /api/cart/get
-export const getCart = async (req, res) => {
+// 🆕 Verificar stock de um produto
+const checkStock = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { productId, quantity = 1 } = req.body;
 
-    if (!userId) {
-      return res.json({ success: false, message: 'User ID is required' });
-    }
-
-    const user = await User.findById(userId).select('cartItems');
-
-    if (!user) {
-      return res.json({ success: false, message: 'User not found' });
-    }
-
-    res.json({
-      success: true,
-      cartItems: user.cartItems || {},
-    });
-  } catch (error) {
-    console.log('Get cart error:', error.message);
-    res.json({ success: false, message: error.message });
-  }
-};
-
-// 🆕 Verificar stock de um produto : /api/cart/check-stock
-export const checkStock = async (req, res) => {
-  try {
-    const { productId, variantId, quantity } = req.body;
-    
     const product = await Product.findById(productId);
     
     if (!product) {
       return res.json({ 
         success: false, 
-        message: 'Produto não encontrado',
         available: false,
+        message: "Produto não encontrado" 
       });
     }
-    
-    let availableStock;
-    let variantInfo = null;
-    
-    if (variantId && product.variants && product.variants.length > 0) {
-      const variant = product.variants.id(variantId);
-      if (!variant) {
-        return res.json({ 
-          success: false, 
-          message: 'Variante não encontrada',
-          available: false,
-        });
-      }
-      availableStock = variant.stock;
-      variantInfo = {
-        color: variant.color,
-        colorCode: variant.colorCode,
-      };
-    } else {
-      availableStock = product.stock;
-    }
-    
-    const isAvailable = quantity <= availableStock;
-    
-    res.json({
-      success: true,
+
+    const availableStock = product.stock || 0;
+    const isAvailable = availableStock >= quantity;
+
+    res.json({ 
+      success: true, 
       available: isAvailable,
-      availableStock,
-      requestedQuantity: quantity,
-      productName: product.name,
-      variantInfo,
+      stock: availableStock,
+      requested: quantity,
       message: isAvailable 
-        ? 'Stock disponível' 
-        : availableStock === 0 
-          ? 'Produto esgotado'
-          : `Apenas ${availableStock} unidade(s) disponível(eis)`,
+        ? "Stock disponível" 
+        : `Apenas ${availableStock} unidade(s) disponível(eis)`
     });
   } catch (error) {
-    console.log('Check stock error:', error.message);
+    console.log(error.message);
     res.json({ success: false, message: error.message });
   }
 };
 
-// 🆕 Validar carrinho completo antes do checkout : /api/cart/validate
-export const validateCart = async (req, res) => {
+// 🆕 Validar carrinho completo antes do checkout
+const validateCart = async (req, res) => {
   try {
     const { cartItems } = req.body;
     
-    if (!cartItems || typeof cartItems !== 'object') {
-      return res.json({ success: false, message: 'Carrinho inválido' });
+    if (!cartItems || Object.keys(cartItems).length === 0) {
+      return res.json({ 
+        success: true, 
+        valid: true, 
+        message: "Carrinho vazio" 
+      });
     }
-    
-    const validationResults = [];
+
+    const results = [];
     let allValid = true;
-    
-    for (const [key, quantity] of Object.entries(cartItems)) {
+
+    for (const [productId, quantity] of Object.entries(cartItems)) {
       if (quantity <= 0) continue;
-      
-      const [productId, variantId] = key.split('_');
+
       const product = await Product.findById(productId);
       
       if (!product) {
-        validationResults.push({
-          key,
+        results.push({
+          productId,
           valid: false,
-          message: 'Produto não encontrado',
+          message: "Produto não encontrado"
         });
         allValid = false;
         continue;
       }
-      
-      let availableStock;
-      let productName = product.name;
-      
-      if (variantId && product.variants && product.variants.length > 0) {
-        const variant = product.variants.id(variantId);
-        if (!variant) {
-          validationResults.push({
-            key,
-            productName,
-            valid: false,
-            message: 'Variante não encontrada',
-          });
-          allValid = false;
-          continue;
-        }
-        availableStock = variant.stock;
-        productName = `${product.name} - ${variant.color}`;
-      } else {
-        availableStock = product.stock;
+
+      const availableStock = product.stock || 0;
+      const isValid = availableStock >= quantity;
+
+      if (!isValid) {
+        allValid = false;
       }
-      
-      const isValid = quantity <= availableStock;
-      
-      validationResults.push({
-        key,
-        productName,
+
+      results.push({
+        productId,
+        productName: product.name,
+        requested: quantity,
+        available: availableStock,
         valid: isValid,
-        requestedQuantity: quantity,
-        availableStock,
         message: isValid 
-          ? 'OK' 
-          : availableStock === 0 
-            ? 'Esgotado'
-            : `Apenas ${availableStock} disponível(eis)`,
+          ? "OK" 
+          : `Apenas ${availableStock} unidade(s) disponível(eis)`
       });
-      
-      if (!isValid) allValid = false;
     }
-    
-    res.json({
-      success: true,
+
+    res.json({ 
+      success: true, 
       valid: allValid,
-      results: validationResults,
-      message: allValid 
-        ? 'Todos os produtos estão disponíveis'
-        : 'Alguns produtos não têm stock suficiente',
+      results 
     });
   } catch (error) {
-    console.log('Validate cart error:', error.message);
+    console.log(error.message);
     res.json({ success: false, message: error.message });
   }
 };
+
+export { updateCart, getCart, checkStock, validateCart };

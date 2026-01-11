@@ -6,7 +6,6 @@ import axios from 'axios';
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL;
 
-// ⭐ DEBUG - Mas apenas em desenvolvimento
 if (import.meta.env.DEV) {
   console.log('🔧 Backend URL:', import.meta.env.VITE_BACKEND_URL);
 }
@@ -27,7 +26,6 @@ export const AppContextProvider = ({ children }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showCartSidebar, setShowCartSidebar] = useState(false);
   
-  // ✅ OTIMIZADO: isLoading começa false - site carrega imediato
   const [isLoading, setIsLoading] = useState(false);
   const [isSellerLoading, setIsSellerLoading] = useState(true);
 
@@ -42,11 +40,9 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  const getStoredToken = () => {
-    return localStorage.getItem('auth_token');
-  };
+  const getStoredToken = () => localStorage.getItem('auth_token');
 
-  // Save cart to localStorage
+  // Cart storage functions
   const saveCartToStorage = cartData => {
     try {
       localStorage.setItem('cart_items', JSON.stringify(cartData));
@@ -55,7 +51,6 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Load cart from localStorage
   const loadCartFromStorage = () => {
     try {
       const savedCart = localStorage.getItem('cart_items');
@@ -66,7 +61,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Clear all stored data
+  // User storage functions
   const clearStoredData = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('cart_items');
@@ -74,7 +69,6 @@ export const AppContextProvider = ({ children }) => {
     delete axios.defaults.headers.common['Authorization'];
   };
 
-  // Save user data to localStorage
   const saveUserToStorage = userData => {
     try {
       if (userData) {
@@ -87,7 +81,6 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Load user data from localStorage
   const loadUserFromStorage = () => {
     try {
       const savedUser = localStorage.getItem('user_data');
@@ -98,10 +91,9 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // ✅ OTIMIZADO: fetchUser sem setIsLoading global
+  // Fetch user
   const fetchUser = async () => {
     try {
-      // First, try to get user with existing session/cookie
       let response = await axios.get('/api/user/is-auth');
 
       if (response.data.success) {
@@ -117,7 +109,6 @@ export const AppContextProvider = ({ children }) => {
         return;
       }
 
-      // If cookie auth failed, try with stored token
       const storedToken = getStoredToken();
       if (storedToken) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
@@ -137,7 +128,6 @@ export const AppContextProvider = ({ children }) => {
         }
       }
 
-      // Try to load from localStorage as fallback
       const savedUser = loadUserFromStorage();
       const savedCart = loadCartFromStorage();
 
@@ -166,7 +156,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Enhanced logout function
+  // Logout functions
   const logoutUser = async () => {
     try {
       await axios.get('/api/user/logout');
@@ -181,7 +171,6 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // ✅ OTIMIZADO: Logout do Seller centralizado
   const logoutSeller = async () => {
     try {
       await axios.get('/api/seller/logout');
@@ -190,13 +179,13 @@ export const AppContextProvider = ({ children }) => {
     } finally {
       setIsSeller(false);
       sessionStorage.removeItem('seller_just_logged_in');
-      sessionStorage.removeItem('seller_authenticated'); // ✅ Limpar cache
+      sessionStorage.removeItem('seller_authenticated');
       navigate('/');
       toast.success('Logout do Admin realizado com sucesso');
     }
   };
 
-  // ✅ OTIMIZADO: Fetch Seller só quando necessário
+  // Fetch seller
   const fetchSeller = async () => {
     try {
       setIsSellerLoading(true);
@@ -208,7 +197,6 @@ export const AppContextProvider = ({ children }) => {
         
         if (isInSellerArea || justLoggedIn) {
           setIsSeller(true);
-          // ✅ Cachear autenticação no sessionStorage
           sessionStorage.setItem('seller_authenticated', 'true');
           sessionStorage.removeItem('seller_just_logged_in');
         } else {
@@ -216,27 +204,23 @@ export const AppContextProvider = ({ children }) => {
           sessionStorage.removeItem('seller_authenticated');
         }
       } else {
-        // Só desloga se a resposta do servidor for explicitamente false
         setIsSeller(false);
         sessionStorage.removeItem('seller_authenticated');
       }
     } catch (error) {
       console.log('❌ Erro ao verificar seller:', error.message);
       
-      // ✅ CRÍTICO: Não desloga em erro de rede
-      // Apenas desloga se for erro 401 (não autorizado)
       if (error.response?.status === 401) {
         setIsSeller(false);
         sessionStorage.removeItem('seller_authenticated');
         sessionStorage.removeItem('seller_just_logged_in');
       }
-      // Se for erro de rede, mantém o estado atual (não limpa o cache)
     } finally {
       setIsSellerLoading(false);
     }
   };
 
-  // Fetch All Products
+  // Fetch products
   const fetchProducts = async () => {
     try {
       const { data } = await axios.get('/api/product/list');
@@ -248,112 +232,51 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // 🎯 HELPER: Extrair productId e variantId de uma cartKey
-  const parseCartKey = (cartKey) => {
-    const parts = cartKey.split('_');
-    return {
-      productId: parts[0],
-      variantId: parts[1] || null,
-    };
-  };
-
-  // 🎯 HELPER: Criar cartKey a partir de productId e variantId
-  const createCartKey = (productId, variantId = null) => {
-    return variantId ? `${productId}_${variantId}` : productId;
-  };
-
-  // 🎯 HELPER: Obter informações do produto e variante
-  const getProductInfo = (cartKey) => {
-    const { productId, variantId } = parseCartKey(cartKey);
+  // 🎯 HELPER: Obter stock disponível
+  const getAvailableStock = (productId) => {
     const product = products.find(p => p._id === productId);
-    
-    if (!product) return null;
-    
-    let variant = null;
-    if (variantId && product.variants && product.variants.length > 0) {
-      variant = product.variants.find(v => v._id === variantId);
-    }
-    
-    return { product, variant, productId, variantId };
+    return product?.stock || 0;
   };
 
-  // 🎯 HELPER: Obter stock disponível para um item do carrinho
-  const getAvailableStock = (cartKey) => {
-    const info = getProductInfo(cartKey);
-    if (!info) return 0;
-    
-    const { product, variant } = info;
-    
-    if (variant) {
-      return variant.stock || 0;
-    }
-    
-    // Se tem variantes mas nenhuma selecionada, retornar stock total
-    if (product.variants && product.variants.length > 0) {
-      return product.variants.reduce((total, v) => total + (v.stock || 0), 0);
-    }
-    
-    return product.stock || 0;
-  };
-
-  // 🆕 ATUALIZADO: addToCart aceita tanto cartKey como (productId, variantId)
-  // Formatos aceitos:
-  // - addToCart('productId') - produto sem variante
-  // - addToCart('productId_variantId') - produto com variante (cartKey)
-  // - addToCart('productId', 'variantId') - produto com variante (dois args)
-  const addToCart = async (productIdOrCartKey, variantId = null) => {
-    let cartKey;
-    
-    // Detectar se é cartKey (contém _) ou productId simples
-    if (variantId) {
-      // Dois argumentos: productId e variantId
-      cartKey = createCartKey(productIdOrCartKey, variantId);
-    } else if (productIdOrCartKey.includes('_')) {
-      // Um argumento com _ : é um cartKey completo
-      cartKey = productIdOrCartKey;
-    } else {
-      // Um argumento sem _ : é um productId simples
-      cartKey = productIdOrCartKey;
-    }
-    const newCartItems = { ...cartItems };
-    const currentQuantity = newCartItems[cartKey] || 0;
-    
-    // 🎯 VALIDAR STOCK
-    const availableStock = getAvailableStock(cartKey);
+  // 🎯 CART: Adicionar ao carrinho (SIMPLIFICADO - sem variantes)
+  const addToCart = async (productId) => {
+    // Validar stock primeiro
+    const availableStock = getAvailableStock(productId);
     
     if (availableStock === 0) {
       toast.error('Produto esgotado');
       return false;
     }
     
+    const currentQuantity = cartItems[productId] || 0;
+    
     if (currentQuantity >= availableStock) {
       toast.error(`Apenas ${availableStock} unidade(s) disponível(eis)`);
       return false;
     }
 
-    newCartItems[cartKey] = currentQuantity + 1;
+    // Criar novo objeto de carrinho
+    const newCartItems = { 
+      ...cartItems,
+      [productId]: currentQuantity + 1 
+    };
 
+    // Atualizar estado e storage
     setCartItems(newCartItems);
     saveCartToStorage(newCartItems);
+    
+    // Mostrar toast e abrir sidebar após um pequeno delay para garantir re-render
     toast.success('Adicionado ao carrinho');
     
-    // ✅ Abrir sidebar do carrinho
-    setShowCartSidebar(true);
+    // Usar setTimeout para garantir que o state foi atualizado antes de abrir
+    setTimeout(() => {
+      setShowCartSidebar(true);
+    }, 10);
 
+    // Sync com servidor em background
     if (user) {
       try {
-        const response = await axios.post('/api/cart/update', { cartItems: newCartItems });
-        
-        // 🎯 Verificar se o servidor reportou erros de stock
-        if (!response.data.success && response.data.stockErrors) {
-          // Reverter alteração local
-          setCartItems(cartItems);
-          saveCartToStorage(cartItems);
-          
-          const error = response.data.stockErrors[0];
-          toast.error(error.message);
-          return false;
-        }
+        await axios.post('/api/cart/update', { cartItems: newCartItems });
       } catch (error) {
         console.error('Error syncing cart with server:', error);
       }
@@ -362,23 +285,22 @@ export const AppContextProvider = ({ children }) => {
     return true;
   };
 
-  // 🆕 ATUALIZADO: updateCartItem com validação de stock
-  const updateCartItem = async (cartKey, quantity) => {
+  // 🎯 CART: Atualizar item no carrinho
+  const updateCartItem = async (productId, quantity) => {
     const newCartItems = { ...cartItems };
 
     if (quantity <= 0) {
-      delete newCartItems[cartKey];
+      delete newCartItems[productId];
       toast.success('Produto removido do carrinho');
     } else {
-      // 🎯 VALIDAR STOCK
-      const availableStock = getAvailableStock(cartKey);
+      const availableStock = getAvailableStock(productId);
       
       if (quantity > availableStock) {
         toast.error(`Apenas ${availableStock} unidade(s) disponível(eis)`);
         return false;
       }
       
-      newCartItems[cartKey] = quantity;
+      newCartItems[productId] = quantity;
       toast.success('Carrinho atualizado');
     }
 
@@ -387,17 +309,7 @@ export const AppContextProvider = ({ children }) => {
 
     if (user) {
       try {
-        const response = await axios.post('/api/cart/update', { cartItems: newCartItems });
-        
-        if (!response.data.success && response.data.stockErrors) {
-          // Reverter alteração local
-          setCartItems(cartItems);
-          saveCartToStorage(cartItems);
-          
-          const error = response.data.stockErrors[0];
-          toast.error(error.message);
-          return false;
-        }
+        await axios.post('/api/cart/update', { cartItems: newCartItems });
       } catch (error) {
         console.error('Error syncing cart with server:', error);
       }
@@ -406,14 +318,14 @@ export const AppContextProvider = ({ children }) => {
     return true;
   };
 
-  // 🆕 ATUALIZADO: removeFromCart suporta cartKey com variante
-  const removeFromCart = async (cartKey) => {
+  // 🎯 CART: Remover do carrinho
+  const removeFromCart = async (productId) => {
     const newCartItems = { ...cartItems };
 
-    if (newCartItems[cartKey]) {
-      newCartItems[cartKey] -= 1;
-      if (newCartItems[cartKey] === 0) {
-        delete newCartItems[cartKey];
+    if (newCartItems[productId]) {
+      newCartItems[productId] -= 1;
+      if (newCartItems[productId] === 0) {
+        delete newCartItems[productId];
       }
     }
 
@@ -430,9 +342,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  const clearSearchQuery = () => {
-    setSearchQuery('');
-  };
+  const clearSearchQuery = () => setSearchQuery('');
 
   const getCartCount = () => {
     let totalCount = 0;
@@ -442,28 +352,22 @@ export const AppContextProvider = ({ children }) => {
     return totalCount;
   };
 
-  // 🆕 ATUALIZADO: getCartAmount suporta cartKeys com variantes
   const getCartAmount = () => {
     let totalAmount = 0;
     
-    for (const cartKey in cartItems) {
-      if (cartItems[cartKey] <= 0) continue;
+    for (const productId in cartItems) {
+      if (cartItems[productId] <= 0) continue;
       
-      const info = getProductInfo(cartKey);
-      if (!info) continue;
+      const product = products.find(p => p._id === productId);
+      if (!product) continue;
       
-      const { product, variant } = info;
-      
-      // Usar preço da variante se existir, senão usar preço do produto
-      const price = variant?.offerPrice || variant?.price || product.offerPrice;
-      
-      totalAmount += price * cartItems[cartKey];
+      totalAmount += product.offerPrice * cartItems[productId];
     }
     
     return Math.floor(totalAmount * 100) / 100;
   };
 
-  // 🆕 NOVO: Validar todo o carrinho antes do checkout
+  // 🎯 VALIDAR CARRINHO COMPLETO
   const validateCart = async () => {
     if (Object.keys(cartItems).length === 0) {
       return { valid: true, errors: [] };
@@ -512,10 +416,9 @@ export const AppContextProvider = ({ children }) => {
     };
   }, []);
 
-  // ✅ OTIMIZADO: Inicialização rápida
+  // Initialize app
   useEffect(() => {
     const initializeApp = async () => {
-      // 1. Carregar dados locais IMEDIATAMENTE (sem await)
       const token = getStoredToken();
       if (token) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -529,29 +432,19 @@ export const AppContextProvider = ({ children }) => {
         setUser(savedUser);
       }
 
-      // 2. Buscar produtos (não bloqueia)
       fetchProducts();
-
-      // 3. Verificar usuário em background
       fetchUser();
 
-      // 4. ✅ MELHORADO: Verificar seller com cache de sessionStorage
       if (window.location.pathname.startsWith('/seller')) {
-        // Verificar cache primeiro
         const sellerCached = sessionStorage.getItem('seller_authenticated');
         
         if (sellerCached === 'true') {
-          // Restaurar estado do cache
           setIsSeller(true);
           setIsSellerLoading(false);
-          
-          // Verificar em background (não bloqueia)
           fetchSeller().catch(() => {
-            // Se falhar a verificação em background, mantém o cache por enquanto
             console.log('⚠️ Verificação de seller falhou, mantendo sessão');
           });
         } else {
-          // Não há cache, precisa verificar
           fetchSeller();
         }
       } else {
@@ -562,17 +455,14 @@ export const AppContextProvider = ({ children }) => {
     initializeApp();
   }, []);
 
-  // ✅ Verificar seller apenas na primeira vez que entra na área de seller
+  // Check seller on route change
   useEffect(() => {
-    // Só verifica se:
-    // 1. Está na área de seller
-    // 2. Ainda não verificou (isSellerLoading é true) OU não está logado como seller
     if (location.pathname.startsWith('/seller') && !isSeller && isSellerLoading) {
       fetchSeller();
     }
   }, [location.pathname]);
 
-  // Auto-sync cart with server when user changes
+  // Auto-sync cart with server
   useEffect(() => {
     const syncCartWithServer = async () => {
       if (user && Object.keys(cartItems).length > 0) {
@@ -620,10 +510,6 @@ export const AppContextProvider = ({ children }) => {
     saveCartToStorage,
     loadCartFromStorage,
     saveUserToStorage,
-    // 🆕 NOVOS EXPORTS
-    parseCartKey,
-    createCartKey,
-    getProductInfo,
     getAvailableStock,
     validateCart,
   };

@@ -1,5 +1,5 @@
 // server/controllers/orderController.js
-// VERSÃO COM SUPORTE A MB WAY, MULTIBANCO E GESTÃO DE STOCK
+// VERSÃO SIMPLIFICADA SEM VARIANTES
 
 import { sendOrderConfirmationEmail } from '../services/emailService.js';
 import Order from '../models/Order.js';
@@ -21,7 +21,7 @@ try {
 }
 
 // =============================================================================
-// 🆕 FUNÇÃO PARA VALIDAR E DECREMENTAR STOCK
+// 🆕 FUNÇÃO PARA VALIDAR E DECREMENTAR STOCK (SIMPLIFICADA)
 // =============================================================================
 const validateAndDecrementStock = async (items) => {
   const stockErrors = [];
@@ -38,24 +38,7 @@ const validateAndDecrementStock = async (items) => {
       continue;
     }
     
-    // Verificar stock (considerando variante se existir)
-    let availableStock;
-    let variantId = item.variantId || null;
-    
-    if (variantId && product.variants && product.variants.length > 0) {
-      const variant = product.variants.id(variantId);
-      if (!variant) {
-        stockErrors.push({
-          productId: item.product,
-          productName: product.name,
-          message: 'Variante não encontrada',
-        });
-        continue;
-      }
-      availableStock = variant.stock;
-    } else {
-      availableStock = product.stock;
-    }
+    const availableStock = product.stock || 0;
     
     if (item.quantity > availableStock) {
       stockErrors.push({
@@ -71,7 +54,6 @@ const validateAndDecrementStock = async (items) => {
       decrementOperations.push({
         product,
         quantity: item.quantity,
-        variantId,
       });
     }
   }
@@ -82,7 +64,7 @@ const validateAndDecrementStock = async (items) => {
 const executeStockDecrement = async (decrementOperations) => {
   for (const op of decrementOperations) {
     try {
-      await op.product.decrementStock(op.quantity, op.variantId);
+      await op.product.decrementStock(op.quantity);
       console.log(`📦 Stock decrementado: ${op.product.name} (-${op.quantity})`);
     } catch (error) {
       console.error(`❌ Erro ao decrementar stock de ${op.product.name}:`, error.message);
@@ -91,7 +73,7 @@ const executeStockDecrement = async (decrementOperations) => {
 };
 
 // =============================================================================
-// FUNÇÃO PARA ENVIAR EMAIL AO CLIENTE (ORIGINAL QUE FUNCIONAVA)
+// FUNÇÃO PARA ENVIAR EMAIL AO CLIENTE
 // =============================================================================
 const sendClientEmail = async (order, userId) => {
   try {
@@ -107,7 +89,6 @@ const sendClientEmail = async (order, userId) => {
       return;
     }
 
-    // ✅ EMAIL PARA O CLIENTE (código original que funcionava)
     const emailResult = await sendOrderConfirmationEmail(order, user, products, address);
     
     if (emailResult.success) {
@@ -116,7 +97,6 @@ const sendClientEmail = async (order, userId) => {
       console.error('❌ Falha no email:', emailResult.error);
     }
 
-    // ✅ NOTIFICAÇÃO ADMIN (WhatsApp + Email) - só se disponível
     if (notifyAdminNewOrder) {
       try {
         console.log('🔔 Enviando notificação para admin...');
@@ -146,8 +126,6 @@ export const placeOrderCOD = async (req, res) => {
       discountAmount,
       discountPercentage,
       promoCode,
-      paymentType,
-      isPaid,
     } = req.body;
 
     if (!address || items.length === 0) {
@@ -165,7 +143,7 @@ export const placeOrderCOD = async (req, res) => {
       });
     }
 
-    // ✅ CRIAR PEDIDO COM TODOS OS CAMPOS DO MODELO
+    // ✅ CRIAR PEDIDO
     const newOrder = await Order.create({
       userId,
       items,
@@ -179,12 +157,7 @@ export const placeOrderCOD = async (req, res) => {
       originalAmount,
     });
 
-    console.log('✅ Pedido COD criado:', {
-      orderId: newOrder._id,
-      amount: newOrder.amount,
-      originalAmount: newOrder.originalAmount,
-      discountAmount: newOrder.discountAmount,
-    });
+    console.log('✅ Pedido COD criado:', newOrder._id);
 
     // 🎯 DECREMENTAR STOCK APÓS CRIAR O PEDIDO
     await executeStockDecrement(decrementOperations);
@@ -192,7 +165,7 @@ export const placeOrderCOD = async (req, res) => {
     // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // ✅ ENVIAR EMAIL (em background, não bloqueia resposta)
+    // ✅ ENVIAR EMAIL (em background)
     sendClientEmail(newOrder, userId).catch(err => {
       console.error('❌ Erro no envio de email (background):', err.message);
     });
@@ -213,7 +186,6 @@ export const placeOrderCOD = async (req, res) => {
 // =============================================================================
 export const placeOrderStripe = async (req, res) => {
   console.log('🚀 STRIPE FUNCTION STARTED!!!');
-  console.log('Body received:', req.body);
 
   try {
     const {
@@ -225,9 +197,7 @@ export const placeOrderStripe = async (req, res) => {
       discountAmount,
       discountPercentage,
       promoCode,
-      paymentType,
       paymentMethod,
-      isPaid,
     } = req.body;
 
     const { origin } = req.headers;
@@ -259,8 +229,8 @@ export const placeOrderStripe = async (req, res) => {
       });
     }
 
-    // ✅ CRIAR PEDIDO (stock será decrementado após confirmação do pagamento)
-    const order = await Order.create({
+    // ✅ CRIAR PEDIDO (marcado como não pago)
+    const newOrder = await Order.create({
       userId,
       items,
       amount,
@@ -273,107 +243,68 @@ export const placeOrderStripe = async (req, res) => {
       originalAmount,
     });
 
-    console.log('✅ Pedido Stripe criado:', {
-      orderId: order._id,
-      amount: order.amount,
-      originalAmount: order.originalAmount,
-      discountAmount: order.discountAmount,
-    });
+    console.log('✅ Pedido Stripe criado:', newOrder._id);
 
-    // Stripe Gateway Initialize
+    // ✅ CONFIGURAR STRIPE
     const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
 
-    // create line items for stripe
-    const line_items = productData.map(item => {
-      let itemPrice = item.price;
-      if (discountPercentage > 0) {
-        itemPrice = item.price * (1 - discountPercentage / 100);
-      }
+    // ✅ CONFIGURAR PAYMENT METHOD TYPES baseado na escolha do usuário
+    let payment_method_types = ['card'];
+    
+    if (paymentMethod === 'mbway') {
+      payment_method_types = ['card'];
+      console.log('📱 MB Way selecionado (via Stripe)');
+    } else if (paymentMethod === 'multibanco') {
+      payment_method_types = ['multibanco'];
+      console.log('🏦 Multibanco selecionado');
+    }
 
-      return {
+    // ✅ CRIAR STRIPE CHECKOUT SESSION
+    const session = await stripeInstance.checkout.sessions.create({
+      payment_method_types,
+      line_items: productData.map((item) => ({
         price_data: {
           currency: 'eur',
-          product_data: {
-            name:
-              discountPercentage > 0
-                ? `${item.name} (${discountPercentage}% OFF)`
-                : item.name,
-          },
-          unit_amount: Math.floor(itemPrice * 100),
+          product_data: { name: item.name },
+          unit_amount: Math.round(item.price * 100),
         },
         quantity: item.quantity,
-      };
+      })),
+      mode: 'payment',
+      success_url: `${origin}/verify?success=true&orderId=${newOrder._id}`,
+      cancel_url: `${origin}/verify?success=false&orderId=${newOrder._id}`,
+      metadata: {
+        orderId: newOrder._id.toString(),
+        userId: userId,
+        paymentMethod: paymentMethod,
+        items: JSON.stringify(items),
+      },
+      ...(paymentMethod === 'multibanco' && {
+        payment_method_options: {
+          multibanco: {
+            expires_after_days: 7,
+          },
+        },
+      }),
     });
 
-    // ✅ CONFIGURAR MÉTODOS DE PAGAMENTO
-    let payment_method_types;
-    
-    switch (paymentMethod) {
-      case 'mbway':
-        payment_method_types = ['mb_way'];
-        console.log('💳 Método de pagamento: MB Way');
-        break;
-      case 'multibanco':
-        payment_method_types = ['multibanco'];
-        console.log('💳 Método de pagamento: Multibanco');
-        break;
-      case 'card':
-      default:
-        payment_method_types = ['card'];
-        console.log('💳 Método de pagamento: Cartão');
-        break;
-    }
+    console.log('✅ Stripe Session criada:', session.id);
 
-    // ✅ CONFIGURAR SESSION OPTIONS
-    const sessionOptions = {
-      line_items,
-      mode: 'payment',
-      payment_method_types,
-      success_url: `${origin}/order-success/${order._id}?payment=stripe&method=${paymentMethod || 'card'}`,
-      cancel_url: `${origin}/cart`,
-      metadata: {
-        orderId: order._id.toString(),
-        userId,
-        paymentMethod: paymentMethod || 'card',
-        // 🎯 Guardar items para decrementar stock no webhook
-        items: JSON.stringify(items.map(i => ({
-          product: i.product.toString(),
-          quantity: i.quantity,
-          variantId: i.variantId || null,
-        }))),
-      },
-    };
-
-    if (paymentMethod === 'mbway') {
-      sessionOptions.payment_method_options = {
-        mb_way: {},
-      };
-    }
-
-    if (paymentMethod === 'multibanco') {
-      sessionOptions.payment_method_options = {
-        multibanco: {},
-      };
-    }
-
-    // create session
-    const session = await stripeInstance.checkout.sessions.create(sessionOptions);
-
-    console.log('✅ Sessão Stripe criada:', session.id);
-
-    return res.json({ success: true, url: session.url });
+    return res.json({
+      success: true,
+      url: session.url,
+    });
   } catch (error) {
-    console.error('❌ Erro Stripe completo:', error);
+    console.error('❌ Erro Stripe:', error);
     return res.json({ success: false, message: error.message });
   }
 };
 
 // =============================================================================
-// STRIPE WEBHOOKS - COM DECREMENTO DE STOCK
+// STRIPE WEBHOOKS
 // =============================================================================
 export const stripeWebhooks = async (request, response) => {
   const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
-
   const sig = request.headers['stripe-signature'];
   let event;
 
@@ -383,42 +314,34 @@ export const stripeWebhooks = async (request, response) => {
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
-  } catch (error) {
-    console.error('❌ Webhook Error:', error.message);
-    return response.status(400).send(`Webhook Error: ${error.message}`);
+  } catch (err) {
+    console.error('⚠️ Webhook Error:', err.message);
+    return response.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // Handle the event
+  console.log(`📨 Webhook recebido: ${event.type}`);
+
   switch (event.type) {
     case 'checkout.session.completed': {
       const session = event.data.object;
-      console.log('✅ Checkout Session Completed:', session.id);
-      
       const { orderId, userId, paymentMethod, items } = session.metadata;
-      
+
+      console.log('✅ Checkout completado:', { orderId, paymentMethod });
+
       if (session.payment_status === 'paid') {
-        console.log(`💳 Pagamento ${paymentMethod} confirmado para pedido:`, orderId);
-        
-        // Mark Payment as Paid
         const updatedOrder = await Order.findByIdAndUpdate(
-          orderId, 
+          orderId,
           { isPaid: true },
           { new: true }
         );
         
-        console.log('✅ Pedido marcado como pago:', orderId);
-        
+        console.log('💰 Pedido marcado como pago:', orderId);
+
         // 🎯 DECREMENTAR STOCK APÓS PAGAMENTO CONFIRMADO
         if (items) {
           try {
             const parsedItems = JSON.parse(items);
-            const { decrementOperations } = await validateAndDecrementStock(
-              parsedItems.map(i => ({
-                product: i.product,
-                quantity: i.quantity,
-                variantId: i.variantId,
-              }))
-            );
+            const { decrementOperations } = await validateAndDecrementStock(parsedItems);
             await executeStockDecrement(decrementOperations);
             console.log('📦 Stock decrementado após pagamento Stripe');
           } catch (stockError) {
@@ -457,7 +380,7 @@ export const stripeWebhooks = async (request, response) => {
           break;
         }
 
-        const { orderId, userId, paymentMethod, items } = session.data[0].metadata;
+        const { orderId, userId, paymentMethod } = session.data[0].metadata;
         
         const updatedOrder = await Order.findByIdAndUpdate(
           orderId, 
@@ -466,9 +389,6 @@ export const stripeWebhooks = async (request, response) => {
         );
         
         console.log(`✅ Pedido ${paymentMethod} marcado como pago:`, orderId);
-        
-        // 🎯 DECREMENTAR STOCK (pode já ter sido feito no checkout.session.completed)
-        // Verificar se já foi decrementado para evitar duplicação
         
         await User.findByIdAndUpdate(userId, { cartItems: {} });
 
@@ -496,8 +416,6 @@ export const stripeWebhooks = async (request, response) => {
 
         if (session.data && session.data.length > 0) {
           const { orderId } = session.data[0].metadata;
-          // 🎯 NÃO deletar o pedido, apenas marcar como cancelado
-          // O stock NÃO foi decrementado ainda (só decrementa após pagamento)
           await Order.findByIdAndUpdate(orderId, { status: 'Cancelled' });
           console.log('🗑️ Pedido marcado como cancelado:', orderId);
         }
@@ -533,8 +451,6 @@ export const getUserOrders = async (req, res) => {
     const userId =
       req.user?.id || req.user?._id || req.query.userId || req.body.userId;
 
-    console.log('🔍 Buscando pedidos para userId:', userId);
-
     if (!userId) {
       return res.json({ success: false, message: 'User ID is required' });
     }
@@ -545,16 +461,13 @@ export const getUserOrders = async (req, res) => {
     })
       .populate({
         path: 'items.product',
-        select: 'name image category offerPrice weight variants',
+        select: 'name image category offerPrice weight color colorCode',
       })
       .populate({
         path: 'address',
-        select:
-          'firstName lastName street city state zipcode country email phone',
+        select: 'firstName lastName street city state zipcode country email phone',
       })
       .sort({ createdAt: -1 });
-
-    console.log(`📋 ${orders.length} pedidos encontrados`);
 
     res.json({ success: true, orders });
   } catch (error) {
@@ -626,14 +539,7 @@ export const updateOrderStatus = async (req, res) => {
       for (const item of order.items) {
         const product = await Product.findById(item.product._id || item.product);
         if (product) {
-          if (item.variantId && product.variants) {
-            const variant = product.variants.id(item.variantId);
-            if (variant) {
-              variant.stock += item.quantity;
-            }
-          } else {
-            product.stock += item.quantity;
-          }
+          product.stock += item.quantity;
           await product.save();
           console.log(`📦 Stock devolvido: ${product.name} (+${item.quantity})`);
         }

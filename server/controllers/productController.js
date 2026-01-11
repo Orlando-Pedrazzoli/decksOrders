@@ -1,56 +1,35 @@
-import { v2 as cloudinary } from 'cloudinary';
-import Product from '../models/Product.js';
+import { v2 as cloudinary } from "cloudinary";
+import Product from "../models/Product.js";
 
-// Add Product : /api/product/add
-export const addProduct = async (req, res) => {
+// Add Product
+const addProduct = async (req, res) => {
   try {
     let productData = JSON.parse(req.body.productData);
+
     const images = req.files;
-    
-    // Upload das imagens principais
     let imagesUrl = await Promise.all(
-      images.map(async item => {
+      images.map(async (item) => {
         let result = await cloudinary.uploader.upload(item.path, {
-          resource_type: 'image',
+          resource_type: "image",
         });
         return result.secure_url;
       })
     );
-    
-    // 🎯 Processar variantes se existirem
-    let variants = [];
-    if (productData.variants && productData.variants.length > 0) {
-      variants = productData.variants.map(variant => ({
-        color: variant.color,
-        colorCode: variant.colorCode,
-        images: variant.images || [],
-        stock: parseInt(variant.stock) || 0,
-        price: variant.price ? parseFloat(variant.price) : undefined,
-        offerPrice: variant.offerPrice ? parseFloat(variant.offerPrice) : undefined,
-      }));
-    }
-    
-    // Criar produto
-    const newProduct = await Product.create({ 
-      ...productData, 
+
+    const product = await Product.create({
+      ...productData,
       image: imagesUrl,
-      stock: parseInt(productData.stock) || 0,
-      variants,
     });
-    
-    res.json({ 
-      success: true, 
-      message: 'Produto adicionado com sucesso',
-      product: newProduct,
-    });
+
+    res.json({ success: true, message: "Produto adicionado com sucesso", product });
   } catch (error) {
     console.log(error.message);
     res.json({ success: false, message: error.message });
   }
 };
 
-// Get Product : /api/product/list
-export const productList = async (req, res) => {
+// Get Product List
+const productList = async (req, res) => {
   try {
     const products = await Product.find({});
     res.json({ success: true, products });
@@ -60,8 +39,8 @@ export const productList = async (req, res) => {
   }
 };
 
-// Get single Product : /api/product/id
-export const productById = async (req, res) => {
+// Get single product by id
+const productById = async (req, res) => {
   try {
     const { id } = req.body;
     const product = await Product.findById(id);
@@ -72,333 +51,145 @@ export const productById = async (req, res) => {
   }
 };
 
-// Change Product inStock : /api/product/stock
-export const changeStock = async (req, res) => {
+// 🆕 Buscar produtos da mesma família (para bolinhas de cor)
+const getProductFamily = async (req, res) => {
+  try {
+    const { productId, productFamily } = req.body;
+    
+    let familyId = productFamily;
+    
+    // Se não passou productFamily, buscar do produto
+    if (!familyId && productId) {
+      const product = await Product.findById(productId);
+      if (product) {
+        familyId = product.productFamily;
+      }
+    }
+    
+    // Se não tem família, retornar array vazio
+    if (!familyId) {
+      return res.json({ success: true, products: [] });
+    }
+    
+    // Buscar todos os produtos da mesma família
+    const products = await Product.find({ 
+      productFamily: familyId 
+    }).select('_id name color colorCode image offerPrice price stock inStock');
+    
+    res.json({ success: true, products });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// Change inStock status (legacy - mantido para compatibilidade)
+const changeStock = async (req, res) => {
   try {
     const { id, inStock } = req.body;
     await Product.findByIdAndUpdate(id, { inStock });
-    res.json({ success: true, message: 'Stock Updated' });
+    res.json({ success: true, message: "Stock atualizado" });
   } catch (error) {
     console.log(error.message);
     res.json({ success: false, message: error.message });
   }
 };
 
-// 🆕 Update Stock Quantity : /api/product/update-stock
-export const updateStockQuantity = async (req, res) => {
-  try {
-    const { id, stock, variantId } = req.body;
-    
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.json({ success: false, message: 'Produto não encontrado' });
-    }
-    
-    if (variantId) {
-      // Atualizar stock de uma variante específica
-      const variant = product.variants.id(variantId);
-      if (!variant) {
-        return res.json({ success: false, message: 'Variante não encontrada' });
-      }
-      variant.stock = parseInt(stock) || 0;
-    } else {
-      // Atualizar stock geral
-      product.stock = parseInt(stock) || 0;
-    }
-    
-    await product.save(); // Isso irá recalcular inStock via pre-save
-    
-    res.json({ 
-      success: true, 
-      message: 'Stock atualizado com sucesso',
-      product,
-    });
-  } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
-  }
-};
-
-// 🆕 Add Variant : /api/product/add-variant
-export const addVariant = async (req, res) => {
-  try {
-    const { id, variant } = req.body;
-    
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.json({ success: false, message: 'Produto não encontrado' });
-    }
-    
-    // Verificar se já existe uma variante com a mesma cor
-    const existingVariant = product.variants.find(
-      v => v.color.toLowerCase() === variant.color.toLowerCase()
-    );
-    
-    if (existingVariant) {
-      return res.json({ 
-        success: false, 
-        message: 'Já existe uma variante com esta cor' 
-      });
-    }
-    
-    product.variants.push({
-      color: variant.color,
-      colorCode: variant.colorCode,
-      images: variant.images || [],
-      stock: parseInt(variant.stock) || 0,
-      price: variant.price ? parseFloat(variant.price) : undefined,
-      offerPrice: variant.offerPrice ? parseFloat(variant.offerPrice) : undefined,
-    });
-    
-    await product.save();
-    
-    res.json({ 
-      success: true, 
-      message: 'Variante adicionada com sucesso',
-      product,
-    });
-  } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
-  }
-};
-
-// 🆕 Update Variant : /api/product/update-variant
-export const updateVariant = async (req, res) => {
-  try {
-    const { id, variantId, variantData } = req.body;
-    
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.json({ success: false, message: 'Produto não encontrado' });
-    }
-    
-    const variant = product.variants.id(variantId);
-    if (!variant) {
-      return res.json({ success: false, message: 'Variante não encontrada' });
-    }
-    
-    // Atualizar campos da variante
-    if (variantData.color) variant.color = variantData.color;
-    if (variantData.colorCode) variant.colorCode = variantData.colorCode;
-    if (variantData.images) variant.images = variantData.images;
-    if (variantData.stock !== undefined) variant.stock = parseInt(variantData.stock) || 0;
-    if (variantData.price !== undefined) variant.price = parseFloat(variantData.price) || undefined;
-    if (variantData.offerPrice !== undefined) variant.offerPrice = parseFloat(variantData.offerPrice) || undefined;
-    
-    await product.save();
-    
-    res.json({ 
-      success: true, 
-      message: 'Variante atualizada com sucesso',
-      product,
-    });
-  } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
-  }
-};
-
-// 🆕 Delete Variant : /api/product/delete-variant
-export const deleteVariant = async (req, res) => {
-  try {
-    const { id, variantId } = req.body;
-    
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.json({ success: false, message: 'Produto não encontrado' });
-    }
-    
-    const variant = product.variants.id(variantId);
-    if (!variant) {
-      return res.json({ success: false, message: 'Variante não encontrada' });
-    }
-    
-    // Remover imagens da variante do Cloudinary
-    for (const imageUrl of variant.images) {
-      try {
-        const publicId = imageUrl.split('/').pop().split('.')[0];
-        await cloudinary.uploader.destroy(publicId);
-      } catch (error) {
-        console.log('Erro ao excluir imagem da variante:', error.message);
-      }
-    }
-    
-    // Usar pull para remover a variante
-    product.variants.pull(variantId);
-    await product.save();
-    
-    res.json({ 
-      success: true, 
-      message: 'Variante removida com sucesso',
-      product,
-    });
-  } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
-  }
-};
-
-// 🆕 Upload Variant Images : /api/product/upload-variant-images
-export const uploadVariantImages = async (req, res) => {
-  try {
-    const { id, variantId } = req.body;
-    const images = req.files;
-    
-    if (!images || images.length === 0) {
-      return res.json({ success: false, message: 'Nenhuma imagem enviada' });
-    }
-    
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.json({ success: false, message: 'Produto não encontrado' });
-    }
-    
-    const variant = product.variants.id(variantId);
-    if (!variant) {
-      return res.json({ success: false, message: 'Variante não encontrada' });
-    }
-    
-    // Upload das novas imagens
-    const newImagesUrl = await Promise.all(
-      images.map(async item => {
-        let result = await cloudinary.uploader.upload(item.path, {
-          resource_type: 'image',
-        });
-        return result.secure_url;
-      })
-    );
-    
-    // Adicionar às imagens existentes da variante
-    variant.images = [...variant.images, ...newImagesUrl];
-    await product.save();
-    
-    res.json({ 
-      success: true, 
-      message: 'Imagens adicionadas com sucesso',
-      images: variant.images,
-      product,
-    });
-  } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
-  }
-};
-
-// Update Product : /api/product/update
-export const updateProduct = async (req, res) => {
+// Update product
+const updateProduct = async (req, res) => {
   try {
     const { id } = req.body;
     let productData = JSON.parse(req.body.productData);
+
+    // Processar novas imagens se enviadas
     const images = req.files;
+    let imagesUrl = [];
 
-    // Buscar produto existente
-    const existingProduct = await Product.findById(id);
-    if (!existingProduct) {
-      return res.json({ success: false, message: 'Produto não encontrado' });
-    }
-
-    // Se houver novas imagens, fazer upload
-    let imagesUrl = existingProduct.image; // Manter imagens antigas por padrão
     if (images && images.length > 0) {
-      // Excluir imagens antigas do Cloudinary
-      for (const imageUrl of existingProduct.image) {
-        try {
-          const publicId = imageUrl.split('/').pop().split('.')[0];
-          await cloudinary.uploader.destroy(publicId);
-        } catch (error) {
-          console.log('Erro ao excluir imagem antiga:', error.message);
-        }
-      }
-
-      // Upload das novas imagens
       imagesUrl = await Promise.all(
-        images.map(async item => {
+        images.map(async (item) => {
           let result = await cloudinary.uploader.upload(item.path, {
-            resource_type: 'image',
+            resource_type: "image",
           });
           return result.secure_url;
         })
       );
     }
 
-    // 🎯 Processar variantes se existirem no update
-    let updateData = {
+    // Se há novas imagens, usar elas; senão manter as existentes
+    const updateData = {
       ...productData,
-      image: imagesUrl,
     };
-    
-    if (productData.stock !== undefined) {
-      updateData.stock = parseInt(productData.stock) || 0;
-    }
-    
-    if (productData.variants) {
-      updateData.variants = productData.variants.map(variant => ({
-        ...variant,
-        stock: parseInt(variant.stock) || 0,
-        price: variant.price ? parseFloat(variant.price) : undefined,
-        offerPrice: variant.offerPrice ? parseFloat(variant.offerPrice) : undefined,
-      }));
+
+    if (imagesUrl.length > 0) {
+      // Buscar produto atual para deletar imagens antigas
+      const existingProduct = await Product.findById(id);
+      if (existingProduct && existingProduct.image) {
+        // Deletar imagens antigas do Cloudinary
+        for (const imageUrl of existingProduct.image) {
+          try {
+            const publicId = imageUrl.split('/').pop().split('.')[0];
+            await cloudinary.uploader.destroy(publicId);
+          } catch (err) {
+            console.log('Erro ao deletar imagem antiga:', err.message);
+          }
+        }
+      }
+      updateData.image = imagesUrl;
     }
 
-    // Atualizar produto
-    const updatedProduct = await Product.findByIdAndUpdate(id, updateData, { new: true });
-    
-    // Forçar recálculo do inStock
-    await updatedProduct.save();
+    const product = await Product.findByIdAndUpdate(id, updateData, { new: true });
 
-    res.json({ 
-      success: true, 
-      message: 'Produto atualizado com sucesso',
-      product: updatedProduct,
-    });
+    res.json({ success: true, message: "Produto atualizado com sucesso", product });
   } catch (error) {
     console.log(error.message);
     res.json({ success: false, message: error.message });
   }
 };
 
-// Delete Product : /api/product/delete
-export const deleteProduct = async (req, res) => {
+// Delete product
+const deleteProduct = async (req, res) => {
   try {
     const { id } = req.body;
 
-    // Buscar produto para obter URLs das imagens
+    // Buscar produto para deletar imagens do Cloudinary
     const product = await Product.findById(id);
-    if (!product) {
-      return res.json({ success: false, message: 'Produto não encontrado' });
-    }
-
-    // Excluir imagens principais do Cloudinary
-    for (const imageUrl of product.image) {
-      try {
-        const publicId = imageUrl.split('/').pop().split('.')[0];
-        await cloudinary.uploader.destroy(publicId);
-      } catch (error) {
-        console.log('Erro ao excluir imagem do Cloudinary:', error.message);
-      }
-    }
-    
-    // 🎯 Excluir imagens das variantes também
-    if (product.variants && product.variants.length > 0) {
-      for (const variant of product.variants) {
-        for (const imageUrl of variant.images) {
-          try {
-            const publicId = imageUrl.split('/').pop().split('.')[0];
-            await cloudinary.uploader.destroy(publicId);
-          } catch (error) {
-            console.log('Erro ao excluir imagem de variante:', error.message);
-          }
+    if (product && product.image) {
+      for (const imageUrl of product.image) {
+        try {
+          const publicId = imageUrl.split('/').pop().split('.')[0];
+          await cloudinary.uploader.destroy(publicId);
+        } catch (err) {
+          console.log('Erro ao deletar imagem:', err.message);
         }
       }
     }
 
-    // Excluir produto do banco de dados
     await Product.findByIdAndDelete(id);
+    res.json({ success: true, message: "Produto eliminado com sucesso" });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
 
-    res.json({
-      success: true,
-      message: 'Produto excluído com sucesso',
+// 🆕 Atualizar quantidade de stock
+const updateStockQuantity = async (req, res) => {
+  try {
+    const { productId, stock } = req.body;
+
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.json({ success: false, message: "Produto não encontrado" });
+    }
+
+    product.stock = stock;
+    await product.save();
+
+    res.json({ 
+      success: true, 
+      message: "Stock atualizado com sucesso",
+      product 
     });
   } catch (error) {
     console.log(error.message);
@@ -406,44 +197,56 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
-// 🆕 Decrement Stock After Purchase : /api/product/decrement-stock
-export const decrementStock = async (req, res) => {
+// 🆕 Decrementar stock (usado após venda)
+const decrementStock = async (req, res) => {
   try {
-    const { items } = req.body; // Array de { productId, variantId?, quantity }
-    
+    const { items } = req.body; // Array de { productId, quantity }
+
     const results = [];
-    
+
     for (const item of items) {
       const product = await Product.findById(item.productId);
       
       if (!product) {
-        results.push({
-          productId: item.productId,
-          success: false,
-          message: 'Produto não encontrado',
+        results.push({ 
+          productId: item.productId, 
+          success: false, 
+          message: "Produto não encontrado" 
         });
         continue;
       }
-      
-      await product.decrementStock(item.quantity, item.variantId);
-      
-      results.push({
-        productId: item.productId,
-        variantId: item.variantId,
-        success: true,
-        newStock: item.variantId 
-          ? product.variants.id(item.variantId)?.stock 
-          : product.stock,
-      });
+
+      try {
+        await product.decrementStock(item.quantity);
+        results.push({ 
+          productId: item.productId, 
+          success: true, 
+          newStock: product.stock 
+        });
+      } catch (err) {
+        results.push({ 
+          productId: item.productId, 
+          success: false, 
+          message: err.message 
+        });
+      }
     }
-    
-    res.json({
-      success: true,
-      message: 'Stock decrementado com sucesso',
-      results,
-    });
+
+    res.json({ success: true, results });
   } catch (error) {
     console.log(error.message);
     res.json({ success: false, message: error.message });
   }
+};
+
+export { 
+  addProduct, 
+  productList, 
+  productById, 
+  changeStock, 
+  updateProduct, 
+  deleteProduct,
+  updateStockQuantity,
+  decrementStock,
+  getProductFamily
 };

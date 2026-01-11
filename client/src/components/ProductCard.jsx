@@ -1,371 +1,225 @@
-import React, { useState, memo, useMemo } from 'react';
-import { assets } from '../assets/assets';
+import { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { assets } from '../assets/assets';
 
-const ProductCard = memo(({ product }) => {
-  const { currency, addToCart, removeFromCart, cartItems, navigate } =
-    useAppContext();
-  
-  // 🎯 Estado para variante selecionada
-  const [selectedVariant, setSelectedVariant] = useState(null);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+const ProductCard = ({ product }) => {
+  const { currency, addToCart, navigate, products } = useAppContext();
 
-  if (!product || !product.image || product.image.length === 0) return null;
+  const [familyProducts, setFamilyProducts] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(product);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // 🎯 CALCULAR STOCK E DISPONIBILIDADE
-  const hasVariants = product.variants && product.variants.length > 0;
-  
-  const totalStock = useMemo(() => {
-    if (hasVariants) {
-      return product.variants.reduce((total, v) => total + (v.stock || 0), 0);
-    }
-    return product.stock || 0;
-  }, [product, hasVariants]);
-  
-  const isInactive = totalStock === 0;
-  
-  // 🎯 IMAGENS A EXIBIR (baseado na variante selecionada)
-  const displayImages = useMemo(() => {
-    if (selectedVariant) {
-      const variant = product.variants.find(v => v._id === selectedVariant);
-      if (variant && variant.images && variant.images.length > 0) {
-        return variant.images;
-      }
-    }
-    return product.image;
-  }, [product, selectedVariant]);
-
-  // 🎯 STOCK DA VARIANTE SELECIONADA
-  const currentStock = useMemo(() => {
-    if (selectedVariant && hasVariants) {
-      const variant = product.variants.find(v => v._id === selectedVariant);
-      return variant?.stock || 0;
-    }
-    return hasVariants ? totalStock : (product.stock || 0);
-  }, [product, selectedVariant, hasVariants, totalStock]);
-
-  // 🎯 PREÇO DA VARIANTE (se tiver preço específico)
-  const currentPrice = useMemo(() => {
-    if (selectedVariant && hasVariants) {
-      const variant = product.variants.find(v => v._id === selectedVariant);
-      if (variant?.offerPrice) {
-        return {
-          price: variant.price || product.price,
-          offerPrice: variant.offerPrice,
-        };
-      }
-    }
-    return {
-      price: product.price,
-      offerPrice: product.offerPrice,
-    };
-  }, [product, selectedVariant, hasVariants]);
-
-  // 🎯 KEY DO CARRINHO (productId ou productId_variantId)
-  const cartKey = selectedVariant ? `${product._id}_${selectedVariant}` : product._id;
-  const cartQuantity = cartItems[cartKey] || 0;
-
-  const nextImage = e => {
-    e.stopPropagation();
-    if (isInactive) return;
-    setCurrentImageIndex(prev => (prev + 1) % displayImages.length);
-  };
-
-  const prevImage = e => {
-    e.stopPropagation();
-    if (isInactive) return;
-    setCurrentImageIndex(
-      prev => (prev - 1 + displayImages.length) % displayImages.length
-    );
-  };
-
-  const handleCardClick = () => {
-    navigate(`/products/${product.category.toLowerCase()}/${product._id}`);
-    window.scrollTo(0, 0);
-  };
-
-  // 🎯 HANDLER PARA SELEÇÃO DE COR
-  const handleColorSelect = (e, variantId) => {
-    e.stopPropagation();
-    setSelectedVariant(variantId === selectedVariant ? null : variantId);
-    setCurrentImageIndex(0); // Reset para primeira imagem da variante
-  };
-
-  // 🎯 HANDLER PARA ADICIONAR AO CARRINHO
-  const handleAddToCart = (e) => {
-    e.stopPropagation();
-    if (currentStock === 0) return;
-    
-    // Se tem variantes mas nenhuma selecionada, selecionar a primeira com stock
-    if (hasVariants && !selectedVariant) {
-      const firstAvailable = product.variants.find(v => v.stock > 0);
-      if (firstAvailable) {
-        setSelectedVariant(firstAvailable._id);
-        addToCart(`${product._id}_${firstAvailable._id}`);
-      }
+  // 🎯 Buscar produtos da mesma família
+  useEffect(() => {
+    if (product.productFamily) {
+      const family = products.filter(
+        p => p.productFamily === product.productFamily
+      );
+      setFamilyProducts(family);
     } else {
-      addToCart(cartKey);
+      setFamilyProducts([]);
     }
+  }, [product.productFamily, products]);
+
+  // Reset quando o produto base muda
+  useEffect(() => {
+    setSelectedProduct(product);
+  }, [product._id]);
+
+  // 🎯 Trocar para outro produto da família COM TRANSIÇÃO
+  const handleColorClick = (familyProduct, e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    if (familyProduct._id === selectedProduct._id) return;
+    
+    // Iniciar transição
+    setIsTransitioning(true);
+    
+    // Após fade-out, trocar produto
+    setTimeout(() => {
+      setSelectedProduct(familyProduct);
+      // Após trocar, fade-in
+      setTimeout(() => {
+        setIsTransitioning(false);
+      }, 50);
+    }, 150);
   };
+
+  // 🎯 Navegar para a página do produto selecionado
+  const handleCardClick = () => {
+    navigate(`/products/${selectedProduct.category.toLowerCase()}/${selectedProduct._id}`);
+  };
+
+  // 🎯 Adicionar ao carrinho
+  const handleAddToCart = async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (selectedProduct.stock <= 0) {
+      return;
+    }
+
+    addToCart(selectedProduct._id);
+  };
+
+  // Dados do produto selecionado
+  const displayProduct = selectedProduct;
+  const stock = displayProduct.stock || 0;
+  const isOutOfStock = stock <= 0;
+  const isLowStock = stock > 0 && stock <= 3;
 
   return (
     <div
       onClick={handleCardClick}
-      className={`border border-gray-500/20 rounded-md p-2 bg-white w-full transition-all duration-300 flex flex-col h-full relative ${
-        isInactive
-          ? 'opacity-90 cursor-default'
-          : 'hover:shadow-md cursor-pointer'
-      }`}
+      className="border border-gray-500/20 rounded-md md:px-4 px-3 py-2 bg-white cursor-pointer group relative overflow-hidden"
     >
-      {/* Image Carousel Container */}
-      <div
-        className='group relative flex items-center justify-center mb-3 overflow-hidden bg-gray-50 rounded-lg'
-        style={{ aspectRatio: '1 / 1', minHeight: '160px' }}
-      >
-        <img
-          className={`max-w-[90%] max-h-[90%] object-contain object-center transition-all duration-300 ${
-            isInactive ? 'opacity-40' : ''
-          }`}
-          src={displayImages[currentImageIndex]}
-          alt={product.name}
-          loading='lazy'
-        />
+      {/* Imagem do Produto com Transição */}
+      <div className="relative flex items-center justify-center px-2 overflow-hidden">
+        <div className={`
+          transition-all duration-300 ease-out
+          ${isTransitioning 
+            ? 'opacity-0 scale-95 blur-sm' 
+            : 'opacity-100 scale-100 blur-0'
+          }
+        `}>
+          <img
+            className="group-hover:scale-105 transition-transform duration-300 max-w-26 md:max-w-36 aspect-square object-contain"
+            src={displayProduct.image[0]}
+            alt={displayProduct.name}
+          />
+        </div>
 
-        {/* Overlay de indisponível */}
-        {isInactive && (
-          <div className='absolute inset-0 flex items-center justify-center bg-black/5'>
-            <div className='text-gray-600 px-3 py-1.5 rounded-md font-medium text-xs tracking-wide uppercase'>
-              Indisponível
-            </div>
+        {/* Badge de Stock */}
+        {isOutOfStock && (
+          <div className="absolute top-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg">
+            Esgotado
+          </div>
+        )}
+        {isLowStock && (
+          <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded shadow-lg">
+            Últimas {stock}!
           </div>
         )}
 
-        {/* 🎯 INDICADOR DE STOCK BAIXO */}
-        {!isInactive && currentStock > 0 && currentStock <= 3 && (
-          <div className='absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-0.5 rounded-full font-medium'>
-            Últimas {currentStock}!
-          </div>
-        )}
-
-        {/* Setas de navegação */}
-        {!isInactive && displayImages.length > 1 && (
-          <>
-            <button
-              onClick={prevImage}
-              className='absolute z-10 left-2 sm:left-3 bg-white/80 rounded-full p-1.5 shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100 md:opacity-30 md:group-hover:opacity-100'
-              aria-label='Previous image'
-            >
-              <img
-                src={assets.arrow_left}
-                alt=''
-                className='w-3 h-3 md:w-4 md:h-4'
-              />
-            </button>
-            <button
-              onClick={nextImage}
-              className='absolute z-10 right-2 sm:right-3 bg-white/80 rounded-full p-1.5 shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100 md:opacity-30 md:group-hover:opacity-100'
-              aria-label='Next image'
-            >
-              <img
-                src={assets.arrow_right}
-                alt=''
-                className='w-3 h-3 md:w-4 md:h-4'
-              />
-            </button>
-          </>
-        )}
-
-        {/* Indicadores (pontos) */}
-        {!isInactive && displayImages.length > 1 && (
-          <div className='absolute bottom-2 z-10 left-0 right-0 flex justify-center gap-1.5'>
-            {displayImages.map((_, index) => (
-              <button
-                key={index}
-                onClick={e => {
-                  e.stopPropagation();
-                  setCurrentImageIndex(index);
-                }}
-                className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full transition-all ${
-                  currentImageIndex === index
-                    ? 'bg-primary w-3 md:w-4'
-                    : 'bg-gray-300/80'
-                }`}
-                aria-label={`Go to image ${index + 1}`}
-              />
-            ))}
-          </div>
+        {/* Botão Adicionar ao Carrinho (hover) */}
+        {!isOutOfStock && (
+          <button
+            onClick={handleAddToCart}
+            className="absolute bottom-2 right-2 bg-primary hover:bg-primary-dull transition-all text-white text-xs md:text-sm px-2 py-1 md:px-3 md:py-1.5 rounded opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 duration-200"
+          >
+            <img
+              src={assets.cart_icon}
+              alt="Adicionar"
+              className="w-4 h-4 inline mr-1"
+            />
+            Adicionar
+          </button>
         )}
       </div>
 
-      {/* Product Info */}
-      <div className='flex flex-col flex-grow text-gray-500/60 text-sm'>
-        <p
-          className={`text-gray-700 font-medium text-base md:text-lg line-clamp-2 h-[3em] mt-1 ${
-            isInactive ? 'opacity-60' : ''
-          }`}
-        >
-          {product.name}
+      {/* Informações do Produto */}
+      <div className="text-gray-500/60 text-sm mt-2">
+        <p>{displayProduct.category}</p>
+        
+        {/* Nome com transição */}
+        <p className={`
+          text-gray-700 font-medium text-lg truncate w-full
+          transition-all duration-300
+          ${isTransitioning ? 'opacity-0 translate-x-2' : 'opacity-100 translate-x-0'}
+        `}>
+          {displayProduct.name}
         </p>
 
-        {/* 🎯 BOLINHAS DE CORES */}
-        {hasVariants && (
-          <div className='flex items-center gap-1.5 mt-2 flex-wrap'>
-            {product.variants.map((variant) => {
-              const variantOutOfStock = variant.stock === 0;
-              const isSelected = selectedVariant === variant._id;
-              
+        {/* 🆕 Bolinhas de Cores (família de produtos) */}
+        {familyProducts.length > 1 && (
+          <div className="flex items-center gap-1.5 mt-2 mb-2 flex-wrap">
+            {familyProducts.slice(0, 6).map((familyProduct) => {
+              const isSelected = familyProduct._id === displayProduct._id;
+              const familyStock = familyProduct.stock || 0;
+              const familyOutOfStock = familyStock <= 0;
+
               return (
                 <button
-                  key={variant._id}
-                  onClick={(e) => handleColorSelect(e, variant._id)}
-                  title={`${variant.color}${variantOutOfStock ? ' (Esgotado)' : ''}`}
+                  key={familyProduct._id}
+                  onClick={(e) => handleColorClick(familyProduct, e)}
+                  title={`${familyProduct.color || familyProduct.name}${familyOutOfStock ? ' (Esgotado)' : ''}`}
                   className={`
-                    relative w-5 h-5 md:w-6 md:h-6 rounded-full transition-all duration-200
-                    ${isSelected 
-                      ? 'ring-2 ring-offset-1 ring-primary scale-110' 
-                      : 'hover:scale-105'
+                    w-5 h-5 rounded-full border-2 transition-all duration-200 relative
+                    transform hover:scale-110 active:scale-95
+                    ${isSelected
+                      ? 'ring-2 ring-primary ring-offset-1 border-primary scale-110'
+                      : 'border-gray-300 hover:border-gray-400'
                     }
-                    ${variantOutOfStock ? 'opacity-40' : ''}
+                    ${familyOutOfStock ? 'opacity-50' : ''}
                   `}
-                  style={{ backgroundColor: variant.colorCode }}
-                  disabled={variantOutOfStock}
+                  style={{
+                    backgroundColor: familyProduct.colorCode || '#ccc',
+                  }}
                 >
-                  {/* X para variantes esgotadas */}
-                  {variantOutOfStock && (
-                    <span className='absolute inset-0 flex items-center justify-center text-white text-xs font-bold drop-shadow-md'>
+                  {/* X para esgotado */}
+                  {familyOutOfStock && (
+                    <span className="absolute inset-0 flex items-center justify-center text-white text-xs font-bold drop-shadow">
                       ✕
                     </span>
                   )}
-                  {/* Borda branca para cores claras */}
-                  <span 
-                    className='absolute inset-0 rounded-full border border-gray-300'
-                    style={{ 
-                      borderColor: isLightColor(variant.colorCode) ? '#d1d5db' : 'transparent' 
-                    }}
-                  />
                 </button>
               );
             })}
+            {familyProducts.length > 6 && (
+              <span className="text-xs text-gray-400">
+                +{familyProducts.length - 6}
+              </span>
+            )}
           </div>
         )}
 
-        {/* Rating */}
-        <div className='flex items-center gap-0.5 mt-2'>
-          {Array(5)
-            .fill('')
-            .map((_, i) => (
-              <img
-                key={i}
-                className='w-3 md:w-3.5'
-                src={i < 4 ? assets.star_icon : assets.star_dull_icon}
-                alt=''
-              />
-            ))}
-          <p className='text-xs md:text-sm'>(4)</p>
-        </div>
+        {/* Cor do produto atual (se definida mas sem família) */}
+        {displayProduct.color && familyProducts.length <= 1 && (
+          <div className="flex items-center gap-1.5 mt-1">
+            <div
+              className="w-4 h-4 rounded-full border border-gray-300"
+              style={{ backgroundColor: displayProduct.colorCode || '#ccc' }}
+            />
+            <span className="text-xs">{displayProduct.color}</span>
+          </div>
+        )}
 
-        {/* Price and Add to Cart */}
-        <div className='flex items-end justify-between mt-3 flex-grow'>
-          <div>
-            <p
-              className={`text-lg md:text-xl font-medium text-gray-700 ${
-                isInactive ? 'opacity-60' : ''
-              }`}
-            >
-              {currentPrice.offerPrice.toLocaleString('pt-PT', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}{' '}
+        {/* Preço com transição */}
+        <div className={`
+          flex items-end justify-between mt-2
+          transition-all duration-300
+          ${isTransitioning ? 'opacity-0' : 'opacity-100'}
+        `}>
+          <p className="md:text-xl text-base font-semibold text-primary">
+            {currency}
+            {displayProduct.offerPrice}
+          </p>
+          {displayProduct.price !== displayProduct.offerPrice && (
+            <p className="text-gray-400 text-sm line-through">
               {currency}
+              {displayProduct.price}
             </p>
-            {currentPrice.offerPrice < currentPrice.price && (
-              <p
-                className={`text-gray-500/60 text-xs md:text-sm line-through ${
-                  isInactive ? 'opacity-60' : ''
-                }`}
-              >
-                {currentPrice.price.toLocaleString('pt-PT', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{' '}
-                {currency}
-              </p>
-            )}
-          </div>
-
-          {/* Botão de carrinho */}
-          <div
-            onClick={e => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            className='text-primary'
-          >
-            {isInactive || currentStock === 0 ? (
-              <div className='flex items-center justify-center gap-1 bg-gray-100 border border-gray-300 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 rounded-lg text-xs sm:text-sm font-medium cursor-not-allowed opacity-70'>
-                <span className='text-gray-500'>Esgotado</span>
-              </div>
-            ) : cartQuantity === 0 ? (
-              <button
-                className='flex items-center justify-center gap-1 bg-primary/10 border border-primary/40 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 rounded-lg hover:bg-primary/20 transition-colors text-sm sm:text-base md:text-lg font-medium shadow-sm active:scale-95'
-                onClick={handleAddToCart}
-              >
-                <img
-                  src={assets.cart_icon}
-                  alt='cart_icon'
-                  className='w-4 sm:w-5 md:w-6'
-                />
-                Add
-              </button>
-            ) : (
-              <div className='flex items-center justify-center gap-2 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 bg-primary/10 border border-primary/20 rounded-lg select-none shadow-sm'>
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    removeFromCart(cartKey);
-                  }}
-                  className='cursor-pointer text-lg sm:text-xl md:text-2xl px-2 sm:px-3 md:px-4 h-full flex items-center justify-center hover:bg-primary/20 rounded-l-lg transition-colors active:scale-95 font-bold'
-                >
-                  -
-                </button>
-                <span className='w-6 sm:w-8 md:w-10 text-center text-sm sm:text-base md:text-lg font-semibold'>
-                  {cartQuantity}
-                </span>
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    // 🎯 VERIFICAR STOCK ANTES DE ADICIONAR
-                    if (cartQuantity < currentStock) {
-                      addToCart(cartKey);
-                    }
-                  }}
-                  disabled={cartQuantity >= currentStock}
-                  className={`cursor-pointer text-lg sm:text-xl md:text-2xl px-2 sm:px-3 md:px-4 h-full flex items-center justify-center hover:bg-primary/20 rounded-r-lg transition-colors active:scale-95 font-bold ${
-                    cartQuantity >= currentStock ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  +
-                </button>
-              </div>
-            )}
-          </div>
+          )}
         </div>
+
+        {/* Stock info */}
+        <p className={`
+          text-xs text-gray-400 mt-1
+          transition-all duration-300
+          ${isTransitioning ? 'opacity-0' : 'opacity-100'}
+        `}>
+          {isOutOfStock ? (
+            <span className="text-red-500">Sem stock</span>
+          ) : isLowStock ? (
+            <span className="text-orange-500">Apenas {stock} em stock</span>
+          ) : (
+            <span>{stock} disponíveis</span>
+          )}
+        </p>
       </div>
     </div>
   );
-});
-
-// 🎯 HELPER: Verificar se a cor é clara (para adicionar borda)
-function isLightColor(hexColor) {
-  if (!hexColor) return false;
-  const hex = hexColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.7;
-}
-
-ProductCard.displayName = 'ProductCard';
+};
 
 export default ProductCard;
