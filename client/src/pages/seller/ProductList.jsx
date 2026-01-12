@@ -10,13 +10,14 @@ const ProductList = () => {
   const [productToDelete, setProductToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // 🆕 ESTADOS PARA BUSCAR TODOS OS PRODUTOS (INCLUINDO VARIANTES)
+  // Estados para buscar todos os produtos (incluindo variantes)
   const [allProducts, setAllProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filterFamily, setFilterFamily] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
   const [showOnlyMain, setShowOnlyMain] = useState(false);
 
-  // 🆕 BUSCAR TODOS OS PRODUTOS (INCLUINDO VARIANTES)
+  // Buscar todos os produtos (incluindo variantes)
   useEffect(() => {
     fetchAllProducts();
   }, []);
@@ -36,15 +37,25 @@ const ProductList = () => {
     }
   };
 
-  // 🆕 PRODUTOS FILTRADOS
+  // 🆕 FUNÇÃO PARA SINCRONIZAR AMBAS AS LISTAS
+  const refreshAllProducts = async () => {
+    await fetchAllProducts(); // Lista local do seller
+    await fetchProducts();    // Lista global do AppContext (sincroniza Categories, etc.)
+  };
+
+  // Produtos filtrados
   const filteredProducts = allProducts.filter(product => {
     if (showOnlyMain && product.isMainVariant === false) return false;
     if (filterFamily && product.productFamily !== filterFamily) return false;
+    if (filterCategory && product.category?.toLowerCase() !== filterCategory.toLowerCase()) return false;
     return true;
   });
 
-  // 🆕 EXTRAIR FAMÍLIAS ÚNICAS
+  // Extrair famílias únicas
   const uniqueFamilies = [...new Set(allProducts.filter(p => p.productFamily).map(p => p.productFamily))];
+  
+  // 🆕 Extrair categorias únicas
+  const uniqueCategories = [...new Set(allProducts.filter(p => p.category).map(p => p.category))];
 
   const toggleStock = async (id, inStock) => {
     if (updatingProducts.has(id)) return;
@@ -53,13 +64,13 @@ const ProductList = () => {
     try {
       const { data } = await axios.post('/api/product/stock', { id, inStock });
       if (data.success) {
-        await fetchAllProducts();
-        toast.success(inStock ? 'Produto ativado com sucesso!' : 'Produto desativado');
+        await refreshAllProducts(); // 🆕 Sincroniza tudo
+        toast.success(inStock ? 'Produto ativado!' : 'Produto desativado');
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message || 'Erro ao atualizar o produto');
+      toast.error(error.message || 'Erro ao atualizar');
     } finally {
       setUpdatingProducts(prev => {
         const newSet = new Set(prev);
@@ -69,7 +80,7 @@ const ProductList = () => {
     }
   };
 
-  // 🆕 ATUALIZAR STOCK RÁPIDO
+  // Atualizar stock rápido
   const updateStockQuick = async (productId, newStock) => {
     try {
       const { data } = await axios.post('/api/product/update-stock', {
@@ -77,7 +88,7 @@ const ProductList = () => {
         stock: newStock
       });
       if (data.success) {
-        await fetchAllProducts();
+        await refreshAllProducts(); // 🆕 Sincroniza tudo
         toast.success('Stock atualizado!');
       } else {
         toast.error(data.message);
@@ -94,20 +105,19 @@ const ProductList = () => {
       const { data } = await axios.post('/api/product/delete', { id: productToDelete._id });
       if (data.success) {
         toast.success(data.message);
-        await fetchAllProducts();
+        await refreshAllProducts(); // 🆕 Sincroniza tudo
         setProductToDelete(null);
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      console.error('Erro ao excluir:', error);
-      toast.error(error.response?.data?.message || error.message || 'Erro ao excluir produto');
+      toast.error(error.response?.data?.message || 'Erro ao excluir');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // 🆕 Helper: verificar se cor é clara
+  // Helper: verificar se cor é clara
   const isLightColor = (color) => {
     if (!color) return false;
     const hex = color.replace('#', '');
@@ -138,12 +148,26 @@ const ProductList = () => {
             <h2 className='text-2xl font-bold text-gray-800'>Gestão de Produtos</h2>
             <p className='text-sm text-gray-500 mt-1'>
               Total: <span className='font-semibold'>{allProducts.length}</span> produtos
-              {showOnlyMain && ` (${filteredProducts.length} principais)`}
+              {(showOnlyMain || filterFamily || filterCategory) && 
+                ` (${filteredProducts.length} filtrados)`
+              }
             </p>
           </div>
           
-          {/* 🆕 FILTROS */}
+          {/* FILTROS */}
           <div className='flex flex-wrap gap-3'>
+            {/* Filtro por Categoria */}
+            <select
+              value={filterCategory}
+              onChange={e => setFilterCategory(e.target.value)}
+              className='px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary'
+            >
+              <option value=''>Todas as Categorias</option>
+              {uniqueCategories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            
             {/* Filtro por Família */}
             <select
               value={filterFamily}
@@ -166,23 +190,37 @@ const ProductList = () => {
               />
               <span className='text-sm text-gray-700'>Só principais</span>
             </label>
+            
+            {/* Botão Limpar Filtros */}
+            {(filterCategory || filterFamily || showOnlyMain) && (
+              <button
+                onClick={() => {
+                  setFilterCategory('');
+                  setFilterFamily('');
+                  setShowOnlyMain(false);
+                }}
+                className='px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors'
+              >
+                Limpar
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Legenda dos status */}
+        {/* Legenda */}
         <div className='mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200'>
           <div className='flex flex-wrap gap-4 text-sm'>
             <div className='flex items-center gap-2'>
               <div className='w-3 h-3 bg-green-500 rounded-full'></div>
-              <span className='text-gray-700'>Ativo (em stock)</span>
+              <span className='text-gray-700'>Ativo</span>
             </div>
             <div className='flex items-center gap-2'>
               <div className='w-3 h-3 bg-red-500 rounded-full'></div>
-              <span className='text-gray-700'>Inativo (sem stock)</span>
+              <span className='text-gray-700'>Inativo</span>
             </div>
             <div className='flex items-center gap-2'>
               <div className='w-6 h-4 bg-primary/20 rounded text-xs flex items-center justify-center font-medium text-primary'>P</div>
-              <span className='text-gray-700'>Produto Principal</span>
+              <span className='text-gray-700'>Principal</span>
             </div>
             <div className='flex items-center gap-2'>
               <div className='w-6 h-4 bg-gray-200 rounded text-xs flex items-center justify-center font-medium text-gray-500'>V</div>
@@ -220,7 +258,7 @@ const ProductList = () => {
                         isUpdating ? 'opacity-50 pointer-events-none' : ''
                       } ${!isMainVariant ? 'bg-gray-50/50' : ''}`}
                     >
-                      {/* Produto com imagem e nome */}
+                      {/* Produto */}
                       <td className='px-4 py-3'>
                         <div className='flex items-center space-x-3'>
                           <div className='relative border border-gray-300 rounded-lg p-2 bg-white shadow-sm'>
@@ -239,15 +277,13 @@ const ProductList = () => {
                           </div>
                           <div className='flex-1 min-w-0'>
                             <div className='flex items-center gap-2'>
-                              <p className='font-medium text-gray-900 truncate'>{product.name}</p>
-                              {/* 🆕 Badge Principal/Variante */}
+                              <p className='font-medium text-gray-900 truncate max-w-[200px]'>{product.name}</p>
                               {isMainVariant ? (
-                                <span className='px-1.5 py-0.5 bg-primary/20 text-primary text-xs font-medium rounded'>P</span>
+                                <span className='px-1.5 py-0.5 bg-primary/20 text-primary text-xs font-medium rounded flex-shrink-0'>P</span>
                               ) : (
-                                <span className='px-1.5 py-0.5 bg-gray-200 text-gray-500 text-xs font-medium rounded'>V</span>
+                                <span className='px-1.5 py-0.5 bg-gray-200 text-gray-500 text-xs font-medium rounded flex-shrink-0'>V</span>
                               )}
                             </div>
-                            {/* 🆕 Família */}
                             {product.productFamily && (
                               <p className='text-xs text-gray-500 truncate mt-0.5'>
                                 Família: {product.productFamily}
@@ -260,12 +296,12 @@ const ProductList = () => {
                         </div>
                       </td>
 
-                      {/* 🆕 Cor */}
+                      {/* Cor */}
                       <td className='px-4 py-3'>
                         {product.colorCode ? (
                           <div className='flex items-center gap-2'>
                             <div
-                              className={`w-8 h-8 rounded-full border-2 ${
+                              className={`w-8 h-8 rounded-full border-2 flex-shrink-0 ${
                                 isLightColor(product.colorCode) ? 'border-gray-300' : 'border-gray-200'
                               }`}
                               style={{ backgroundColor: product.colorCode }}
@@ -301,7 +337,7 @@ const ProductList = () => {
                         </div>
                       </td>
 
-                      {/* 🆕 Stock com Input Inline */}
+                      {/* Stock */}
                       <td className='px-4 py-3'>
                         <div className='flex flex-col items-center gap-1'>
                           <div className='flex items-center gap-1'>
@@ -335,7 +371,6 @@ const ProductList = () => {
                               +
                             </button>
                           </div>
-                          {/* Badge Stock */}
                           {currentStock === 0 ? (
                             <span className='text-xs text-red-600 font-medium'>Esgotado</span>
                           ) : isLowStock ? (
@@ -344,7 +379,7 @@ const ProductList = () => {
                         </div>
                       </td>
 
-                      {/* Toggle Status */}
+                      {/* Status */}
                       <td className='px-4 py-3'>
                         <div className='flex items-center justify-center gap-3'>
                           <div className='hidden sm:flex items-center gap-1.5'>
@@ -361,6 +396,7 @@ const ProductList = () => {
                               disabled={isUpdating}
                               type='checkbox'
                               className='sr-only peer'
+                              readOnly
                             />
                             <div className={`w-14 h-8 rounded-full transition-all duration-300 ${
                               isActive ? 'bg-green-500 shadow-green-500/50' : 'bg-red-400 shadow-red-400/50'
@@ -392,8 +428,8 @@ const ProductList = () => {
                         <div className='flex items-center justify-center gap-2'>
                           <button
                             onClick={() => setProductToEdit(product)}
-                            className='p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors group'
-                            title='Editar produto'
+                            className='p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors'
+                            title='Editar'
                           >
                             <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                               <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' />
@@ -401,8 +437,8 @@ const ProductList = () => {
                           </button>
                           <button
                             onClick={() => setProductToDelete(product)}
-                            className='p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors group'
-                            title='Excluir produto'
+                            className='p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors'
+                            title='Excluir'
                           >
                             <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                               <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16' />
@@ -417,26 +453,55 @@ const ProductList = () => {
             </table>
           </div>
 
-          {/* Mensagem quando não há produtos */}
           {filteredProducts.length === 0 && (
             <div className='py-12 text-center text-gray-500'>
               <svg className='w-16 h-16 mx-auto mb-4 text-gray-400' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
                 <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4' />
               </svg>
               <p className='text-lg font-medium'>Nenhum produto encontrado</p>
-              <p className='text-sm mt-1'>Adicione produtos para começar a gerir o seu inventário</p>
+              <p className='text-sm mt-1'>Ajuste os filtros ou adicione novos produtos</p>
             </div>
           )}
         </div>
 
-        {/* Estatísticas */}
+        {/* Estatísticas por Categoria */}
+        <div className='mt-6'>
+          <h3 className='text-lg font-semibold text-gray-800 mb-4'>Resumo por Categoria</h3>
+          <div className='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4'>
+            {uniqueCategories.map(cat => {
+              const catProducts = allProducts.filter(p => p.category === cat);
+              const mainCount = catProducts.filter(p => p.isMainVariant !== false).length;
+              const variantCount = catProducts.filter(p => p.isMainVariant === false).length;
+              const inStockCount = catProducts.filter(p => p.inStock).length;
+              
+              return (
+                <div 
+                  key={cat} 
+                  className='bg-white p-4 rounded-lg border border-gray-200 shadow-sm cursor-pointer hover:border-primary transition-colors'
+                  onClick={() => setFilterCategory(filterCategory === cat ? '' : cat)}
+                >
+                  <p className='text-sm font-medium text-gray-800 truncate'>{cat}</p>
+                  <div className='mt-2 space-y-1'>
+                    <p className='text-2xl font-bold text-primary'>{mainCount}</p>
+                    <p className='text-xs text-gray-500'>
+                      {variantCount > 0 && `+${variantCount} variantes • `}
+                      {inStockCount} em stock
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Estatísticas Gerais */}
         <div className='mt-6 grid grid-cols-2 md:grid-cols-5 gap-4'>
           <div className='bg-white p-4 rounded-lg border border-gray-200 shadow-sm'>
-            <p className='text-sm text-gray-600'>Total de Produtos</p>
+            <p className='text-sm text-gray-600'>Total</p>
             <p className='text-2xl font-bold text-gray-900 mt-1'>{allProducts.length}</p>
           </div>
           <div className='bg-white p-4 rounded-lg border border-gray-200 shadow-sm'>
-            <p className='text-sm text-gray-600'>Produtos Principais</p>
+            <p className='text-sm text-gray-600'>Principais</p>
             <p className='text-2xl font-bold text-primary mt-1'>
               {allProducts.filter(p => p.isMainVariant !== false).length}
             </p>
@@ -467,12 +532,12 @@ const ProductList = () => {
         <EditProductModal
           product={productToEdit}
           onClose={() => setProductToEdit(null)}
-          onSuccess={fetchAllProducts}
+          onSuccess={refreshAllProducts}
           axios={axios}
         />
       )}
 
-      {/* Modal de Confirmação de Exclusão */}
+      {/* Modal de Exclusão */}
       {productToDelete && (
         <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'>
           <div className='bg-white rounded-lg shadow-xl max-w-md w-full p-6'>
@@ -481,12 +546,10 @@ const ProductList = () => {
                 <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' />
               </svg>
             </div>
-
             <h3 className='text-lg font-bold text-gray-900 text-center mb-2'>Excluir Produto?</h3>
             <p className='text-sm text-gray-600 text-center mb-6'>
-              Tem certeza que deseja excluir "{productToDelete.name}"? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir "{productToDelete.name}"?
             </p>
-
             <div className='flex items-center gap-3'>
               <button
                 onClick={() => setProductToDelete(null)}
@@ -497,20 +560,18 @@ const ProductList = () => {
               </button>
               <button
                 onClick={handleDelete}
-                className='flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2'
+                className='flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2'
                 disabled={isDeleting}
               >
                 {isDeleting ? (
                   <>
-                    <svg className='animate-spin h-5 w-5 text-white' viewBox='0 0 24 24'>
+                    <svg className='animate-spin h-5 w-5' viewBox='0 0 24 24'>
                       <circle className='opacity-25' cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='4' fill='none' />
                       <path className='opacity-75' fill='currentColor' d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z' />
                     </svg>
                     Excluindo...
                   </>
-                ) : (
-                  'Excluir Permanentemente'
-                )}
+                ) : 'Excluir'}
               </button>
             </div>
           </div>

@@ -39,7 +39,7 @@ const AddProduct = () => {
   const [colorCode, setColorCode] = useState('#000000');
   const [isMainVariant, setIsMainVariant] = useState(true);
 
-  const { axios } = useAppContext();
+  const { axios, fetchProducts } = useAppContext();
 
   // 🎯 GERAR SLUG PARA FAMÍLIA
   const generateFamilySlug = (text) => {
@@ -114,6 +114,10 @@ const AddProduct = () => {
 
       if (data.success) {
         toast.success('Produto adicionado com sucesso!');
+        
+        // 🆕 Sincronizar produtos globais
+        await fetchProducts();
+        
         // Reset form
         setName('');
         setDescription('');
