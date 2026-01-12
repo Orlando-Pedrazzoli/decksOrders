@@ -248,15 +248,34 @@ export const AppContextProvider = ({ children }) => {
   // 🆕 FUNÇÕES DE STOCK
   // =============================================================================
 
+  // 🎯 Função auxiliar para encontrar produto (em products OU familyCache)
+  const findProduct = (productId) => {
+    // Primeiro procura nos produtos principais
+    let product = products.find(p => p._id === productId);
+    
+    // Se não encontrou, procura no cache de famílias (variantes)
+    if (!product) {
+      for (const familySlug in familyCache) {
+        const familyProduct = familyCache[familySlug].find(p => p._id === productId);
+        if (familyProduct) {
+          product = familyProduct;
+          break;
+        }
+      }
+    }
+    
+    return product;
+  };
+
   // 🎯 Obter stock disponível de um produto
   const getAvailableStock = (productId) => {
-    const product = products.find(p => p._id === productId);
+    const product = findProduct(productId);
     return product?.stock || 0;
   };
 
   // 🎯 Validar se pode adicionar ao carrinho
   const canAddToCart = (productId, quantityToAdd = 1) => {
-    const product = products.find(p => p._id === productId);
+    const product = findProduct(productId);
     
     if (!product) {
       return { can: false, reason: 'Produto não encontrado' };
@@ -437,7 +456,7 @@ export const AppContextProvider = ({ children }) => {
   const getCartAmount = () => {
     let totalAmount = 0;
     for (const items in cartItems) {
-      let itemInfo = products.find(product => product._id === items);
+      let itemInfo = findProduct(items); // 🆕 Usar findProduct para encontrar variantes
       if (itemInfo && cartItems[items] > 0) {
         totalAmount += itemInfo.offerPrice * cartItems[items];
       }
@@ -579,6 +598,7 @@ export const AppContextProvider = ({ children }) => {
     // 🆕 FUNÇÕES DE STOCK
     getAvailableStock,
     canAddToCart,
+    findProduct, // 🆕 Encontrar produto em products ou familyCache
     // 🆕 FUNÇÕES DE FAMÍLIA/VARIANTES
     getProductFamily,
     clearFamilyCache,

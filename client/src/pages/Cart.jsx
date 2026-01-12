@@ -21,6 +21,7 @@ const Cart = () => {
     setShowUserLogin,
     isMobile,
     saveCartToStorage,
+    findProduct, // 🆕 Para encontrar variantes
   } = useAppContext();
 
   const [cartArray, setCartArray] = useState([]);
@@ -56,7 +57,7 @@ const Cart = () => {
   const updateCartArray = () => {
     const tempArray = Object.keys(cartItems)
       .map(key => {
-        const product = products.find(item => item._id === key);
+        const product = findProduct(key); // 🆕 Usar findProduct para encontrar variantes
         return product ? { ...product, quantity: cartItems[key] } : null;
       })
       .filter(Boolean);
@@ -102,7 +103,7 @@ const Cart = () => {
 
   // 🆕 VALIDAR STOCK ANTES DE ALTERAR QUANTIDADE
   const handleQuantityChange = (productId, newQuantity) => {
-    const product = products.find(p => p._id === productId);
+    const product = findProduct(productId); // 🆕 Usar findProduct para encontrar variantes
     if (!product) return;
 
     const availableStock = product.stock || 0;

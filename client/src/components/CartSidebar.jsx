@@ -15,6 +15,7 @@ const CartSidebar = () => {
     getCartCount,
     getCartAmount,
     navigate,
+    findProduct, // 🆕 Para encontrar variantes
   } = useAppContext();
 
   const [isVisible, setIsVisible] = useState(false);
@@ -79,7 +80,7 @@ const CartSidebar = () => {
 
   const cartArray = Object.keys(cartItems)
     .map((key) => {
-      const product = products.find((item) => item._id === key);
+      const product = findProduct(key); // 🆕 Usar findProduct para encontrar variantes
       return product ? { ...product, quantity: cartItems[key] } : null;
     })
     .filter(Boolean);
