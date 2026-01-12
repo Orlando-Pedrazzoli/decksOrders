@@ -23,7 +23,6 @@ const PRESET_COLORS = [
 
 const AddProduct = () => {
   const [files, setFiles] = useState([]);
-  const [videoFile, setVideoFile] = useState(null); // 🆕 Vídeo do produto
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
@@ -110,11 +109,6 @@ const AddProduct = () => {
       for (let i = 0; i < files.length; i++) {
         formData.append('images', files[i]);
       }
-      
-      // 🆕 Adicionar vídeo se existir
-      if (videoFile) {
-        formData.append('video', videoFile);
-      }
 
       const { data } = await axios.post('/api/product/add', formData);
 
@@ -132,7 +126,6 @@ const AddProduct = () => {
         setOfferPrice('');
         setStock('');
         setFiles([]);
-        setVideoFile(null); // 🆕 Reset vídeo
         setProductFamily('');
         setHasColor(false);
         setColor('');
@@ -184,57 +177,6 @@ const AddProduct = () => {
               ))}
           </div>
           <p className='text-xs text-gray-500 mt-2'>Arraste ou clique para adicionar até 8 imagens</p>
-        </div>
-
-        {/* 🆕 Vídeo do Produto */}
-        <div>
-          <p className='text-base font-medium mb-2'>Vídeo do Produto <span className='text-gray-400 font-normal'>(opcional)</span></p>
-          <div className='flex items-start gap-4'>
-            <label htmlFor='product-video' className='cursor-pointer'>
-              <input
-                onChange={e => setVideoFile(e.target.files[0])}
-                type='file'
-                id='product-video'
-                hidden
-                accept='video/mp4,video/webm,video/mov,video/quicktime'
-              />
-              <div className={`w-32 h-20 rounded-lg border-2 border-dashed flex items-center justify-center transition-colors ${videoFile ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-primary'}`}>
-                {videoFile ? (
-                  <div className='text-center'>
-                    <svg className='w-6 h-6 mx-auto text-primary' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' />
-                    </svg>
-                    <span className='text-xs text-primary mt-1 block'>Vídeo</span>
-                  </div>
-                ) : (
-                  <div className='text-center text-gray-400'>
-                    <svg className='w-6 h-6 mx-auto' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' />
-                    </svg>
-                    <span className='text-xs mt-1 block'>+ Vídeo</span>
-                  </div>
-                )}
-              </div>
-            </label>
-            {videoFile && (
-              <div className='flex-1'>
-                <div className='flex items-center gap-2'>
-                  <span className='text-sm text-gray-700 truncate max-w-[200px]'>{videoFile.name}</span>
-                  <button
-                    type='button'
-                    onClick={() => setVideoFile(null)}
-                    className='text-red-500 hover:text-red-700 text-sm'
-                  >
-                    Remover
-                  </button>
-                </div>
-                <span className='text-xs text-gray-500'>
-                  {(videoFile.size / (1024 * 1024)).toFixed(2)} MB
-                </span>
-              </div>
-            )}
-          </div>
-          <p className='text-xs text-gray-500 mt-2'>MP4, WebM ou MOV (máx. 100MB)</p>
         </div>
 
         {/* Nome */}
