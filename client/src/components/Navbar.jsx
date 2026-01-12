@@ -99,7 +99,6 @@ const Navbar = () => {
     navigate('/seller');
   };
 
-  // ✅ Abrir Cart Sidebar
   const handleCartClick = () => {
     setShowCartSidebar(true);
   };
@@ -143,7 +142,7 @@ const Navbar = () => {
       ) : (
         <img
           src={assets.search_icon}
-          alt='search'
+          alt='Pesquisar'
           className='w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 transition-opacity'
           onClick={() => {
             if (localSearchInput.trim()) {
@@ -160,12 +159,20 @@ const Navbar = () => {
   );
 
   return (
-    <nav className='sticky top-0 flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b border-gray-300 bg-white relative shadow-sm z-50'>
-      <NavLink to='/' onClick={() => setOpen(false)}>
-        <img className='h-9' src={assets.logo_es} alt='logo' />
+   <nav className='sticky top-0 flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b border-gray-300 bg-white shadow-sm z-50'>
+      <NavLink 
+        to='/' 
+        onClick={() => setOpen(false)}
+        aria-label='Elite Surfing Portugal - Página Inicial'
+        title='Ir para página inicial'
+      >
+        <img 
+          className='h-9' 
+          src={assets.logo_es} 
+          alt='Elite Surfing Portugal - Loja de Surf'
+        />
       </NavLink>
 
-      {/* Desktop Navigation */}
       <div className='hidden sm:flex items-center gap-8'>
         <NavLink
           to='/'
@@ -188,7 +195,6 @@ const Navbar = () => {
 
         <div className='hidden lg:flex items-center'>{renderSearchInput()}</div>
 
-        {/* Admin Icon com Dropdown - Desktop */}
         <div className='relative group'>
           <button
             onClick={handleAdminAccess}
@@ -218,14 +224,13 @@ const Navbar = () => {
           )}
         </div>
 
-        {/* Cart Icon - Desktop - ✅ Abre Sidebar */}
         <div
           onClick={handleCartClick}
           className='relative cursor-pointer'
         >
           <img
             src={assets.nav_cart_icon}
-            alt='cart'
+            alt='Carrinho de compras'
             className='w-6 opacity-80'
           />
           <button className='absolute -top-2 -right-3 text-xs text-white bg-primary w-[18px] h-[18px] rounded-full'>
@@ -233,7 +238,6 @@ const Navbar = () => {
           </button>
         </div>
 
-        {/* User Login/Profile - Desktop */}
         {!user ? (
           <button
             onClick={() => setShowUserLogin(true)}
@@ -243,7 +247,7 @@ const Navbar = () => {
           </button>
         ) : (
           <div className='relative group flex flex-col items-center'>
-            <img src={assets.profile_icon} className='w-10' alt='profile' />
+            <img src={assets.profile_icon} className='w-10' alt='Perfil do utilizador' />
             <span className='text-xs text-gray-600 mt-1 max-w-20 truncate'>
               {user.name}
             </span>
@@ -274,16 +278,14 @@ const Navbar = () => {
         )}
       </div>
 
-      {/* Mobile - Apenas Cart e Menu */}
       <div className='flex items-center gap-4 sm:hidden'>
-        {/* Cart Icon - Mobile - ✅ Abre Sidebar */}
         <div
           onClick={handleCartClick}
           className='relative cursor-pointer'
         >
           <img
             src={assets.nav_cart_icon}
-            alt='cart'
+            alt='Carrinho de compras'
             className='w-6 opacity-80'
           />
           <button className='absolute -top-2 -right-3 text-xs text-white bg-primary w-[18px] h-[18px] rounded-full'>
@@ -291,17 +293,15 @@ const Navbar = () => {
           </button>
         </div>
 
-        {/* Menu Icon - Mobile */}
         <button
           onClick={() => setOpen(!open)}
-          aria-label='Menu'
+          aria-label='Menu de navegação'
           className='focus:outline-none'
         >
-          <img src={assets.menu_icon} alt='menu' className='w-7 h-7' />
+          <img src={assets.menu_icon} alt='Menu' className='w-7 h-7' />
         </button>
       </div>
 
-      {/* Mobile Menu Panel */}
       {open && (
         <div
           className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden'
@@ -311,11 +311,11 @@ const Navbar = () => {
             className='absolute top-0 right-0 h-full w-3/4 bg-white shadow-lg flex flex-col overflow-hidden'
             onClick={e => e.stopPropagation()}
           >
-            {/* Header fixo */}
             <div className='p-6 pb-4 border-b border-gray-100 bg-white'>
               <button
                 onClick={() => setOpen(false)}
                 className='float-right text-gray-500 hover:text-gray-800 -mt-2'
+                aria-label='Fechar menu'
               >
                 <svg
                   xmlns='http://www.w3.org/2000/svg'
@@ -333,14 +333,10 @@ const Navbar = () => {
                 </svg>
               </button>
               <div className='clear-both'></div>
-
-              {/* Search no header */}
               <div className='mt-2'>{renderSearchInput(true)}</div>
             </div>
 
-            {/* Conteúdo scrollável */}
             <div className='flex-1 overflow-y-auto p-6 space-y-4'>
-              {/* Navegação */}
               <NavLink
                 to='/'
                 className={({ isActive }) =>
@@ -377,7 +373,6 @@ const Navbar = () => {
                 Contacto
               </NavLink>
 
-              {/* Área Admin */}
               <button
                 onClick={handleAdminAccess}
                 className='flex items-center gap-2 w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100'
@@ -391,7 +386,6 @@ const Navbar = () => {
                 )}
               </button>
 
-              {/* Logout Admin */}
               {isSeller && (
                 <button
                   onClick={handleSellerLogout}
@@ -402,16 +396,14 @@ const Navbar = () => {
                 </button>
               )}
 
-              {/* User Section */}
               {user ? (
                 <>
-                  {/* User Info Card */}
                   <div className='w-full p-3 bg-primary/5 rounded-lg border border-primary/20 mt-4'>
                     <div className='flex items-center gap-3'>
                       <img
                         src={assets.profile_icon}
                         className='w-10 h-10'
-                        alt='profile'
+                        alt='Perfil'
                       />
                       <div>
                         <p className='font-semibold text-gray-800 text-base'>
@@ -422,7 +414,6 @@ const Navbar = () => {
                     </div>
                   </div>
 
-                  {/* User Menu Items */}
                   <NavLink
                     to='/my-orders'
                     className={({ isActive }) =>
@@ -447,7 +438,6 @@ const Navbar = () => {
                     ⭐ Escrever Reviews
                   </NavLink>
 
-                  {/* Logout Button */}
                   <button
                     onClick={handleLogout}
                     className='w-full flex items-center justify-center gap-2 px-6 py-3.5 mt-4 mb-4 bg-red-50 hover:bg-red-100 border-2 border-red-200 text-red-600 rounded-lg text-base font-semibold transition-colors active:scale-95'

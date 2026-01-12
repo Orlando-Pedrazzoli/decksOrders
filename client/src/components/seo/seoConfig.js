@@ -1,7 +1,6 @@
-// Configuração SEO centralizada para todas as páginas estáticas
 const seoConfig = {
   home: {
-    title: null, // Usa título padrão
+    title: null,
     description: 'Loja online de equipamento de surf em Portugal. Decks, leashes, quilhas, capas, wax e acessórios de surf. Entregas em Portugal Continental. Qualidade e preços competitivos.',
     url: '/'
   },
@@ -28,17 +27,17 @@ const seoConfig = {
   },
   privacy: {
     title: 'Política de Privacidade',
-    description: 'Política de privacidade da Elite Surfing Portugal. Saiba como protegemos os seus dados pessoais.',
+    description: 'Política de privacidade da Elite Surfing Portugal. Saiba como protegemos os seus dados pessoais e informações de pagamento.',
     url: '/privacy'
   },
   terms: {
     title: 'Termos e Condições',
-    description: 'Termos e condições de utilização da loja online Elite Surfing Portugal. Informações sobre compras, envios e devoluções.',
+    description: 'Termos e condições de utilização da loja online Elite Surfing Portugal. Informações sobre compras, envios, garantias e devoluções.',
     url: '/terms'
   },
   refund: {
     title: 'Política de Reembolso',
-    description: 'Política de reembolso e devoluções da Elite Surfing Portugal. Conheça os seus direitos e o processo de devolução.',
+    description: 'Política de reembolso e devoluções da Elite Surfing Portugal. Conheça os seus direitos, prazos e o processo de devolução de produtos.',
     url: '/refund-policy'
   },
   myOrders: {
@@ -49,39 +48,34 @@ const seoConfig = {
   }
 };
 
-// Descrições por categoria
 export const categoryDescriptions = {
-  deck: {
-    title: 'Decks de Tracção para Surf',
-    description: 'Decks e grips de tracção para prancha de surf. Maior aderência e conforto. Várias cores e designs disponíveis.'
+  'deck-tahiti': {
+    title: 'Deck Tahiti - Decks de Tracção',
+    description: 'Decks Tahiti de alta qualidade com E.V.A fresado em ângulo diamantado. Peça única com kicktail de 26mm. Várias cores disponíveis. Envio rápido para Portugal.'
   },
-  leash: {
-    title: 'Leashes para Surf',
-    description: 'Leashes e amarras de qualidade para prancha de surf. Diferentes tamanhos para ondas pequenas a grandes.'
+  'deck-hawaii-grom': {
+    title: 'Deck Hawaii Grom - Decks de Surf',
+    description: 'Decks Hawaii Grom em 3 partes com E.V.A fresado em ângulo diamantado. Kicktail de 26mm e fita adesiva alemã. Ideal para groms e surfistas de todos os níveis.'
   },
-  quilhas: {
-    title: 'Quilhas e Fins para Surf',
-    description: 'Quilhas e fins para todos os tipos de prancha. FCS, Futures e outros sistemas. Melhore a performance da sua prancha.'
+  'deck-saquarema': {
+    title: 'Deck Saquarema - Decks Premium',
+    description: 'Decks Saquarema com EVA lixado e fresa dupla (Double Square Groove). 3 partes, barra central super soft e kicktail rígido de 25mm. Fita adesiva 3M.'
   },
-  fins: {
-    title: 'Quilhas e Fins para Surf',
-    description: 'Quilhas e fins para todos os tipos de prancha. FCS, Futures e outros sistemas. Melhore a performance da sua prancha.'
+  'deck-noronha': {
+    title: 'Deck Noronha - Decks de Tracção',
+    description: 'Decks Noronha com EVA lixado e fresa dupla em formato de quadrados. Barra central super soft com detalhes CNC. Várias cores disponíveis.'
   },
-  capas: {
-    title: 'Capas para Prancha de Surf',
-    description: 'Capas protetoras para prancha de surf. Proteção contra sol, riscos e impactos. Vários tamanhos disponíveis.'
+  'deck-fiji-classic': {
+    title: 'Deck Fiji Classic - Decks Clássicos',
+    description: 'Decks Fiji Classic em 3 partes com E.V.A fresado em ângulo diamantado. Design clássico com várias combinações de cores. Kicktail de 26mm.'
   },
-  wax: {
-    title: 'Wax para Surf',
-    description: 'Wax e parafina para prancha de surf. Diferentes temperaturas de água. Maior aderência garantida.'
+  'deck-j-bay': {
+    title: 'Deck J-Bay - Decks de Surf',
+    description: 'Decks J-Bay em 3 partes com E.V.A fresado em ângulo diamantado. Inspirados na famosa onda sul-africana. Várias cores e combinações disponíveis.'
   },
-  acessorios: {
-    title: 'Acessórios de Surf',
-    description: 'Acessórios diversos para surf. Ferramentas, racks, protetores e muito mais para o surfista.'
-  },
-  acessórios: {
-    title: 'Acessórios de Surf',
-    description: 'Acessórios diversos para surf. Ferramentas, racks, protetores e muito mais para o surfista.'
+  'fuwax-cool': {
+    title: 'Fu Wax Cool - Parafina para Surf',
+    description: 'Parafina Fu Wax Cool Water para águas entre 11°C e 17°C. Utilizada por surfistas profissionais como Kelly Slater e Gabriel Medina. Alto desempenho garantido.'
   }
 };
 

@@ -1,5 +1,5 @@
 # Elite Surfing Portugal - robots.txt
-# https://elitesurfing.pt
+# https://www.elitesurfing.pt
 
 User-agent: *
 Allow: /
@@ -13,13 +13,17 @@ Disallow: /write-review
 Disallow: /write-review/*
 Disallow: /order-success
 
+# URLs antigas/inválidas
+Disallow: /products/Deck-Bells
+Disallow: /products/deck-bells
+
 # Assets que não precisam ser indexados
 Disallow: /assets/
 Disallow: /*.js$
 Disallow: /*.css$
 
 # Sitemap
-Sitemap: https://elitesurfing.pt/sitemap.xml
+Sitemap: https://www.elitesurfing.pt/sitemap.xml
 
-# Crawl delay (opcional, para não sobrecarregar servidor)
+# Crawl delay
 Crawl-delay: 1

@@ -5,9 +5,9 @@ export const OrganizationSchema = () => {
     "@type": "Organization",
     "name": "Elite Surfing Portugal",
     "alternateName": "Elite Surfing",
-    "url": "https://elitesurfing.pt",
-    "logo": "https://elitesurfing.pt/logo.png",
-    "image": "https://elitesurfing.pt/og-image.jpg",
+    "url": "https://www.elitesurfing.pt",
+    "logo": "https://www.elitesurfing.pt/logo.png",
+    "image": "https://www.elitesurfing.pt/og-image.jpg",
     "description": "Loja online de equipamento e acessórios de surf em Portugal. Decks, leashes, quilhas, capas, wax e muito mais.",
     "address": {
       "@type": "PostalAddress",
@@ -40,15 +40,46 @@ export const WebSiteSchema = () => {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Elite Surfing Portugal",
-    "url": "https://elitesurfing.pt",
+    "url": "https://www.elitesurfing.pt",
     "potentialAction": {
       "@type": "SearchAction",
       "target": {
         "@type": "EntryPoint",
-        "urlTemplate": "https://elitesurfing.pt/products?search={search_term_string}"
+        "urlTemplate": "https://www.elitesurfing.pt/products?search={search_term_string}"
       },
       "query-input": "required name=search_term_string"
     }
+  };
+
+  return (
+    <script type="application/ld+json">
+      {JSON.stringify(schema)}
+    </script>
+  );
+};
+
+// SiteNavigationElement Schema - Define os sitelinks corretos para o Google
+export const SiteNavigationSchema = () => {
+  const navigationItems = [
+    { name: "Produtos", url: "https://www.elitesurfing.pt/products" },
+    { name: "Deck Tahiti", url: "https://www.elitesurfing.pt/products/deck-tahiti" },
+    { name: "Deck Saquarema", url: "https://www.elitesurfing.pt/products/deck-saquarema" },
+    { name: "Deck Noronha", url: "https://www.elitesurfing.pt/products/deck-noronha" },
+    { name: "Deck Fiji Classic", url: "https://www.elitesurfing.pt/products/deck-fiji-classic" },
+    { name: "Deck J-Bay", url: "https://www.elitesurfing.pt/products/deck-j-bay" },
+    { name: "Contacto", url: "https://www.elitesurfing.pt/contact" },
+    { name: "FAQ", url: "https://www.elitesurfing.pt/faq" }
+  ];
+
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "itemListElement": navigationItems.map((item, index) => ({
+      "@type": "SiteNavigationElement",
+      "position": index + 1,
+      "name": item.name,
+      "url": item.url
+    }))
   };
 
   return (
@@ -77,7 +108,7 @@ export const ProductSchema = ({ product }) => {
     },
     "offers": {
       "@type": "Offer",
-      "url": `https://elitesurfing.pt/products/${product.category?.toLowerCase()}/${product._id}`,
+      "url": `https://www.elitesurfing.pt/products/${product.category?.toLowerCase()}/${product._id}`,
       "priceCurrency": "EUR",
       "price": product.offerPrice || product.price,
       "priceValidUntil": new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
@@ -91,7 +122,6 @@ export const ProductSchema = ({ product }) => {
     }
   };
 
-  // Add aggregate rating if reviews exist
   if (product.averageRating && product.reviewCount) {
     schema.aggregateRating = {
       "@type": "AggregateRating",
@@ -116,7 +146,7 @@ export const BreadcrumbSchema = ({ items }) => {
       "@type": "ListItem",
       "position": index + 1,
       "name": item.name,
-      "item": item.url ? `https://elitesurfing.pt${item.url}` : undefined
+      "item": item.url ? `https://www.elitesurfing.pt${item.url}` : undefined
     }))
   };
 
@@ -149,14 +179,14 @@ export const FAQSchema = ({ faqs }) => {
   );
 };
 
-// LocalBusiness Schema (for contact page)
+// LocalBusiness Schema
 export const LocalBusinessSchema = () => {
   const schema = {
     "@context": "https://schema.org",
     "@type": "Store",
     "name": "Elite Surfing Portugal",
-    "image": "https://elitesurfing.pt/og-image.jpg",
-    "url": "https://elitesurfing.pt",
+    "image": "https://www.elitesurfing.pt/og-image.jpg",
+    "url": "https://www.elitesurfing.pt",
     "telephone": "+351912164220",
     "email": "pedrazzoliorlando@gmail.com",
     "address": {

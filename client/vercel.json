@@ -11,14 +11,24 @@
   ],
   "routes": [
     {
+      "src": "/products/Deck-Bells",
+      "status": 301,
+      "headers": { "Location": "/products" }
+    },
+    {
+      "src": "/products/deck-bells",
+      "status": 301,
+      "headers": { "Location": "/products" }
+    },
+    {
       "src": "/sitemap.xml",
       "dest": "/sitemap.xml",
-      "headers": { "Cache-Control": "public, max-age=3600" }
+      "headers": { "Cache-Control": "public, max-age=3600", "Content-Type": "application/xml" }
     },
     {
       "src": "/robots.txt",
       "dest": "/robots.txt",
-      "headers": { "Cache-Control": "public, max-age=3600" }
+      "headers": { "Cache-Control": "public, max-age=3600", "Content-Type": "text/plain" }
     },
     {
       "src": "/assets/(.*)",

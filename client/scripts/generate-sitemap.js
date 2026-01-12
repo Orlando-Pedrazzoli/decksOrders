@@ -1,19 +1,9 @@
-/**
- * Script para gerar sitemap.xml com produtos dinâmicos
- * 
- * Este script busca todos os produtos da API e gera um sitemap.xml completo.
- * Executa: node scripts/generate-sitemap.js
- * 
- * Recomendado executar antes de cada deploy ou via cron job.
- */
-
 import fs from 'fs';
 import path from 'path';
 
-const SITE_URL = 'https://elitesurfing.pt';
+const SITE_URL = 'https://www.elitesurfing.pt';
 const API_URL = 'https://elitesurfingeu-backend.vercel.app';
 
-// Rotas estáticas
 const staticRoutes = [
   { url: '/', changefreq: 'daily', priority: 1.0 },
   { url: '/products', changefreq: 'daily', priority: 0.9 },
@@ -24,15 +14,19 @@ const staticRoutes = [
   { url: '/refund-policy', changefreq: 'yearly', priority: 0.3 },
 ];
 
-// Categorias
 const categories = [
-  { slug: 'deck', priority: 0.8 },
-  { slug: 'leash', priority: 0.8 },
-  { slug: 'quilhas', priority: 0.8 },
-  { slug: 'fins', priority: 0.8 },
-  { slug: 'capas', priority: 0.8 },
-  { slug: 'wax', priority: 0.8 },
-  { slug: 'acessorios', priority: 0.8 },
+  { slug: 'deck-tahiti', name: 'Deck Tahiti', priority: 0.8 },
+  { slug: 'deck-hawaii-grom', name: 'Deck Hawaii Grom', priority: 0.8 },
+  { slug: 'deck-saquarema', name: 'Deck Saquarema', priority: 0.8 },
+  { slug: 'deck-noronha', name: 'Deck Noronha', priority: 0.8 },
+  { slug: 'deck-fiji-classic', name: 'Deck Fiji Classic', priority: 0.8 },
+  { slug: 'deck-j-bay', name: 'Deck J-Bay', priority: 0.8 },
+  { slug: 'fuwax-cool', name: 'Fu Wax Cool', priority: 0.8 },
+];
+
+const invalidProductSlugs = [
+  'Deck-Bells',
+  'deck-bells',
 ];
 
 async function fetchProducts() {
@@ -41,7 +35,13 @@ async function fetchProducts() {
     const data = await response.json();
     
     if (data.success && data.products) {
-      return data.products;
+      return data.products.filter(product => {
+        const productId = product._id || '';
+        const productSlug = product.slug || '';
+        return !invalidProductSlugs.includes(productId) && 
+               !invalidProductSlugs.includes(productSlug) &&
+               product.inStock === true;
+      });
     }
     console.log('⚠️ Nenhum produto encontrado na API');
     return [];
@@ -66,12 +66,18 @@ function generateSitemapXML(urls) {
     <changefreq>${item.changefreq || 'weekly'}</changefreq>
     <priority>${item.priority || 0.5}</priority>`;
     
-    // Adicionar imagem se existir
     if (item.image) {
+      const safeTitle = (item.title || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+      
       xml += `
     <image:image>
       <image:loc>${item.image}</image:loc>
-      <image:title>${item.title || ''}</image:title>
+      <image:title>${safeTitle}</image:title>
     </image:image>`;
     }
     
@@ -89,11 +95,9 @@ async function generateSitemap() {
   
   const urls = [];
   
-  // Adicionar rotas estáticas
   console.log('📄 Adicionando rotas estáticas...');
   urls.push(...staticRoutes);
   
-  // Adicionar categorias
   console.log('📁 Adicionando categorias...');
   for (const cat of categories) {
     urls.push({
@@ -103,13 +107,13 @@ async function generateSitemap() {
     });
   }
   
-  // Buscar e adicionar produtos
   console.log('🔍 Buscando produtos da API...');
   const products = await fetchProducts();
-  console.log(`✅ ${products.length} produtos encontrados\n`);
+  console.log(`✅ ${products.length} produtos válidos (em stock) encontrados\n`);
   
   for (const product of products) {
-    const category = product.category?.toLowerCase() || 'acessorios';
+    const category = (product.category || '').toLowerCase();
+    
     const lastmod = product.updatedAt 
       ? new Date(product.updatedAt).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0];
@@ -124,10 +128,8 @@ async function generateSitemap() {
     });
   }
   
-  // Gerar XML
   const xml = generateSitemapXML(urls);
   
-  // Guardar ficheiro
   const outputPath = path.join(process.cwd(), 'public', 'sitemap.xml');
   fs.writeFileSync(outputPath, xml, 'utf8');
   
@@ -139,5 +141,4 @@ async function generateSitemap() {
   console.log(`   - Produtos: ${products.length}`);
 }
 
-// Executar
 generateSitemap().catch(console.error);
