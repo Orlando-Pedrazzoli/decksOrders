@@ -1,34 +1,123 @@
-import React, { useState, memo } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 
 const ProductCard = memo(({ product }) => {
-  const { currency, addToCart, removeFromCart, cartItems, navigate } =
+  const { currency, addToCart, removeFromCart, cartItems, navigate, products } =
     useAppContext();
+  
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [familyProducts, setFamilyProducts] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(product);
+  const [isColorTransitioning, setIsColorTransitioning] = useState(false);
+
+  // 🎯 Buscar produtos da mesma família
+  useEffect(() => {
+    if (product?.productFamily) {
+      const family = products.filter(
+        p => p.productFamily === product.productFamily
+      );
+      // Ordenar: produto atual primeiro, depois por cor
+      family.sort((a, b) => {
+        if (a._id === product._id) return -1;
+        if (b._id === product._id) return 1;
+        return (a.color || '').localeCompare(b.color || '');
+      });
+      setFamilyProducts(family);
+    } else {
+      setFamilyProducts([]);
+    }
+  }, [product?.productFamily, products, product?._id]);
+
+  // Reset quando o produto base muda
+  useEffect(() => {
+    setSelectedProduct(product);
+    setCurrentImageIndex(0);
+  }, [product?._id]);
 
   if (!product || !product.image || product.image.length === 0) return null;
 
-  const isInactive = !product.inStock;
+  // Usar dados do produto selecionado
+  const displayProduct = selectedProduct || product;
+  const isInactive = !displayProduct.inStock || displayProduct.stock <= 0;
+  const isLowStock = displayProduct.stock > 0 && displayProduct.stock <= 3;
+
+  // 🎯 Trocar para outro produto da família COM TRANSIÇÃO
+  const handleColorClick = (familyProduct, e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    if (familyProduct._id === displayProduct._id) return;
+    
+    // Iniciar transição (fade out)
+    setIsColorTransitioning(true);
+    
+    // Após fade-out, trocar produto
+    setTimeout(() => {
+      setSelectedProduct(familyProduct);
+      setCurrentImageIndex(0);
+      
+      // Fade in
+      setTimeout(() => {
+        setIsColorTransitioning(false);
+      }, 50);
+    }, 150);
+  };
+
+  // 🎯 Hover na bolinha muda imagem (desktop)
+  const handleColorHover = (familyProduct) => {
+    if (familyProduct._id === displayProduct._id) return;
+    setIsColorTransitioning(true);
+    setTimeout(() => {
+      setSelectedProduct(familyProduct);
+      setCurrentImageIndex(0);
+      setTimeout(() => setIsColorTransitioning(false), 50);
+    }, 100);
+  };
 
   const nextImage = e => {
     e.stopPropagation();
     if (isInactive) return;
-    setCurrentImageIndex(prev => (prev + 1) % product.image.length);
+    setCurrentImageIndex(prev => (prev + 1) % displayProduct.image.length);
   };
 
   const prevImage = e => {
     e.stopPropagation();
     if (isInactive) return;
     setCurrentImageIndex(
-      prev => (prev - 1 + product.image.length) % product.image.length
+      prev => (prev - 1 + displayProduct.image.length) % displayProduct.image.length
     );
   };
 
   const handleCardClick = () => {
-    navigate(`/products/${product.category.toLowerCase()}/${product._id}`);
+    navigate(`/products/${displayProduct.category.toLowerCase()}/${displayProduct._id}`);
     window.scrollTo(0, 0);
   };
+
+  const handleAddToCart = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    if (isInactive) return;
+    
+    // Verificar stock antes de adicionar
+    const currentInCart = cartItems[displayProduct._id] || 0;
+    if (currentInCart >= displayProduct.stock) {
+      return; // Não adiciona mais se já atingiu o limite
+    }
+    
+    addToCart(displayProduct._id);
+  };
+
+  const handleRemoveFromCart = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    removeFromCart(displayProduct._id);
+  };
+
+  // Quantidade no carrinho do produto selecionado
+  const cartQuantity = cartItems[displayProduct._id] || 0;
+  const canAddMore = cartQuantity < displayProduct.stock;
 
   return (
     <div
@@ -39,22 +128,28 @@ const ProductCard = memo(({ product }) => {
           : 'hover:shadow-md cursor-pointer'
       }`}
     >
-      {/* Image Carousel Container */}
+      {/* Image Container */}
       <div
         className='group relative flex items-center justify-center mb-3 overflow-hidden bg-gray-50 rounded-lg'
         style={{ aspectRatio: '1 / 1', minHeight: '160px' }}
       >
-        {/* 🎯 ATUALIZADO: Imagem com escurecimento suave quando inativo */}
-        <img
-          className={`max-w-[90%] max-h-[90%] object-contain object-center transition-all duration-300 ${
-            isInactive ? 'opacity-40' : ''
-          }`}
-          src={product.image[currentImageIndex]}
-          alt={product.name}
-          loading='lazy'
-        />
+        {/* 🎯 Imagem com transição de cor */}
+        <div className={`
+          w-full h-full flex items-center justify-center
+          transition-all duration-150 ease-out
+          ${isColorTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}
+        `}>
+          <img
+            className={`max-w-[90%] max-h-[90%] object-contain object-center transition-all duration-300 ${
+              isInactive ? 'opacity-40' : ''
+            }`}
+            src={displayProduct.image[currentImageIndex]}
+            alt={displayProduct.name}
+            loading='lazy'
+          />
+        </div>
 
-        {/* 🎯 ATUALIZADO: Overlay mais suave e clean */}
+        {/* Badge Esgotado */}
         {isInactive && (
           <div className='absolute inset-0 flex items-center justify-center bg-black/5'>
             <div className='text-gray-600 px-3 py-1.5 rounded-md font-medium text-xs tracking-wide uppercase'>
@@ -63,38 +158,37 @@ const ProductCard = memo(({ product }) => {
           </div>
         )}
 
-        {/* Setas de navegação - desabilitadas quando inativo */}
-        {!isInactive && product.image.length > 1 && (
+        {/* Badge Stock Baixo */}
+        {isLowStock && !isInactive && (
+          <div className='absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-md font-medium animate-pulse'>
+            Últimas {displayProduct.stock}!
+          </div>
+        )}
+
+        {/* Setas de navegação */}
+        {!isInactive && displayProduct.image.length > 1 && (
           <>
             <button
               onClick={prevImage}
               className='absolute z-10 left-2 sm:left-3 bg-white/80 rounded-full p-1.5 shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100 md:opacity-30 md:group-hover:opacity-100'
-              aria-label='Previous image'
+              aria-label='Imagem anterior'
             >
-              <img
-                src={assets.arrow_left}
-                alt=''
-                className='w-3 h-3 md:w-4 md:h-4'
-              />
+              <img src={assets.arrow_left} alt='' className='w-3 h-3 md:w-4 md:h-4' />
             </button>
             <button
               onClick={nextImage}
               className='absolute z-10 right-2 sm:right-3 bg-white/80 rounded-full p-1.5 shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100 md:opacity-30 md:group-hover:opacity-100'
-              aria-label='Next image'
+              aria-label='Próxima imagem'
             >
-              <img
-                src={assets.arrow_right}
-                alt=''
-                className='w-3 h-3 md:w-4 md:h-4'
-              />
+              <img src={assets.arrow_right} alt='' className='w-3 h-3 md:w-4 md:h-4' />
             </button>
           </>
         )}
 
-        {/* Indicadores (pontos) - hidden quando inativo */}
-        {!isInactive && product.image.length > 1 && (
+        {/* Indicadores (pontos) */}
+        {!isInactive && displayProduct.image.length > 1 && (
           <div className='absolute bottom-2 z-10 left-0 right-0 flex justify-center gap-1.5'>
-            {product.image.map((_, index) => (
+            {displayProduct.image.map((_, index) => (
               <button
                 key={index}
                 onClick={e => {
@@ -106,7 +200,7 @@ const ProductCard = memo(({ product }) => {
                     ? 'bg-primary w-3 md:w-4'
                     : 'bg-gray-300/80'
                 }`}
-                aria-label={`Go to image ${index + 1}`}
+                aria-label={`Ir para imagem ${index + 1}`}
               />
             ))}
           </div>
@@ -115,13 +209,64 @@ const ProductCard = memo(({ product }) => {
 
       {/* Product Info */}
       <div className='flex flex-col flex-grow text-gray-500/60 text-sm'>
+        {/* Nome com transição */}
         <p
-          className={`text-gray-700 font-medium text-base md:text-lg line-clamp-2 h-[3em] mt-1 ${
+          className={`text-gray-700 font-medium text-base md:text-lg line-clamp-2 h-[3em] mt-1 transition-opacity duration-150 ${
             isInactive ? 'opacity-60' : ''
-          }`}
+          } ${isColorTransitioning ? 'opacity-0' : 'opacity-100'}`}
         >
-          {product.name}
+          {displayProduct.name}
         </p>
+
+        {/* 🆕 BOLINHAS DE COR */}
+        {familyProducts.length > 1 && (
+          <div className='flex items-center gap-1.5 mt-2 flex-wrap'>
+            {familyProducts.slice(0, 5).map((familyProduct) => {
+              const isSelected = familyProduct._id === displayProduct._id;
+              const familyStock = familyProduct.stock || 0;
+              const familyOutOfStock = familyStock <= 0;
+              const isLightColor = familyProduct.colorCode && 
+                ['#FFFFFF', '#FFF', '#ffffff', '#fff'].includes(familyProduct.colorCode);
+
+              return (
+                <button
+                  key={familyProduct._id}
+                  onClick={(e) => handleColorClick(familyProduct, e)}
+                  onMouseEnter={() => handleColorHover(familyProduct)}
+                  onMouseLeave={() => {
+                    // Voltar ao produto original no mouse leave (opcional)
+                    // handleColorHover(product);
+                  }}
+                  title={`${familyProduct.color || familyProduct.name}${familyOutOfStock ? ' (Esgotado)' : ''}`}
+                  className={`
+                    relative w-6 h-6 md:w-7 md:h-7 rounded-full transition-all duration-200
+                    ${isSelected 
+                      ? 'ring-2 ring-offset-1 ring-gray-800 scale-110' 
+                      : 'hover:scale-110'
+                    }
+                    ${familyOutOfStock ? 'opacity-50' : ''}
+                    ${isLightColor ? 'border-2 border-gray-300' : 'border border-gray-200'}
+                  `}
+                  style={{ backgroundColor: familyProduct.colorCode || '#ccc' }}
+                >
+                  {/* X para esgotado */}
+                  {familyOutOfStock && (
+                    <span className='absolute inset-0 flex items-center justify-center'>
+                      <svg className='w-3 h-3 text-gray-600' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3'>
+                        <path d='M18 6L6 18M6 6l12 12' />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            {familyProducts.length > 5 && (
+              <span className='text-xs text-gray-400 ml-1'>
+                +{familyProducts.length - 5}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Rating */}
         <div className='flex items-center gap-0.5 mt-2'>
@@ -140,25 +285,25 @@ const ProductCard = memo(({ product }) => {
 
         {/* Price and Add to Cart */}
         <div className='flex items-end justify-between mt-3 flex-grow'>
-          <div>
+          <div className={`transition-opacity duration-150 ${isColorTransitioning ? 'opacity-0' : 'opacity-100'}`}>
             <p
               className={`text-lg md:text-xl font-medium text-gray-700 ${
                 isInactive ? 'opacity-60' : ''
               }`}
             >
-              {product.offerPrice.toLocaleString('pt-PT', {
+              {displayProduct.offerPrice.toLocaleString('pt-PT', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}{' '}
               {currency}
             </p>
-            {product.offerPrice < product.price && (
+            {displayProduct.offerPrice < displayProduct.price && (
               <p
                 className={`text-gray-500/60 text-xs md:text-sm line-through ${
                   isInactive ? 'opacity-60' : ''
                 }`}
               >
-                {product.price.toLocaleString('pt-PT', {
+                {displayProduct.price.toLocaleString('pt-PT', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}{' '}
@@ -167,7 +312,7 @@ const ProductCard = memo(({ product }) => {
             )}
           </div>
 
-          {/* 🎯 ATUALIZADO: Botão mais clean quando indisponível */}
+          {/* Botão Carrinho */}
           <div
             onClick={e => {
               e.stopPropagation();
@@ -179,17 +324,14 @@ const ProductCard = memo(({ product }) => {
               <div className='flex items-center justify-center gap-1 bg-gray-100 border border-gray-300 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 rounded-lg text-xs sm:text-sm font-medium cursor-not-allowed opacity-70'>
                 <span className='text-gray-500'>Esgotado</span>
               </div>
-            ) : !cartItems[product._id] ? (
+            ) : !cartQuantity ? (
               <button
                 className='flex items-center justify-center gap-1 bg-primary/10 border border-primary/40 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 rounded-lg hover:bg-primary/20 transition-colors text-sm sm:text-base md:text-lg font-medium shadow-sm active:scale-95'
-                onClick={e => {
-                  e.stopPropagation();
-                  addToCart(product._id);
-                }}
+                onClick={handleAddToCart}
               >
                 <img
                   src={assets.cart_icon}
-                  alt='cart_icon'
+                  alt='Adicionar'
                   className='w-4 sm:w-5 md:w-6'
                 />
                 Add
@@ -197,23 +339,20 @@ const ProductCard = memo(({ product }) => {
             ) : (
               <div className='flex items-center justify-center gap-2 w-20 sm:w-24 md:w-28 h-10 sm:h-11 md:h-12 bg-primary/10 border border-primary/20 rounded-lg select-none shadow-sm'>
                 <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    removeFromCart(product._id);
-                  }}
+                  onClick={handleRemoveFromCart}
                   className='cursor-pointer text-lg sm:text-xl md:text-2xl px-2 sm:px-3 md:px-4 h-full flex items-center justify-center hover:bg-primary/20 rounded-l-lg transition-colors active:scale-95 font-bold'
                 >
                   -
                 </button>
                 <span className='w-6 sm:w-8 md:w-10 text-center text-sm sm:text-base md:text-lg font-semibold'>
-                  {cartItems[product._id]}
+                  {cartQuantity}
                 </span>
                 <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    addToCart(product._id);
-                  }}
-                  className='cursor-pointer text-lg sm:text-xl md:text-2xl px-2 sm:px-3 md:px-4 h-full flex items-center justify-center hover:bg-primary/20 rounded-r-lg transition-colors active:scale-95 font-bold'
+                  onClick={handleAddToCart}
+                  disabled={!canAddMore}
+                  className={`cursor-pointer text-lg sm:text-xl md:text-2xl px-2 sm:px-3 md:px-4 h-full flex items-center justify-center rounded-r-lg transition-colors active:scale-95 font-bold ${
+                    canAddMore ? 'hover:bg-primary/20' : 'opacity-50 cursor-not-allowed'
+                  }`}
                 >
                   +
                 </button>

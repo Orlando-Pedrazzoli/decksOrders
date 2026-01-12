@@ -1,5 +1,5 @@
 // server/controllers/orderController.js
-// VERSÃO COM SUPORTE A MB WAY E MULTIBANCO
+// 🎯 VERSÃO COM SUPORTE A STOCK + MB WAY + MULTIBANCO
 
 import { sendOrderConfirmationEmail } from '../services/emailService.js';
 import Order from '../models/Order.js';
@@ -8,9 +8,7 @@ import User from '../models/User.js';
 import Address from '../models/Address.js';
 import stripe from 'stripe';
 
-// =============================================================================
-// IMPORTAÇÃO SEGURA DO WHATSAPP (não quebra se não existir)
-// =============================================================================
+// Importação segura do WhatsApp
 let notifyAdminNewOrder = null;
 try {
   const adminNotification = await import('../services/adminNotificationService.js');
@@ -21,7 +19,72 @@ try {
 }
 
 // =============================================================================
-// FUNÇÃO PARA ENVIAR EMAIL AO CLIENTE (ORIGINAL QUE FUNCIONAVA)
+// 🆕 FUNÇÃO PARA DECREMENTAR STOCK
+// =============================================================================
+const decrementProductStock = async (items) => {
+  try {
+    console.log('📦 Decrementando stock dos produtos...');
+    
+    for (const item of items) {
+      const productId = item.product._id || item.product;
+      const quantity = item.quantity;
+      
+      const product = await Product.findById(productId);
+      
+      if (product) {
+        const newStock = Math.max(0, (product.stock || 0) - quantity);
+        
+        await Product.findByIdAndUpdate(productId, {
+          stock: newStock,
+          inStock: newStock > 0
+        });
+        
+        console.log(`  ✓ ${product.name}: ${product.stock} → ${newStock}`);
+      }
+    }
+    
+    console.log('✅ Stock atualizado com sucesso');
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao decrementar stock:', error.message);
+    return false;
+  }
+};
+
+// =============================================================================
+// 🆕 FUNÇÃO PARA VALIDAR STOCK ANTES DE CRIAR PEDIDO
+// =============================================================================
+const validateOrderStock = async (items) => {
+  const errors = [];
+  
+  for (const item of items) {
+    const productId = item.product._id || item.product;
+    const quantity = item.quantity;
+    
+    const product = await Product.findById(productId);
+    
+    if (!product) {
+      errors.push(`Produto não encontrado: ${productId}`);
+      continue;
+    }
+    
+    const availableStock = product.stock || 0;
+    
+    if (availableStock === 0) {
+      errors.push(`${product.name} está esgotado`);
+    } else if (quantity > availableStock) {
+      errors.push(`${product.name}: apenas ${availableStock} disponível(eis), solicitado ${quantity}`);
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+};
+
+// =============================================================================
+// FUNÇÃO PARA ENVIAR EMAIL AO CLIENTE
 // =============================================================================
 const sendClientEmail = async (order, userId) => {
   try {
@@ -37,7 +100,6 @@ const sendClientEmail = async (order, userId) => {
       return;
     }
 
-    // ✅ EMAIL PARA O CLIENTE (código original que funcionava)
     const emailResult = await sendOrderConfirmationEmail(order, user, products, address);
     
     if (emailResult.success) {
@@ -46,7 +108,6 @@ const sendClientEmail = async (order, userId) => {
       console.error('❌ Falha no email:', emailResult.error);
     }
 
-    // ✅ NOTIFICAÇÃO ADMIN (WhatsApp + Email) - só se disponível
     if (notifyAdminNewOrder) {
       try {
         console.log('🔔 Enviando notificação para admin...');
@@ -63,7 +124,7 @@ const sendClientEmail = async (order, userId) => {
 };
 
 // =============================================================================
-// PLACE ORDER COD - USANDO MODELO Order COMPLETO
+// PLACE ORDER COD
 // =============================================================================
 export const placeOrderCOD = async (req, res) => {
   try {
@@ -76,15 +137,21 @@ export const placeOrderCOD = async (req, res) => {
       discountAmount,
       discountPercentage,
       promoCode,
-      paymentType,
-      isPaid,
     } = req.body;
 
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
     }
 
-    // ✅ CRIAR PEDIDO COM TODOS OS CAMPOS DO MODELO
+    // 🆕 VALIDAR STOCK ANTES DE CRIAR PEDIDO
+    const stockValidation = await validateOrderStock(items);
+    if (!stockValidation.valid) {
+      return res.json({ 
+        success: false, 
+        message: 'Stock insuficiente: ' + stockValidation.errors.join(', ')
+      });
+    }
+
     const newOrder = await Order.create({
       userId,
       items,
@@ -98,17 +165,15 @@ export const placeOrderCOD = async (req, res) => {
       originalAmount,
     });
 
-    console.log('✅ Pedido COD criado:', {
-      orderId: newOrder._id,
-      amount: newOrder.amount,
-      originalAmount: newOrder.originalAmount,
-      discountAmount: newOrder.discountAmount,
-    });
+    console.log('✅ Pedido COD criado:', newOrder._id);
+
+    // 🆕 DECREMENTAR STOCK (COD decrementa imediatamente pois é confirmado)
+    await decrementProductStock(items);
 
     // Clear user cart
     await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-    // ✅ ENVIAR EMAIL (em background, não bloqueia resposta)
+    // Enviar email em background
     sendClientEmail(newOrder, userId).catch(err => {
       console.error('❌ Erro no envio de email (background):', err.message);
     });
@@ -125,11 +190,10 @@ export const placeOrderCOD = async (req, res) => {
 };
 
 // =============================================================================
-// PLACE ORDER STRIPE - COM SUPORTE A MB WAY E MULTIBANCO
+// PLACE ORDER STRIPE
 // =============================================================================
 export const placeOrderStripe = async (req, res) => {
   console.log('🚀 STRIPE FUNCTION STARTED!!!');
-  console.log('Body received:', req.body);
 
   try {
     const {
@@ -141,32 +205,26 @@ export const placeOrderStripe = async (req, res) => {
       discountAmount,
       discountPercentage,
       promoCode,
-      paymentType,
-      paymentMethod, // ✅ NOVO: 'card', 'mbway', 'multibanco'
-      isPaid,
+      paymentMethod,
     } = req.body;
 
     const { origin } = req.headers;
-
-    console.log('🔍 All fields extracted:', {
-      userId,
-      items,
-      address,
-      originalAmount,
-      amount,
-      discountAmount,
-      discountPercentage,
-      promoCode,
-      paymentMethod,
-    });
 
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Invalid data' });
     }
 
+    // 🆕 VALIDAR STOCK ANTES DE CRIAR PEDIDO
+    const stockValidation = await validateOrderStock(items);
+    if (!stockValidation.valid) {
+      return res.json({ 
+        success: false, 
+        message: 'Stock insuficiente: ' + stockValidation.errors.join(', ')
+      });
+    }
+
     let productData = [];
 
-    // Preparar productData para Stripe
     for (const item of items) {
       const product = await Product.findById(item.product);
       productData.push({
@@ -176,21 +234,6 @@ export const placeOrderStripe = async (req, res) => {
       });
     }
 
-    console.log('🔍 Creating order with:', {
-      userId,
-      items,
-      amount,
-      address,
-      paymentType: 'Online',
-      paymentMethod: paymentMethod || 'card',
-      isPaid: false,
-      promoCode: promoCode || '',
-      discountAmount: discountAmount || 0,
-      discountPercentage: discountPercentage || 0,
-      originalAmount,
-    });
-
-    // ✅ CRIAR PEDIDO COM TODOS OS CAMPOS DO MODELO
     const order = await Order.create({
       userId,
       items,
@@ -204,19 +247,12 @@ export const placeOrderStripe = async (req, res) => {
       originalAmount,
     });
 
-    console.log('✅ Pedido Stripe criado:', {
-      orderId: order._id,
-      amount: order.amount,
-      originalAmount: order.originalAmount,
-      discountAmount: order.discountAmount,
-    });
+    console.log('✅ Pedido Stripe criado:', order._id);
 
-    // Stripe Gateway Initialize
+    // Stripe Gateway
     const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
 
-    // create line items for stripe
     const line_items = productData.map(item => {
-      // Se há desconto, aplicar proporcionalmente
       let itemPrice = item.price;
       if (discountPercentage > 0) {
         itemPrice = item.price * (1 - discountPercentage / 100);
@@ -226,10 +262,9 @@ export const placeOrderStripe = async (req, res) => {
         price_data: {
           currency: 'eur',
           product_data: {
-            name:
-              discountPercentage > 0
-                ? `${item.name} (${discountPercentage}% OFF)`
-                : item.name,
+            name: discountPercentage > 0
+              ? `${item.name} (${discountPercentage}% OFF)`
+              : item.name,
           },
           unit_amount: Math.floor(itemPrice * 100),
         },
@@ -237,26 +272,21 @@ export const placeOrderStripe = async (req, res) => {
       };
     });
 
-    // ✅ CONFIGURAR MÉTODOS DE PAGAMENTO BASEADO NA ESCOLHA DO UTILIZADOR
     let payment_method_types;
     
     switch (paymentMethod) {
       case 'mbway':
         payment_method_types = ['mb_way'];
-        console.log('💳 Método de pagamento: MB Way');
         break;
       case 'multibanco':
         payment_method_types = ['multibanco'];
-        console.log('💳 Método de pagamento: Multibanco');
         break;
       case 'card':
       default:
         payment_method_types = ['card'];
-        console.log('💳 Método de pagamento: Cartão');
         break;
     }
 
-    // ✅ CONFIGURAR SESSION OPTIONS
     const sessionOptions = {
       line_items,
       mode: 'payment',
@@ -270,25 +300,14 @@ export const placeOrderStripe = async (req, res) => {
       },
     };
 
-    // ✅ PARA MB WAY, ADICIONAR CONFIGURAÇÕES ESPECÍFICAS
     if (paymentMethod === 'mbway') {
-      sessionOptions.payment_method_options = {
-        mb_way: {
-          // MB Way requer número de telefone - será solicitado no checkout
-        },
-      };
+      sessionOptions.payment_method_options = { mb_way: {} };
     }
 
-    // ✅ PARA MULTIBANCO, ADICIONAR CONFIGURAÇÕES ESPECÍFICAS
     if (paymentMethod === 'multibanco') {
-      sessionOptions.payment_method_options = {
-        multibanco: {
-          // Multibanco gera referência automaticamente
-        },
-      };
+      sessionOptions.payment_method_options = { multibanco: {} };
     }
 
-    // create session
     const session = await stripeInstance.checkout.sessions.create(sessionOptions);
 
     console.log('✅ Sessão Stripe criada:', session.id);
@@ -301,10 +320,9 @@ export const placeOrderStripe = async (req, res) => {
 };
 
 // =============================================================================
-// STRIPE WEBHOOKS - ATUALIZADO PARA MB WAY E MULTIBANCO
+// STRIPE WEBHOOKS - 🆕 COM DECREMENTO DE STOCK
 // =============================================================================
 export const stripeWebhooks = async (request, response) => {
-  // Stripe Gateway Initialize
   const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
 
   const sig = request.headers['stripe-signature'];
@@ -321,45 +339,44 @@ export const stripeWebhooks = async (request, response) => {
     return response.status(400).send(`Webhook Error: ${error.message}`);
   }
 
-  // Handle the event
   switch (event.type) {
-    // ✅ CHECKOUT SESSION COMPLETED - PRINCIPAL PARA TODOS OS MÉTODOS
     case 'checkout.session.completed': {
       const session = event.data.object;
       console.log('✅ Checkout Session Completed:', session.id);
       
       const { orderId, userId, paymentMethod } = session.metadata;
       
-      // Verificar se o pagamento foi confirmado
       if (session.payment_status === 'paid') {
         console.log(`💳 Pagamento ${paymentMethod} confirmado para pedido:`, orderId);
         
-        // Mark Payment as Paid
         const updatedOrder = await Order.findByIdAndUpdate(
           orderId, 
           { isPaid: true },
           { new: true }
-        );
+        ).populate('items.product');
         
         console.log('✅ Pedido marcado como pago:', orderId);
+        
+        // 🆕 DECREMENTAR STOCK APÓS PAGAMENTO CONFIRMADO
+        if (updatedOrder) {
+          await decrementProductStock(updatedOrder.items);
+        }
         
         // Clear user cart
         await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-        // ✅ ENVIAR EMAIL APÓS PAGAMENTO CONFIRMADO
+        // Enviar email
         if (updatedOrder) {
           sendClientEmail(updatedOrder, userId).catch(err => {
             console.error('❌ Erro no email Stripe (background):', err.message);
           });
         }
       } else if (session.payment_status === 'unpaid' && paymentMethod === 'multibanco') {
-        // Multibanco: pagamento pendente (aguardando referência ser paga)
         console.log('⏳ Multibanco: Aguardando pagamento da referência para pedido:', orderId);
       }
       break;
     }
 
-    // ✅ PAYMENT INTENT SUCCEEDED
     case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object;
       const paymentIntentId = paymentIntent.id;
@@ -367,7 +384,6 @@ export const stripeWebhooks = async (request, response) => {
       console.log('💳 Pagamento confirmado (payment_intent.succeeded):', paymentIntentId);
 
       try {
-        // Getting Session Metadata
         const session = await stripeInstance.checkout.sessions.list({
           payment_intent: paymentIntentId,
         });
@@ -379,19 +395,21 @@ export const stripeWebhooks = async (request, response) => {
 
         const { orderId, userId, paymentMethod } = session.data[0].metadata;
         
-        // Mark Payment as Paid
         const updatedOrder = await Order.findByIdAndUpdate(
           orderId, 
           { isPaid: true },
           { new: true }
-        );
+        ).populate('items.product');
         
         console.log(`✅ Pedido ${paymentMethod} marcado como pago:`, orderId);
         
-        // Clear user cart
+        // 🆕 DECREMENTAR STOCK
+        if (updatedOrder) {
+          await decrementProductStock(updatedOrder.items);
+        }
+        
         await User.findByIdAndUpdate(userId, { cartItems: {} });
 
-        // ✅ ENVIAR EMAIL APÓS PAGAMENTO CONFIRMADO
         if (updatedOrder) {
           sendClientEmail(updatedOrder, userId).catch(err => {
             console.error('❌ Erro no email Stripe (background):', err.message);
@@ -403,7 +421,6 @@ export const stripeWebhooks = async (request, response) => {
       break;
     }
 
-    // ✅ PAYMENT INTENT FAILED
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object;
       const paymentIntentId = paymentIntent.id;
@@ -426,7 +443,6 @@ export const stripeWebhooks = async (request, response) => {
       break;
     }
 
-    // ✅ MULTIBANCO: SOURCE CHARGEABLE (referência gerada)
     case 'source.chargeable': {
       const source = event.data.object;
       if (source.type === 'multibanco') {
@@ -446,14 +462,11 @@ export const stripeWebhooks = async (request, response) => {
 };
 
 // =============================================================================
-// GET USER ORDERS - HÍBRIDO (funciona com GET e POST)
+// GET USER ORDERS
 // =============================================================================
 export const getUserOrders = async (req, res) => {
   try {
-    const userId =
-      req.user?.id || req.user?._id || req.query.userId || req.body.userId;
-
-    console.log('🔍 Buscando pedidos para userId:', userId);
+    const userId = req.user?.id || req.user?._id || req.query.userId || req.body.userId;
 
     if (!userId) {
       return res.json({ success: false, message: 'User ID is required' });
@@ -465,16 +478,13 @@ export const getUserOrders = async (req, res) => {
     })
       .populate({
         path: 'items.product',
-        select: 'name image category offerPrice weight',
+        select: 'name image category offerPrice weight color colorCode',
       })
       .populate({
         path: 'address',
-        select:
-          'firstName lastName street city state zipcode country email phone',
+        select: 'firstName lastName street city state zipcode country email phone',
       })
       .sort({ createdAt: -1 });
-
-    console.log(`📋 ${orders.length} pedidos encontrados`);
 
     res.json({ success: true, orders });
   } catch (error) {
@@ -524,19 +534,13 @@ export const updateOrderStatus = async (req, res) => {
     ];
 
     if (!validStatuses.includes(status)) {
-      return res.json({
-        success: false,
-        message: 'Status inválido',
-      });
+      return res.json({ success: false, message: 'Status inválido' });
     }
 
     const order = await Order.findById(orderId);
 
     if (!order) {
-      return res.json({
-        success: false,
-        message: 'Pedido não encontrado',
-      });
+      return res.json({ success: false, message: 'Pedido não encontrado' });
     }
 
     const updatedOrder = await Order.findByIdAndUpdate(
@@ -553,7 +557,6 @@ export const updateOrderStatus = async (req, res) => {
       newStatus: status,
     });
 
-    // Se o status for "Delivered" e for COD, marcar como pago
     if (status === 'Delivered' && order.paymentType === 'COD') {
       await Order.findByIdAndUpdate(orderId, { isPaid: true });
       console.log('✅ Pedido COD marcado como pago (entregue)');

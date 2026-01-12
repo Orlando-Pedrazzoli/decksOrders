@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight, ChevronRight } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import toast from 'react-hot-toast';
 
 const CartSidebar = () => {
   const {
@@ -16,25 +17,19 @@ const CartSidebar = () => {
     navigate,
   } = useAppContext();
 
-  // Estados
   const [isVisible, setIsVisible] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  
-  // Refs para touch
   const startXRef = useRef(0);
 
-  // Controlar animação de entrada
   useEffect(() => {
     if (showCartSidebar) {
-      // Pequeno delay para garantir que o componente está montado antes da animação
       requestAnimationFrame(() => {
         setIsVisible(true);
       });
     }
   }, [showCartSidebar]);
 
-  // Fechar com animação
   const handleClose = () => {
     setIsVisible(false);
     setDragOffset(0);
@@ -43,7 +38,6 @@ const CartSidebar = () => {
     }, 300);
   };
 
-  // Fechar com ESC e bloquear scroll
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === 'Escape') handleClose();
@@ -60,7 +54,6 @@ const CartSidebar = () => {
     };
   }, [showCartSidebar]);
 
-  // Touch handlers para swipe
   const handleTouchStart = (e) => {
     startXRef.current = e.touches[0].clientX;
     setIsDragging(true);
@@ -68,20 +61,15 @@ const CartSidebar = () => {
 
   const handleTouchMove = (e) => {
     if (!isDragging) return;
-    
     const currentX = e.touches[0].clientX;
     const diff = currentX - startXRef.current;
-    
-    // Só permite arrastar para a direita (fechar)
     if (diff > 0) {
-      setDragOffset(Math.min(diff, 300)); // Máximo 300px
+      setDragOffset(Math.min(diff, 300));
     }
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
-    
-    // Se arrastou mais de 80px, fecha
     if (dragOffset > 80) {
       handleClose();
     } else {
@@ -89,7 +77,6 @@ const CartSidebar = () => {
     }
   };
 
-  // Criar array de produtos no carrinho
   const cartArray = Object.keys(cartItems)
     .map((key) => {
       const product = products.find((item) => item._id === key);
@@ -97,7 +84,6 @@ const CartSidebar = () => {
     })
     .filter(Boolean);
 
-  // Ir para checkout (Cart.jsx)
   const handleCheckout = () => {
     setShowCartSidebar(false);
     navigate('/cart');
@@ -110,6 +96,31 @@ const CartSidebar = () => {
   const handleProductClick = (product) => {
     setShowCartSidebar(false);
     navigate(`/products/${product.category.toLowerCase()}/${product._id}`);
+  };
+
+  // 🆕 VALIDAR STOCK ANTES DE AUMENTAR
+  const handleIncrease = (product) => {
+    const availableStock = product.stock || 0;
+    const currentQty = product.quantity;
+    
+    if (currentQty >= availableStock) {
+      toast.error(`Apenas ${availableStock} unidade(s) disponível(eis)`);
+      return;
+    }
+    
+    updateCartItem(product._id, currentQty + 1);
+  };
+
+  // 🆕 Helper: verificar se cor é clara
+  const isLightColor = (color) => {
+    if (!color) return false;
+    const hex = color.replace('#', '');
+    if (hex.length !== 6) return false;
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 200;
   };
 
   if (!showCartSidebar) return null;
@@ -165,7 +176,6 @@ const CartSidebar = () => {
         {/* Cart Items */}
         <div className='flex-1 overflow-y-auto'>
           {cartArray.length === 0 ? (
-            // Carrinho Vazio
             <div className='flex flex-col items-center justify-center h-full px-6 text-center'>
               <div className='w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4'>
                 <ShoppingBag className='w-10 h-10 text-gray-400' />
@@ -184,81 +194,118 @@ const CartSidebar = () => {
               </button>
             </div>
           ) : (
-            // Lista de Produtos
             <div className='divide-y divide-gray-100'>
-              {cartArray.map((product) => (
-                <div
-                  key={product._id}
-                  className='p-4 hover:bg-gray-50 transition-colors'
-                >
-                  <div className='flex gap-3'>
-                    {/* Imagem do Produto */}
-                    <img
-                      src={product.image[0]}
-                      alt={product.name}
-                      className='w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0'
-                      onClick={() => handleProductClick(product)}
-                    />
+              {cartArray.map((product) => {
+                const availableStock = product.stock || 0;
+                const canIncrease = product.quantity < availableStock;
+                const isLowStock = availableStock > 0 && availableStock <= 3;
 
-                    {/* Detalhes do Produto */}
-                    <div className='flex-1 min-w-0'>
-                      <h3
-                        className='font-medium text-gray-800 text-sm leading-tight cursor-pointer hover:text-primary transition-colors line-clamp-2'
-                        onClick={() => handleProductClick(product)}
-                      >
-                        {product.name}
-                      </h3>
-                      
-                      <p className='text-primary font-bold mt-1'>
-                        {currency} {product.offerPrice.toFixed(2)}
-                      </p>
+                return (
+                  <div
+                    key={product._id}
+                    className='p-4 hover:bg-gray-50 transition-colors'
+                  >
+                    <div className='flex gap-3'>
+                      {/* Imagem do Produto */}
+                      <div className='relative'>
+                        <img
+                          src={product.image[0]}
+                          alt={product.name}
+                          className='w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0'
+                          onClick={() => handleProductClick(product)}
+                        />
+                        {/* 🆕 Bolinha de Cor */}
+                        {product.colorCode && (
+                          <div
+                            className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white shadow-sm ${
+                              isLightColor(product.colorCode) ? 'ring-1 ring-gray-300' : ''
+                            }`}
+                            style={{ backgroundColor: product.colorCode }}
+                            title={product.color || 'Cor'}
+                          />
+                        )}
+                      </div>
 
-                      {/* Controlos de Quantidade */}
-                      <div className='flex items-center justify-between mt-2'>
-                        <div className='flex items-center border border-gray-200 rounded-lg overflow-hidden'>
+                      {/* Detalhes do Produto */}
+                      <div className='flex-1 min-w-0'>
+                        <h3
+                          className='font-medium text-gray-800 text-sm leading-tight cursor-pointer hover:text-primary transition-colors line-clamp-2'
+                          onClick={() => handleProductClick(product)}
+                        >
+                          {product.name}
+                        </h3>
+                        
+                        {/* 🆕 Nome da Cor */}
+                        {product.color && (
+                          <p className='text-xs text-gray-500 mt-0.5'>
+                            Cor: {product.color}
+                          </p>
+                        )}
+                        
+                        <p className='text-primary font-bold mt-1'>
+                          {currency} {product.offerPrice.toFixed(2)}
+                        </p>
+
+                        {/* 🆕 Badge Stock Baixo */}
+                        {isLowStock && (
+                          <p className='text-xs text-orange-600 font-medium mt-0.5'>
+                            Últimas {availableStock}!
+                          </p>
+                        )}
+
+                        {/* Controlos de Quantidade */}
+                        <div className='flex items-center justify-between mt-2'>
+                          <div className='flex items-center border border-gray-200 rounded-lg overflow-hidden'>
+                            <button
+                              onClick={() => {
+                                if (product.quantity > 1) {
+                                  updateCartItem(product._id, product.quantity - 1);
+                                }
+                              }}
+                              className='p-1.5 hover:bg-gray-100 transition-colors disabled:opacity-50 cursor-pointer'
+                              disabled={product.quantity <= 1}
+                            >
+                              <Minus className='w-3.5 h-3.5 text-gray-600' />
+                            </button>
+                            <span className='px-3 py-1 text-sm font-medium min-w-[36px] text-center'>
+                              {product.quantity}
+                            </span>
+                            {/* 🆕 BOTÃO + COM VALIDAÇÃO DE STOCK */}
+                            <button
+                              onClick={() => handleIncrease(product)}
+                              disabled={!canIncrease}
+                              className={`p-1.5 transition-colors cursor-pointer ${
+                                canIncrease 
+                                  ? 'hover:bg-gray-100' 
+                                  : 'opacity-50 cursor-not-allowed bg-gray-50'
+                              }`}
+                              title={!canIncrease ? 'Stock máximo atingido' : 'Adicionar mais'}
+                            >
+                              <Plus className='w-3.5 h-3.5 text-gray-600' />
+                            </button>
+                          </div>
+
+                          {/* Botão Remover */}
                           <button
-                            onClick={() => {
-                              if (product.quantity > 1) {
-                                updateCartItem(product._id, product.quantity - 1);
-                              }
-                            }}
-                            className='p-1.5 hover:bg-gray-100 transition-colors disabled:opacity-50 cursor-pointer'
-                            disabled={product.quantity <= 1}
+                            onClick={() => updateCartItem(product._id, 0)}
+                            className='p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer'
+                            aria-label='Remover produto'
                           >
-                            <Minus className='w-3.5 h-3.5 text-gray-600' />
-                          </button>
-                          <span className='px-3 py-1 text-sm font-medium min-w-[36px] text-center'>
-                            {product.quantity}
-                          </span>
-                          <button
-                            onClick={() => updateCartItem(product._id, product.quantity + 1)}
-                            className='p-1.5 hover:bg-gray-100 transition-colors cursor-pointer'
-                          >
-                            <Plus className='w-3.5 h-3.5 text-gray-600' />
+                            <Trash2 className='w-4 h-4' />
                           </button>
                         </div>
-
-                        {/* Botão Remover */}
-                        <button
-                          onClick={() => updateCartItem(product._id, 0)}
-                          className='p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer'
-                          aria-label='Remover produto'
-                        >
-                          <Trash2 className='w-4 h-4' />
-                        </button>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Footer - Subtotal & Ações */}
+        {/* Footer */}
         {cartArray.length > 0 && (
           <div className='border-t border-gray-200 bg-white p-5 space-y-4'>
-            {/* Subtotal */}
             <div className='flex items-center justify-between'>
               <span className='text-gray-600'>Subtotal</span>
               <span className='text-xl font-bold text-gray-800'>
@@ -270,9 +317,7 @@ const CartSidebar = () => {
               Portes e descontos calculados no checkout
             </p>
 
-            {/* Botões de Ação */}
             <div className='space-y-3'>
-              {/* Botão Principal - Finalizar Compra */}
               <button
                 onClick={handleCheckout}
                 className='w-full py-3.5 bg-primary text-white rounded-lg font-bold hover:bg-primary-dull transition-all duration-200 flex items-center justify-center gap-2 shadow-md active:scale-[0.98] cursor-pointer'
@@ -281,7 +326,6 @@ const CartSidebar = () => {
                 <ArrowRight className='w-5 h-5' />
               </button>
 
-              {/* Botão Secundário - Continuar a Comprar */}
               <button
                 onClick={handleContinueShopping}
                 className='w-full py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors cursor-pointer'
@@ -290,7 +334,6 @@ const CartSidebar = () => {
               </button>
             </div>
 
-            {/* Link para ver carrinho detalhado */}
             <button
               onClick={handleCheckout}
               className='w-full text-center text-sm text-primary hover:underline flex items-center justify-center gap-1 cursor-pointer'

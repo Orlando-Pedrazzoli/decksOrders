@@ -21,6 +21,10 @@ const AllProducts = () => {
   useEffect(() => {
     let currentResult = [...products];
 
+    // 🆕 FILTRAR APENAS PRODUTOS PRINCIPAIS (isMainVariant !== false)
+    // Produtos sem o campo ou com isMainVariant: true aparecem
+    currentResult = currentResult.filter(product => product.isMainVariant !== false);
+
     // Apply search filter if search query exists and is a string
     if (
       searchQuery &&
@@ -29,19 +33,23 @@ const AllProducts = () => {
     ) {
       const lowerCaseSearchQuery = searchQuery.toLowerCase();
       currentResult = currentResult.filter(product => {
-        // Check if product.name exists and is a string
         const nameMatch =
           product.name && typeof product.name === 'string'
             ? product.name.toLowerCase().includes(lowerCaseSearchQuery)
             : false;
 
-        // Safely check description
         const descriptionMatch =
           product.description && typeof product.description === 'string'
             ? product.description.toLowerCase().includes(lowerCaseSearchQuery)
             : false;
 
-        return nameMatch || descriptionMatch;
+        // 🆕 Também pesquisar na cor
+        const colorMatch =
+          product.color && typeof product.color === 'string'
+            ? product.color.toLowerCase().includes(lowerCaseSearchQuery)
+            : false;
+
+        return nameMatch || descriptionMatch || colorMatch;
       });
     }
 
@@ -62,7 +70,7 @@ const AllProducts = () => {
   }, [products, searchQuery, selectedCategories]);
 
   const handleCategoryChange = categoryPath => {
-    clearSearchQuery(); // Clears the search term when applying filters
+    clearSearchQuery();
     const lowerCaseCategoryPath = categoryPath.toLowerCase();
     setSelectedCategories(prev =>
       prev.includes(lowerCaseCategoryPath)
@@ -78,7 +86,6 @@ const AllProducts = () => {
 
   return (
     <>
-      {/* SEO - Página de todos os produtos */}
       <SEO 
         title={seoConfig.products.title}
         description={seoConfig.products.description}
@@ -155,19 +162,8 @@ const AllProducts = () => {
                     onClick={() => setShowFilterPanel(false)}
                     className='text-gray-500 hover:text-gray-800 transition-colors duration-200'
                   >
-                    <svg
-                      xmlns='http://www.w3.org/2000/svg'
-                      className='h-8 w-8'
-                      fill='none'
-                      viewBox='0 0 24 24'
-                      stroke='currentColor'
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth={2}
-                        d='M6 18L18 6M6 6l12 12'
-                      />
+                    <svg xmlns='http://www.w3.org/2000/svg' className='h-8 w-8' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
                     </svg>
                   </button>
                 </div>

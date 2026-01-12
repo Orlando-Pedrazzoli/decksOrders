@@ -190,7 +190,7 @@ export const AppContextProvider = ({ children }) => {
     } finally {
       setIsSeller(false);
       sessionStorage.removeItem('seller_just_logged_in');
-      sessionStorage.removeItem('seller_authenticated'); // ✅ Limpar cache
+      sessionStorage.removeItem('seller_authenticated');
       navigate('/');
       toast.success('Logout do Admin realizado com sucesso');
     }
@@ -208,7 +208,6 @@ export const AppContextProvider = ({ children }) => {
         
         if (isInSellerArea || justLoggedIn) {
           setIsSeller(true);
-          // ✅ Cachear autenticação no sessionStorage
           sessionStorage.setItem('seller_authenticated', 'true');
           sessionStorage.removeItem('seller_just_logged_in');
         } else {
@@ -216,21 +215,17 @@ export const AppContextProvider = ({ children }) => {
           sessionStorage.removeItem('seller_authenticated');
         }
       } else {
-        // Só desloga se a resposta do servidor for explicitamente false
         setIsSeller(false);
         sessionStorage.removeItem('seller_authenticated');
       }
     } catch (error) {
       console.log('❌ Erro ao verificar seller:', error.message);
       
-      // ✅ CRÍTICO: Não desloga em erro de rede
-      // Apenas desloga se for erro 401 (não autorizado)
       if (error.response?.status === 401) {
         setIsSeller(false);
         sessionStorage.removeItem('seller_authenticated');
         sessionStorage.removeItem('seller_just_logged_in');
       }
-      // Se for erro de rede, mantém o estado atual (não limpa o cache)
     } finally {
       setIsSellerLoading(false);
     }
@@ -248,8 +243,56 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // Enhanced cart operations with localStorage backup
+  // =============================================================================
+  // 🆕 FUNÇÕES DE STOCK
+  // =============================================================================
+
+  // 🎯 Obter stock disponível de um produto
+  const getAvailableStock = (productId) => {
+    const product = products.find(p => p._id === productId);
+    return product?.stock || 0;
+  };
+
+  // 🎯 Validar se pode adicionar ao carrinho
+  const canAddToCart = (productId, quantityToAdd = 1) => {
+    const product = products.find(p => p._id === productId);
+    
+    if (!product) {
+      return { can: false, reason: 'Produto não encontrado' };
+    }
+    
+    const currentInCart = cartItems[productId] || 0;
+    const availableStock = product.stock !== undefined ? product.stock : 999; // Compatibilidade: se não tem stock definido, assume disponível
+    
+    // Se stock é 0, não pode adicionar
+    if (availableStock === 0) {
+      return { can: false, reason: 'Produto esgotado' };
+    }
+    
+    // Se vai exceder o stock disponível
+    if (currentInCart + quantityToAdd > availableStock) {
+      return { 
+        can: false, 
+        reason: `Apenas ${availableStock} unidade(s) disponível(eis). Já tens ${currentInCart} no carrinho.`
+      };
+    }
+    
+    return { can: true };
+  };
+
+  // =============================================================================
+  // 🆕 CART OPERATIONS COM VALIDAÇÃO DE STOCK
+  // =============================================================================
+
   const addToCart = async itemId => {
+    // 🆕 Validar stock antes de adicionar
+    const validation = canAddToCart(itemId, 1);
+    
+    if (!validation.can) {
+      toast.error(validation.reason);
+      return false;
+    }
+
     const newCartItems = { ...cartItems };
 
     if (newCartItems[itemId]) {
@@ -272,6 +315,8 @@ export const AppContextProvider = ({ children }) => {
         console.error('Error syncing cart with server:', error);
       }
     }
+    
+    return true;
   };
 
   const updateCartItem = async (itemId, quantity) => {
@@ -281,6 +326,15 @@ export const AppContextProvider = ({ children }) => {
       delete newCartItems[itemId];
       toast.success('Produto removido do carrinho');
     } else {
+      // 🆕 Validar stock antes de atualizar
+      const availableStock = getAvailableStock(itemId);
+      
+      // Se o produto tem stock definido e a quantidade excede
+      if (availableStock > 0 && quantity > availableStock) {
+        toast.error(`Apenas ${availableStock} unidade(s) disponível(eis)`);
+        return false;
+      }
+      
       newCartItems[itemId] = quantity;
       toast.success('Carrinho atualizado');
     }
@@ -295,6 +349,8 @@ export const AppContextProvider = ({ children }) => {
         console.error('Error syncing cart with server:', error);
       }
     }
+    
+    return true;
   };
 
   const removeFromCart = async itemId => {
@@ -399,21 +455,16 @@ export const AppContextProvider = ({ children }) => {
 
       // 4. ✅ MELHORADO: Verificar seller com cache de sessionStorage
       if (window.location.pathname.startsWith('/seller')) {
-        // Verificar cache primeiro
         const sellerCached = sessionStorage.getItem('seller_authenticated');
         
         if (sellerCached === 'true') {
-          // Restaurar estado do cache
           setIsSeller(true);
           setIsSellerLoading(false);
           
-          // Verificar em background (não bloqueia)
           fetchSeller().catch(() => {
-            // Se falhar a verificação em background, mantém o cache por enquanto
             console.log('⚠️ Verificação de seller falhou, mantendo sessão');
           });
         } else {
-          // Não há cache, precisa verificar
           fetchSeller();
         }
       } else {
@@ -426,9 +477,6 @@ export const AppContextProvider = ({ children }) => {
 
   // ✅ Verificar seller apenas na primeira vez que entra na área de seller
   useEffect(() => {
-    // Só verifica se:
-    // 1. Está na área de seller
-    // 2. Ainda não verificou (isSellerLoading é true) OU não está logado como seller
     if (location.pathname.startsWith('/seller') && !isSeller && isSellerLoading) {
       fetchSeller();
     }
@@ -482,6 +530,9 @@ export const AppContextProvider = ({ children }) => {
     saveCartToStorage,
     loadCartFromStorage,
     saveUserToStorage,
+    // 🆕 FUNÇÕES DE STOCK
+    getAvailableStock,
+    canAddToCart,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

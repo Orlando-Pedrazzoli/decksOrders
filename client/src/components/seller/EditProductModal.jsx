@@ -2,6 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { assets, categories } from '../../assets/assets';
 import toast from 'react-hot-toast';
 
+// 🎯 CORES PRÉ-DEFINIDAS
+const PRESET_COLORS = [
+  { name: 'Preto', code: '#000000' },
+  { name: 'Branco', code: '#FFFFFF' },
+  { name: 'Cinza', code: '#6B7280' },
+  { name: 'Vermelho', code: '#DC2626' },
+  { name: 'Azul', code: '#2563EB' },
+  { name: 'Azul Marinho', code: '#1E3A5F' },
+  { name: 'Verde', code: '#16A34A' },
+  { name: 'Amarelo', code: '#EAB308' },
+  { name: 'Laranja', code: '#EA580C' },
+  { name: 'Rosa', code: '#EC4899' },
+  { name: 'Roxo', code: '#9333EA' },
+  { name: 'Castanho', code: '#78350F' },
+  { name: 'Bege', code: '#D4B896' },
+  { name: 'Turquesa', code: '#14B8A6' },
+];
+
 const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
   const [files, setFiles] = useState([]);
   const [name, setName] = useState('');
@@ -11,6 +29,16 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
   const [offerPrice, setOfferPrice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 🆕 CAMPOS DE STOCK
+  const [stock, setStock] = useState('');
+
+  // 🆕 CAMPOS DE FAMÍLIA/COR
+  const [productFamily, setProductFamily] = useState('');
+  const [hasColor, setHasColor] = useState(false);
+  const [color, setColor] = useState('');
+  const [colorCode, setColorCode] = useState('#000000');
+  const [isMainVariant, setIsMainVariant] = useState(true);
+
   useEffect(() => {
     if (product) {
       setName(product.name);
@@ -18,21 +46,91 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
       setCategory(product.category);
       setPrice(product.price.toString());
       setOfferPrice(product.offerPrice.toString());
+      
+      // 🆕 Carregar campos de stock
+      setStock((product.stock || 0).toString());
+      
+      // 🆕 Carregar campos de família/cor
+      setProductFamily(product.productFamily || '');
+      setIsMainVariant(product.isMainVariant !== false);
+      
+      if (product.color || product.colorCode) {
+        setHasColor(true);
+        setColor(product.color || '');
+        setColorCode(product.colorCode || '#000000');
+      } else {
+        setHasColor(false);
+        setColor('');
+        setColorCode('#000000');
+      }
     }
   }, [product]);
+
+  // 🎯 GERAR SLUG PARA FAMÍLIA
+  const generateFamilySlug = (text) => {
+    return text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+  };
+
+  // 🎯 SELECIONAR COR PRÉ-DEFINIDA
+  const selectPresetColor = (preset) => {
+    setColor(preset.name);
+    setColorCode(preset.code);
+  };
 
   const handleSubmit = async event => {
     event.preventDefault();
     setIsSubmitting(true);
 
     try {
+      if (stock === '' || parseInt(stock) < 0) {
+        toast.error('Defina a quantidade em stock');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (hasColor && !color.trim()) {
+        toast.error('Defina o nome da cor');
+        setIsSubmitting(false);
+        return;
+      }
+
       const productData = {
         name,
-        description: description.split('\n'),
+        description: description.split('\n').filter(line => line.trim()),
         category,
         price: parseFloat(price),
         offerPrice: parseFloat(offerPrice),
+        stock: parseInt(stock) || 0,
+        isMainVariant,
       };
+
+      // Adicionar dados de família/cor
+      if (productFamily.trim()) {
+        productData.productFamily = generateFamilySlug(productFamily);
+      } else {
+        productData.productFamily = null;
+      }
+      
+      if (hasColor && color.trim()) {
+        productData.color = color;
+        productData.colorCode = colorCode;
+        
+        // Se tem cor mas não tem família, usar o nome base como família
+        if (!productFamily.trim()) {
+          const baseName = name.replace(new RegExp(color, 'gi'), '').trim();
+          if (baseName) {
+            productData.productFamily = generateFamilySlug(baseName);
+          }
+        }
+      } else {
+        productData.color = null;
+        productData.colorCode = null;
+      }
 
       const formData = new FormData();
       formData.append('id', product._id);
@@ -70,25 +168,15 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
     <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4'>
       <div className='bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto'>
         {/* Header */}
-        <div className='sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between'>
+        <div className='sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10'>
           <h2 className='text-xl font-bold text-gray-800'>Editar Produto</h2>
           <button
             onClick={onClose}
             className='text-gray-500 hover:text-gray-700 transition-colors'
             disabled={isSubmitting}
           >
-            <svg
-              className='w-6 h-6'
-              fill='none'
-              stroke='currentColor'
-              viewBox='0 0 24 24'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                strokeWidth={2}
-                d='M6 18L18 6M6 6l12 12'
-              />
+            <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
             </svg>
           </button>
         </div>
@@ -120,56 +208,48 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
 
             {/* New Images Upload */}
             <div className='flex flex-wrap items-center gap-3'>
-              {Array(8)
-                .fill('')
-                .map((_, index) => (
-                  <label key={index} htmlFor={`image${index}`}>
-                    <input
-                      onChange={e => {
-                        const updatedFiles = [...files];
-                        updatedFiles[index] = e.target.files[0];
-                        setFiles(updatedFiles);
-                      }}
-                      type='file'
-                      id={`image${index}`}
-                      hidden
-                      disabled={isSubmitting}
+              {Array(8).fill('').map((_, index) => (
+                <label key={index} htmlFor={`image${index}`}>
+                  <input
+                    onChange={e => {
+                      const updatedFiles = [...files];
+                      updatedFiles[index] = e.target.files[0];
+                      setFiles(updatedFiles);
+                    }}
+                    type='file'
+                    id={`image${index}`}
+                    hidden
+                    disabled={isSubmitting}
+                  />
+                  <div className='relative'>
+                    <img
+                      className='max-w-24 cursor-pointer border border-gray-300 rounded-lg p-2'
+                      src={files[index] ? URL.createObjectURL(files[index]) : assets.upload_area}
+                      alt='uploadArea'
+                      width={100}
+                      height={100}
                     />
-                    <div className='relative'>
-                      <img
-                        className='max-w-24 cursor-pointer border border-gray-300 rounded-lg p-2'
-                        src={
-                          files[index]
-                            ? URL.createObjectURL(files[index])
-                            : assets.upload_area
-                        }
-                        alt='uploadArea'
-                        width={100}
-                        height={100}
-                      />
-                      {files[index] && (
-                        <div className='absolute -top-1 -right-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full'>
-                          Nova
-                        </div>
-                      )}
-                    </div>
-                  </label>
-                ))}
+                    {files[index] && (
+                      <div className='absolute -top-1 -right-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full'>
+                        Nova
+                      </div>
+                    )}
+                  </div>
+                </label>
+              ))}
             </div>
           </div>
 
           {/* Product Name */}
           <div className='flex flex-col gap-1'>
-            <label className='text-base font-medium' htmlFor='product-name'>
-              Nome do Produto
-            </label>
+            <label className='text-base font-medium' htmlFor='product-name'>Nome do Produto</label>
             <input
               onChange={e => setName(e.target.value)}
               value={name}
               id='product-name'
               type='text'
               placeholder='Digite o nome'
-              className='outline-none py-2.5 px-3 rounded border border-gray-500/40'
+              className='outline-none py-2.5 px-3 rounded border border-gray-500/40 focus:border-primary transition-colors'
               required
               disabled={isSubmitting}
             />
@@ -177,18 +257,13 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
 
           {/* Product Description */}
           <div className='flex flex-col gap-1'>
-            <label
-              className='text-base font-medium'
-              htmlFor='product-description'
-            >
-              Descrição do Produto
-            </label>
+            <label className='text-base font-medium' htmlFor='product-description'>Descrição do Produto</label>
             <textarea
               onChange={e => setDescription(e.target.value)}
               value={description}
               id='product-description'
               rows={4}
-              className='outline-none py-2.5 px-3 rounded border border-gray-500/40 resize-none'
+              className='outline-none py-2.5 px-3 rounded border border-gray-500/40 focus:border-primary transition-colors resize-none'
               placeholder='Digite a descrição'
               disabled={isSubmitting}
             ></textarea>
@@ -196,21 +271,17 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
 
           {/* Category */}
           <div className='flex flex-col gap-1'>
-            <label className='text-base font-medium' htmlFor='category'>
-              Categoria
-            </label>
+            <label className='text-base font-medium' htmlFor='category'>Categoria</label>
             <select
               onChange={e => setCategory(e.target.value)}
               value={category}
               id='category'
-              className='outline-none py-2.5 px-3 rounded border border-gray-500/40'
+              className='outline-none py-2.5 px-3 rounded border border-gray-500/40 focus:border-primary transition-colors'
               disabled={isSubmitting}
             >
               <option value=''>Selecione a Categoria</option>
               {categories.map((item, index) => (
-                <option key={index} value={item.path}>
-                  {item.path}
-                </option>
+                <option key={index} value={item.path}>{item.path}</option>
               ))}
             </select>
           </div>
@@ -218,9 +289,7 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
           {/* Prices */}
           <div className='flex items-center gap-5 flex-wrap'>
             <div className='flex-1 flex flex-col gap-1 min-w-[120px]'>
-              <label className='text-base font-medium' htmlFor='product-price'>
-                Preço Original
-              </label>
+              <label className='text-base font-medium' htmlFor='product-price'>Preço Original (€)</label>
               <input
                 onChange={e => setPrice(e.target.value)}
                 value={price}
@@ -228,15 +297,13 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
                 type='number'
                 step='0.01'
                 placeholder='0.00'
-                className='outline-none py-2.5 px-3 rounded border border-gray-500/40'
+                className='outline-none py-2.5 px-3 rounded border border-gray-500/40 focus:border-primary transition-colors'
                 required
                 disabled={isSubmitting}
               />
             </div>
             <div className='flex-1 flex flex-col gap-1 min-w-[120px]'>
-              <label className='text-base font-medium' htmlFor='offer-price'>
-                Preço de Oferta
-              </label>
+              <label className='text-base font-medium' htmlFor='offer-price'>Preço de Venda (€)</label>
               <input
                 onChange={e => setOfferPrice(e.target.value)}
                 value={offerPrice}
@@ -244,10 +311,158 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
                 type='number'
                 step='0.01'
                 placeholder='0.00'
-                className='outline-none py-2.5 px-3 rounded border border-gray-500/40'
+                className='outline-none py-2.5 px-3 rounded border border-gray-500/40 focus:border-primary transition-colors'
                 required
                 disabled={isSubmitting}
               />
+            </div>
+          </div>
+
+          {/* 🆕 STOCK */}
+          <div className='flex flex-col gap-1'>
+            <label className='text-base font-medium' htmlFor='stock'>Quantidade em Stock</label>
+            <input
+              onChange={e => setStock(e.target.value)}
+              value={stock}
+              id='stock'
+              type='number'
+              min='0'
+              placeholder='0'
+              className='outline-none py-2.5 px-3 rounded border border-gray-500/40 focus:border-primary transition-colors max-w-[200px]'
+              required
+              disabled={isSubmitting}
+            />
+            <p className='text-xs text-gray-500'>Defina 0 para produto esgotado</p>
+          </div>
+
+          {/* 🆕 FAMÍLIA DE PRODUTOS */}
+          <div className='border-t border-gray-200 pt-5 mt-5'>
+            <h3 className='text-lg font-semibold text-gray-800 mb-4'>Família de Produtos (Variantes de Cor)</h3>
+
+            {/* Nome da Família */}
+            <div className='flex flex-col gap-1 mb-4'>
+              <label className='text-base font-medium' htmlFor='product-family'>Nome da Família</label>
+              <input
+                onChange={e => setProductFamily(e.target.value)}
+                value={productFamily}
+                id='product-family'
+                type='text'
+                placeholder='Ex: Deck J-Bay (deixe em branco se não aplicável)'
+                className='outline-none py-2.5 px-3 rounded border border-gray-500/40 focus:border-primary transition-colors'
+                disabled={isSubmitting}
+              />
+              <p className='text-xs text-gray-500'>Produtos com o mesmo nome de família serão agrupados</p>
+            </div>
+
+            {/* Toggle Cor */}
+            <div className='flex items-center gap-3 mb-4'>
+              <input
+                type='checkbox'
+                id='hasColor'
+                checked={hasColor}
+                onChange={e => setHasColor(e.target.checked)}
+                className='w-5 h-5 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer'
+                disabled={isSubmitting}
+              />
+              <label htmlFor='hasColor' className='text-base font-medium cursor-pointer'>
+                Este produto tem uma cor específica
+              </label>
+            </div>
+
+            {/* Campos de Cor */}
+            {hasColor && (
+              <div className='bg-gray-50 p-4 rounded-lg space-y-4 border border-gray-200'>
+                {/* Nome da Cor */}
+                <div className='flex flex-col gap-1'>
+                  <label className='text-sm font-medium'>Nome da Cor</label>
+                  <input
+                    type='text'
+                    value={color}
+                    onChange={e => setColor(e.target.value)}
+                    placeholder='Ex: Preto, Azul Marinho'
+                    className='outline-none py-2 px-3 rounded-lg border border-gray-300 focus:border-primary transition-colors'
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                {/* Código da Cor */}
+                <div className='flex flex-col gap-1'>
+                  <label className='text-sm font-medium'>Código da Cor</label>
+                  <div className='flex items-center gap-3'>
+                    <input
+                      type='color'
+                      value={colorCode}
+                      onChange={e => setColorCode(e.target.value)}
+                      className='w-12 h-10 rounded border border-gray-300 cursor-pointer'
+                      disabled={isSubmitting}
+                    />
+                    <input
+                      type='text'
+                      value={colorCode}
+                      onChange={e => setColorCode(e.target.value)}
+                      placeholder='#000000'
+                      className='outline-none py-2 px-3 rounded-lg border border-gray-300 focus:border-primary transition-colors flex-1 font-mono'
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+
+                {/* Cores Rápidas */}
+                <div>
+                  <p className='text-sm font-medium mb-2'>Cores Rápidas:</p>
+                  <div className='flex flex-wrap gap-2'>
+                    {PRESET_COLORS.map((preset, index) => (
+                      <button
+                        key={index}
+                        type='button'
+                        onClick={() => selectPresetColor(preset)}
+                        disabled={isSubmitting}
+                        className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
+                          colorCode === preset.code 
+                            ? 'ring-2 ring-primary ring-offset-2 border-primary' 
+                            : 'border-gray-300'
+                        }`}
+                        style={{ backgroundColor: preset.code }}
+                        title={preset.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview da Cor */}
+                {color && (
+                  <div className='flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200'>
+                    <div
+                      className='w-10 h-10 rounded-full border-2 border-gray-300'
+                      style={{ backgroundColor: colorCode }}
+                    />
+                    <div>
+                      <p className='font-medium'>{color}</p>
+                      <p className='text-xs text-gray-500 font-mono'>{colorCode}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Produto Principal */}
+            <div className='flex items-center gap-3 mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200'>
+              <input
+                type='checkbox'
+                id='isMainVariant'
+                checked={isMainVariant}
+                onChange={e => setIsMainVariant(e.target.checked)}
+                className='w-5 h-5 text-primary rounded border-gray-300 focus:ring-primary cursor-pointer'
+                disabled={isSubmitting}
+              />
+              <div>
+                <label htmlFor='isMainVariant' className='text-base font-medium cursor-pointer'>
+                  Produto Principal da Família
+                </label>
+                <p className='text-xs text-gray-600 mt-0.5'>
+                  Se marcado, este produto aparece na listagem. Apenas um por família deve ser principal.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -268,24 +483,9 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
             >
               {isSubmitting ? (
                 <>
-                  <svg
-                    className='animate-spin h-5 w-5 text-white'
-                    viewBox='0 0 24 24'
-                  >
-                    <circle
-                      className='opacity-25'
-                      cx='12'
-                      cy='12'
-                      r='10'
-                      stroke='currentColor'
-                      strokeWidth='4'
-                      fill='none'
-                    />
-                    <path
-                      className='opacity-75'
-                      fill='currentColor'
-                      d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                    />
+                  <svg className='animate-spin h-5 w-5 text-white' viewBox='0 0 24 24'>
+                    <circle className='opacity-25' cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='4' fill='none' />
+                    <path className='opacity-75' fill='currentColor' d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z' />
                   </svg>
                   Atualizando...
                 </>

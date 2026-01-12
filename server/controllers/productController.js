@@ -6,6 +6,7 @@ export const addProduct = async (req, res) => {
   try {
     let productData = JSON.parse(req.body.productData);
     const images = req.files;
+    
     let imagesUrl = await Promise.all(
       images.map(async item => {
         let result = await cloudinary.uploader.upload(item.path, {
@@ -14,18 +15,38 @@ export const addProduct = async (req, res) => {
         return result.secure_url;
       })
     );
-    await Product.create({ ...productData, image: imagesUrl });
-    res.json({ success: true, message: 'Product Added' });
+    
+    // 🎯 Calcular inStock baseado no stock
+    const stock = productData.stock || 0;
+    const inStock = stock > 0;
+    
+    await Product.create({ 
+      ...productData, 
+      image: imagesUrl,
+      stock,
+      inStock,
+    });
+    
+    res.json({ success: true, message: 'Produto adicionado com sucesso' });
   } catch (error) {
     console.log(error.message);
     res.json({ success: false, message: error.message });
   }
 };
 
-// Get Product : /api/product/list
+// Get Product List : /api/product/list
+// 🎯 ATUALIZADO: Retorna apenas produtos principais (isMainVariant: true)
 export const productList = async (req, res) => {
   try {
-    const products = await Product.find({});
+    const { all } = req.query; // ?all=true para admin ver todos
+    
+    let query = {};
+    if (!all) {
+      // Por defeito, só mostra produtos principais
+      query = { isMainVariant: { $ne: false } }; // true ou null/undefined
+    }
+    
+    const products = await Product.find(query).sort({ createdAt: -1 });
     res.json({ success: true, products });
   } catch (error) {
     console.log(error.message);
@@ -45,11 +66,104 @@ export const productById = async (req, res) => {
   }
 };
 
-// Change Product inStock : /api/product/stock
+// 🆕 Get Products by Family : /api/product/family
+export const getProductFamily = async (req, res) => {
+  try {
+    const { familySlug } = req.body;
+    
+    if (!familySlug) {
+      return res.json({ success: false, message: 'Family slug é obrigatório' });
+    }
+    
+    const products = await Product.find({ 
+      productFamily: familySlug 
+    }).sort({ isMainVariant: -1, createdAt: 1 }); // Principal primeiro
+    
+    res.json({ success: true, products });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// 🆕 Check Stock : /api/product/check-stock
+export const checkStock = async (req, res) => {
+  try {
+    const { productId, quantity } = req.body;
+    
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.json({ success: false, message: 'Produto não encontrado' });
+    }
+    
+    const available = product.stock >= quantity;
+    
+    res.json({ 
+      success: true, 
+      available,
+      stock: product.stock,
+      message: available ? 'Stock disponível' : `Apenas ${product.stock} unidade(s) disponível(eis)`
+    });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// 🆕 Update Stock : /api/product/update-stock
+export const updateStock = async (req, res) => {
+  try {
+    const { productId, stock } = req.body;
+    
+    const newStock = Math.max(0, parseInt(stock) || 0);
+    
+    await Product.findByIdAndUpdate(productId, { 
+      stock: newStock,
+      inStock: newStock > 0
+    });
+    
+    res.json({ success: true, message: 'Stock atualizado' });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// 🆕 Decrement Stock (após compra) : /api/product/decrement-stock
+export const decrementStock = async (req, res) => {
+  try {
+    const { items } = req.body; // [{ productId, quantity }]
+    
+    for (const item of items) {
+      const product = await Product.findById(item.productId);
+      if (product) {
+        const newStock = Math.max(0, product.stock - item.quantity);
+        await Product.findByIdAndUpdate(item.productId, {
+          stock: newStock,
+          inStock: newStock > 0
+        });
+      }
+    }
+    
+    res.json({ success: true, message: 'Stock decrementado' });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// Change Product inStock : /api/product/stock (mantido para compatibilidade)
 export const changeStock = async (req, res) => {
   try {
     const { id, inStock } = req.body;
-    await Product.findByIdAndUpdate(id, { inStock });
+    
+    // Se inStock for false, setar stock para 0
+    const updateData = { inStock };
+    if (!inStock) {
+      updateData.stock = 0;
+    }
+    
+    await Product.findByIdAndUpdate(id, updateData);
     res.json({ success: true, message: 'Stock Updated' });
   } catch (error) {
     console.log(error.message);
@@ -71,7 +185,7 @@ export const updateProduct = async (req, res) => {
     }
 
     // Se houver novas imagens, fazer upload
-    let imagesUrl = existingProduct.image; // Manter imagens antigas por padrão
+    let imagesUrl = existingProduct.image;
     if (images && images.length > 0) {
       // Excluir imagens antigas do Cloudinary
       for (const imageUrl of existingProduct.image) {
@@ -94,6 +208,11 @@ export const updateProduct = async (req, res) => {
       );
     }
 
+    // 🎯 Calcular inStock baseado no stock
+    if (productData.stock !== undefined) {
+      productData.inStock = productData.stock > 0;
+    }
+
     // Atualizar produto
     await Product.findByIdAndUpdate(id, {
       ...productData,
@@ -112,7 +231,6 @@ export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.body;
 
-    // Buscar produto para obter URLs das imagens
     const product = await Product.findById(id);
     if (!product) {
       return res.json({ success: false, message: 'Produto não encontrado' });
@@ -121,7 +239,6 @@ export const deleteProduct = async (req, res) => {
     // Excluir imagens do Cloudinary
     for (const imageUrl of product.image) {
       try {
-        // Extrair public_id da URL do Cloudinary
         const publicId = imageUrl.split('/').pop().split('.')[0];
         await cloudinary.uploader.destroy(publicId);
       } catch (error) {
@@ -129,7 +246,6 @@ export const deleteProduct = async (req, res) => {
       }
     }
 
-    // Excluir produto do banco de dados
     await Product.findByIdAndDelete(id);
 
     res.json({
