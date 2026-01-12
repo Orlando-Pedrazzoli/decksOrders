@@ -6,6 +6,7 @@ const productSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   offerPrice: { type: Number, required: true },
   image: { type: Array, required: true },
+  video: { type: String, default: null }, // 🆕 URL do vídeo (Cloudinary)
   category: { type: String, required: true },
   
   // 🆕 STOCK - Quantidade disponível
