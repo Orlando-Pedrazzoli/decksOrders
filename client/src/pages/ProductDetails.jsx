@@ -17,6 +17,7 @@ const ProductDetails = () => {
     cartItems,
     updateCartItem,
     axios,
+    getProductFamily, // 🆕 Função para buscar família
   } = useAppContext();
   const { id, category } = useParams();
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -36,6 +37,7 @@ const ProductDetails = () => {
   const [familyProducts, setFamilyProducts] = useState([]);
   const [displayProduct, setDisplayProduct] = useState(null);
   const [isColorTransitioning, setIsColorTransitioning] = useState(false);
+  const [showVideo, setShowVideo] = useState(false); // 🆕 Mostrar vídeo
 
   // Estados para o modal
   const [modalImageIndex, setModalImageIndex] = useState(0);
@@ -53,7 +55,28 @@ const ProductDetails = () => {
   const modalImageRef = useRef(null);
   const pinchStartDistance = useRef(0);
 
-  const product = products.find(item => item._id === id);
+  // 🆕 Estado para produto carregado via API (quando não está no products)
+  const [apiProduct, setApiProduct] = useState(null);
+  
+  const productFromContext = products.find(item => item._id === id);
+  const product = productFromContext || apiProduct;
+
+  // 🆕 Buscar produto via API se não estiver no contexto (variante não-principal)
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!productFromContext && id) {
+        try {
+          const { data } = await axios.get(`/api/product/${id}`);
+          if (data.success && data.product) {
+            setApiProduct(data.product);
+          }
+        } catch (error) {
+          console.error('Erro ao buscar produto:', error);
+        }
+      }
+    };
+    fetchProduct();
+  }, [id, productFromContext, axios]);
 
   // 🎯 Atualizar displayProduct quando produto muda
   useEffect(() => {
@@ -63,23 +86,24 @@ const ProductDetails = () => {
     }
   }, [product?._id]);
 
-  // 🎯 Buscar produtos da mesma família
+  // 🎯 Buscar produtos da mesma família via API (com cache)
   useEffect(() => {
-    if (product?.productFamily) {
-      const family = products.filter(
-        p => p.productFamily === product.productFamily
-      );
-      // Ordenar: produto atual primeiro
-      family.sort((a, b) => {
-        if (a._id === product._id) return -1;
-        if (b._id === product._id) return 1;
-        return (a.color || '').localeCompare(b.color || '');
-      });
-      setFamilyProducts(family);
-    } else {
-      setFamilyProducts([]);
-    }
-  }, [product?.productFamily, products, product?._id]);
+    const fetchFamily = async () => {
+      if (product?.productFamily) {
+        const family = await getProductFamily(product.productFamily);
+        // Ordenar: produto atual primeiro
+        const sorted = [...family].sort((a, b) => {
+          if (a._id === product._id) return -1;
+          if (b._id === product._id) return 1;
+          return (a.color || '').localeCompare(b.color || '');
+        });
+        setFamilyProducts(sorted);
+      } else {
+        setFamilyProducts([]);
+      }
+    };
+    fetchFamily();
+  }, [product?.productFamily, product?._id, getProductFamily]);
 
   // Verificar se produto está inativo
   const isInactive = !displayProduct?.inStock || (displayProduct?.stock || 0) <= 0;
@@ -654,6 +678,17 @@ const ProductDetails = () => {
                 onScroll={() => handleImageScroll(imageScrollRef)}
                 className='flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide sm:hidden border border-gray-200 rounded-xl shadow-sm relative'
               >
+                {/* 🆕 Vídeo como primeiro slide (se existir) */}
+                {displayProduct.video && (
+                  <div className='relative w-full h-full flex-shrink-0 snap-center bg-black'>
+                    <video
+                      src={displayProduct.video}
+                      controls
+                      playsInline
+                      className='w-full h-full object-contain'
+                    />
+                  </div>
+                )}
                 {displayProduct.image.map((image, index) => (
                   <div key={index} className='relative w-full h-full flex-shrink-0 snap-center'>
                     <img
@@ -678,16 +713,27 @@ const ProductDetails = () => {
 
               {/* Desktop Main Image */}
               <div className='relative border border-gray-200 w-full h-full rounded-xl overflow-hidden hidden sm:block shadow-sm'>
-                <img
-                  src={displayProduct.image[currentImageIndex]}
-                  alt='Produto'
-                  className={`w-full h-full object-contain transition-all duration-300 ${
-                    isTransitioning ? 'opacity-70' : 'opacity-100'
-                  } ${isInactive ? 'blur-sm grayscale cursor-default' : 'cursor-pointer'} ${
-                    isColorTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
-                  }`}
-                  onClick={() => !isInactive && openModal(currentImageIndex)}
-                />
+                {/* 🆕 Vídeo Player */}
+                {showVideo && displayProduct.video ? (
+                  <video
+                    src={displayProduct.video}
+                    controls
+                    autoPlay
+                    className='w-full h-full object-contain bg-black'
+                    onEnded={() => setShowVideo(false)}
+                  />
+                ) : (
+                  <img
+                    src={displayProduct.image[currentImageIndex]}
+                    alt='Produto'
+                    className={`w-full h-full object-contain transition-all duration-300 ${
+                      isTransitioning ? 'opacity-70' : 'opacity-100'
+                    } ${isInactive ? 'blur-sm grayscale cursor-default' : 'cursor-pointer'} ${
+                      isColorTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+                    }`}
+                    onClick={() => !isInactive && openModal(currentImageIndex)}
+                  />
+                )}
 
                 {isInactive && (
                   <div className='absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px] rounded-xl pointer-events-none'>
@@ -730,6 +776,18 @@ const ProductDetails = () => {
 
               {/* Mobile Dots */}
               <div className='flex justify-center gap-2 mt-4 sm:hidden'>
+                {/* 🆕 Dot do Vídeo */}
+                {displayProduct.video && (
+                  <button
+                    onClick={() => {
+                      if (imageScrollRef.current) {
+                        imageScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+                      }
+                    }}
+                    className='w-2.5 h-2.5 rounded-full bg-red-500 transition-all duration-300 hover:scale-110'
+                    title='Vídeo'
+                  />
+                )}
                 {displayProduct.image.map((_, index) => (
                   <button
                     key={index}
@@ -754,12 +812,32 @@ const ProductDetails = () => {
                   )}
 
                   <div className='flex gap-3 overflow-hidden'>
-                    {displayProduct.image.slice(thumbStartIndex, thumbStartIndex + 5).map((image, index) => (
+                    {/* 🆕 Thumbnail do Vídeo */}
+                    {displayProduct.video && (
+                      <div
+                        onClick={() => { setShowVideo(true); }}
+                        className={`border-2 w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 flex-shrink-0 relative ${
+                          showVideo
+                            ? 'border-primary scale-105 shadow-lg'
+                            : 'border-gray-300 hover:scale-105 hover:border-gray-400'
+                        }`}
+                      >
+                        <div className='w-full h-full bg-gray-900 flex items-center justify-center'>
+                          <svg className='w-8 h-8 text-white' fill='currentColor' viewBox='0 0 24 24'>
+                            <path d='M8 5v14l11-7z' />
+                          </svg>
+                        </div>
+                        <div className='absolute bottom-1 left-1 right-1 text-center'>
+                          <span className='text-[10px] text-white bg-black/60 px-1 rounded'>Vídeo</span>
+                        </div>
+                      </div>
+                    )}
+                    {displayProduct.image.slice(thumbStartIndex, thumbStartIndex + (displayProduct.video ? 4 : 5)).map((image, index) => (
                       <div
                         key={thumbStartIndex + index}
-                        onClick={() => selectThumbnail(thumbStartIndex + index)}
+                        onClick={() => { setShowVideo(false); selectThumbnail(thumbStartIndex + index); }}
                         className={`border-2 w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden cursor-pointer transition-all duration-300 flex-shrink-0 ${
-                          currentImageIndex === thumbStartIndex + index
+                          !showVideo && currentImageIndex === thumbStartIndex + index
                             ? 'border-primary scale-105 shadow-lg'
                             : 'border-gray-300 hover:scale-105 hover:border-gray-400'
                         }`}

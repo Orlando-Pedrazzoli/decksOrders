@@ -3,7 +3,7 @@ import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 
 const ProductCard = memo(({ product }) => {
-  const { currency, addToCart, removeFromCart, cartItems, navigate, products } =
+  const { currency, addToCart, removeFromCart, cartItems, navigate, getProductFamily } =
     useAppContext();
   
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -11,23 +11,24 @@ const ProductCard = memo(({ product }) => {
   const [selectedProduct, setSelectedProduct] = useState(product);
   const [isColorTransitioning, setIsColorTransitioning] = useState(false);
 
-  // 🎯 Buscar produtos da mesma família
+  // 🎯 Buscar produtos da mesma família via API (com cache no contexto)
   useEffect(() => {
-    if (product?.productFamily) {
-      const family = products.filter(
-        p => p.productFamily === product.productFamily
-      );
-      // Ordenar: produto atual primeiro, depois por cor
-      family.sort((a, b) => {
-        if (a._id === product._id) return -1;
-        if (b._id === product._id) return 1;
-        return (a.color || '').localeCompare(b.color || '');
-      });
-      setFamilyProducts(family);
-    } else {
-      setFamilyProducts([]);
-    }
-  }, [product?.productFamily, products, product?._id]);
+    const fetchFamily = async () => {
+      if (product?.productFamily) {
+        const family = await getProductFamily(product.productFamily);
+        // Ordenar: produto atual primeiro, depois por cor
+        const sorted = [...family].sort((a, b) => {
+          if (a._id === product._id) return -1;
+          if (b._id === product._id) return 1;
+          return (a.color || '').localeCompare(b.color || '');
+        });
+        setFamilyProducts(sorted);
+      } else {
+        setFamilyProducts([]);
+      }
+    };
+    fetchFamily();
+  }, [product?.productFamily, product?._id, getProductFamily]);
 
   // Reset quando o produto base muda
   useEffect(() => {

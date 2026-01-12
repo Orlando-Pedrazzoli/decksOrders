@@ -23,6 +23,7 @@ export const AppContextProvider = ({ children }) => {
   const [isSeller, setIsSeller] = useState(false);
   const [showUserLogin, setShowUserLogin] = useState(false);
   const [products, setProducts] = useState([]);
+  const [familyCache, setFamilyCache] = useState({}); // 🆕 Cache de famílias de produtos
   const [cartItems, setCartItems] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [showCartSidebar, setShowCartSidebar] = useState(false);
@@ -281,6 +282,51 @@ export const AppContextProvider = ({ children }) => {
   };
 
   // =============================================================================
+  // 🆕 FUNÇÃO PARA BUSCAR FAMÍLIA DE PRODUTOS (VARIANTES DE COR)
+  // =============================================================================
+
+  // 🎯 Buscar todos os produtos de uma família (com cache)
+  const getProductFamily = async (familySlug) => {
+    if (!familySlug) return [];
+    
+    // Se já está em cache, retornar
+    if (familyCache[familySlug]) {
+      return familyCache[familySlug];
+    }
+    
+    try {
+      const { data } = await axios.post('/api/product/family', { familySlug });
+      
+      if (data.success && data.products) {
+        // Guardar em cache
+        setFamilyCache(prev => ({
+          ...prev,
+          [familySlug]: data.products
+        }));
+        return data.products;
+      }
+      return [];
+    } catch (error) {
+      console.error('Erro ao buscar família:', error);
+      return [];
+    }
+  };
+
+  // 🎯 Limpar cache de uma família (quando produto é atualizado)
+  const clearFamilyCache = (familySlug) => {
+    if (familySlug) {
+      setFamilyCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[familySlug];
+        return newCache;
+      });
+    } else {
+      // Limpar todo o cache
+      setFamilyCache({});
+    }
+  };
+
+  // =============================================================================
   // 🆕 CART OPERATIONS COM VALIDAÇÃO DE STOCK
   // =============================================================================
 
@@ -533,6 +579,10 @@ export const AppContextProvider = ({ children }) => {
     // 🆕 FUNÇÕES DE STOCK
     getAvailableStock,
     canAddToCart,
+    // 🆕 FUNÇÕES DE FAMÍLIA/VARIANTES
+    getProductFamily,
+    clearFamilyCache,
+    familyCache,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

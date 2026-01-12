@@ -5,6 +5,7 @@ import {
   addProduct, 
   productList, 
   productById, 
+  getProductById, // 🆕
   changeStock, 
   updateProduct, 
   deleteProduct,
@@ -18,13 +19,20 @@ const productRouter = express.Router();
 
 // Rotas públicas
 productRouter.get('/list', productList);
+productRouter.get('/:id', getProductById);              // 🆕 Buscar produto por ID (GET)
 productRouter.post('/id', productById);
 productRouter.post('/family', getProductFamily);      // 🆕 Buscar família
 productRouter.post('/check-stock', checkStock);       // 🆕 Verificar stock
 
 // Rotas protegidas (seller/admin)
-productRouter.post('/add', authSeller, upload.array('images'), addProduct);
-productRouter.post('/update', authSeller, upload.array('images'), updateProduct);
+productRouter.post('/add', authSeller, upload.fields([
+  { name: 'images', maxCount: 8 },
+  { name: 'video', maxCount: 1 }
+]), addProduct);
+productRouter.post('/update', authSeller, upload.fields([
+  { name: 'images', maxCount: 8 },
+  { name: 'video', maxCount: 1 }
+]), updateProduct);
 productRouter.post('/delete', authSeller, deleteProduct);
 productRouter.post('/stock', authSeller, changeStock);
 productRouter.post('/update-stock', authSeller, updateStock);       // 🆕 Atualizar stock
