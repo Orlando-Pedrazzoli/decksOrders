@@ -1,6 +1,5 @@
-// ImageGalleryModal.jsx - Galeria de imagens com thumbnails verticais
+// ImageGalleryModal.jsx - Componente de galeria de imagens reutilizável
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { assets } from '../assets/assets';
 import '../styles/ProductDetails.css';
 
 /**
@@ -29,7 +28,7 @@ const useIsTouchDevice = () => {
 
 /**
  * Componente de galeria de imagens com modal
- * Thumbnails verticais no desktop, dots no mobile
+ * Suporta swipe, zoom, navegação por teclado e touch gestures
  */
 const ImageGalleryModal = ({
   images = [],
@@ -65,6 +64,9 @@ const ImageGalleryModal = ({
 
   const minSwipeDistance = 50;
   const maxZoomLevel = 3;
+  
+  // 🆕 Altura fixa da área de thumbnails
+  const THUMBNAIL_AREA_HEIGHT = 110;
 
   // Reset zoom
   const resetZoom = useCallback(() => {
@@ -82,7 +84,6 @@ const ImageGalleryModal = ({
       setTouchEnd(null);
       setTouchStart(touch.clientX);
 
-      // Handle pinch start
       if (e.touches.length === 2) {
         const touch2 = e.touches[1];
         const distance = Math.hypot(
@@ -99,7 +100,6 @@ const ImageGalleryModal = ({
   const handleTouchMove = useCallback(
     e => {
       if (e.touches.length === 2 && enableZoom) {
-        // Handle pinch zoom
         const touch1 = e.touches[0];
         const touch2 = e.touches[1];
         const distance = Math.hypot(
@@ -272,12 +272,6 @@ const ImageGalleryModal = ({
         case 'ArrowRight':
           goToNext();
           break;
-        case 'ArrowUp':
-          goToPrevious();
-          break;
-        case 'ArrowDown':
-          goToNext();
-          break;
         case 'Escape':
           if (isZoomed) {
             resetZoom();
@@ -318,7 +312,7 @@ const ImageGalleryModal = ({
 
   // Handle image error
   const handleImageError = useCallback(e => {
-    e.target.src = assets.placeholder_image || '/placeholder.jpg';
+    e.target.src = '/placeholder.jpg';
     setIsImageLoading(false);
   }, []);
 
@@ -349,23 +343,150 @@ const ImageGalleryModal = ({
   if (!isOpen || !images.length) return null;
 
   const currentImage = images[currentIndex] || '';
+  const hasThumbnails = showThumbnails && images.length > 1;
 
   return (
     <div
       ref={modalRef}
-      className='fixed inset-0 z-[9999] bg-black/95 flex'
+      className='fixed inset-0 z-[9999] bg-black flex flex-col'
       onClick={handleBackdropClick}
       style={{
         touchAction: isZoomed ? 'none' : 'pan-y',
         ...customStyles.container,
       }}
     >
-      {/* ============================================ */}
-      {/* THUMBNAILS VERTICAIS - DESKTOP (lado esquerdo) */}
-      {/* ============================================ */}
-      {showThumbnails && !isZoomed && images.length > 1 && (
-        <div className='hidden md:flex flex-col items-center py-4 px-2 bg-black/50 max-h-full overflow-y-auto scrollbar-hide'>
-          <div className='flex flex-col gap-2'>
+      {/* ========== HEADER: Contador + Botão Fechar ========== */}
+      <div className='absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4'>
+        {/* Image counter */}
+        {showCounter && images.length > 1 ? (
+          <div className='text-white bg-black/50 px-4 py-2 rounded-full text-sm font-medium'>
+            {currentIndex + 1} / {images.length}
+          </div>
+        ) : (
+          <div />
+        )}
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className='text-white bg-black/50 rounded-full w-11 h-11 flex items-center justify-center hover:bg-black/70 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50'
+          aria-label='Fechar galeria'
+        >
+          <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+          </svg>
+        </button>
+      </div>
+
+      {/* Zoom indicator */}
+      {enableZoom && isZoomed && (
+        <div className='absolute top-16 left-1/2 transform -translate-x-1/2 text-white bg-black/50 px-3 py-1 rounded-full text-sm z-50'>
+          Zoom: {Math.round(zoomLevel * 100)}%
+        </div>
+      )}
+
+      {/* Instructions (mobile only) */}
+      {showInstructions && isTouchDevice && !isZoomed && (
+        <div className='absolute top-16 left-1/2 transform -translate-x-1/2 text-white text-xs bg-black/50 px-3 py-1 rounded-full opacity-75 z-50 sm:hidden animate-pulse'>
+          {enableSwipe && 'Deslize para navegar • '}
+          {enableZoom && 'Toque duplo para zoom'}
+        </div>
+      )}
+
+      {/* ========== ÁREA PRINCIPAL DA IMAGEM ========== */}
+      {/* 🆕 Com padding-bottom para não sobrepor as thumbnails */}
+      <div
+        ref={imageContainerRef}
+        className='flex-1 relative flex items-center justify-center px-4 sm:px-12 pt-16'
+        style={{
+          paddingBottom: hasThumbnails && !isZoomed ? `${THUMBNAIL_AREA_HEIGHT + 16}px` : '16px',
+        }}
+        onClick={e => e.stopPropagation()}
+        onTouchStart={enableSwipe ? handleTouchStart : undefined}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={enableSwipe ? handleTouchEnd : undefined}
+        onMouseDown={enableZoom ? handleDragStart : undefined}
+        onMouseMove={enableZoom ? handleDragMove : undefined}
+        onMouseUp={enableZoom ? handleDragEnd : undefined}
+        onMouseLeave={enableZoom ? handleDragEnd : undefined}
+        onWheel={enableZoom ? handleWheel : undefined}
+      >
+        {/* Loading state */}
+        {isImageLoading && (
+          <div className='absolute inset-0 flex items-center justify-center z-40'>
+            <div className='animate-spin rounded-full h-12 w-12 border-2 border-white border-t-transparent'></div>
+          </div>
+        )}
+
+        {/* Main image */}
+        <img
+          src={currentImage}
+          alt={`${productName} - Imagem ${currentIndex + 1} de ${images.length}`}
+          className={`max-w-full max-h-full object-contain select-none transition-all duration-300 ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
+          style={{
+            transform: `scale(${zoomLevel}) translate(${imagePosition.x / zoomLevel}px, ${imagePosition.y / zoomLevel}px)`,
+            cursor: isZoomed ? (isDragging ? 'grabbing' : 'grab') : (enableZoom ? 'zoom-in' : 'default'),
+            userSelect: 'none',
+            touchAction: 'none',
+            willChange: isZoomed ? 'transform' : 'auto',
+          }}
+          onClick={enableZoom ? handleDoubleTap : undefined}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          draggable={false}
+        />
+
+        {/* ========== SETAS DE NAVEGAÇÃO (IGUAIS) ========== */}
+        {!isZoomed && images.length > 1 && (
+          <>
+            {/* Seta Esquerda */}
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                goToPrevious();
+              }}
+              disabled={currentIndex === 0}
+              className='absolute left-2 sm:left-4 bg-white/90 rounded-full p-2 sm:p-3 shadow-lg hover:bg-white hover:scale-110 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 focus:outline-none focus:ring-2 focus:ring-white'
+              style={{
+                top: hasThumbnails ? `calc(50% - ${THUMBNAIL_AREA_HEIGHT / 2}px)` : '50%',
+                transform: 'translateY(-50%)',
+              }}
+              aria-label='Imagem anterior'
+            >
+              <svg className='w-5 h-5 sm:w-6 sm:h-6 text-gray-800' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2.5} d='M15 19l-7-7 7-7' />
+              </svg>
+            </button>
+
+            {/* Seta Direita */}
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                goToNext();
+              }}
+              disabled={currentIndex === images.length - 1}
+              className='absolute right-2 sm:right-4 bg-white/90 rounded-full p-2 sm:p-3 shadow-lg hover:bg-white hover:scale-110 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 focus:outline-none focus:ring-2 focus:ring-white'
+              style={{
+                top: hasThumbnails ? `calc(50% - ${THUMBNAIL_AREA_HEIGHT / 2}px)` : '50%',
+                transform: 'translateY(-50%)',
+              }}
+              aria-label='Próxima imagem'
+            >
+              <svg className='w-5 h-5 sm:w-6 sm:h-6 text-gray-800' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2.5} d='M9 5l7 7-7 7' />
+              </svg>
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* ========== THUMBNAILS (em baixo, com fundo) ========== */}
+      {hasThumbnails && !isZoomed && (
+        <div 
+          className='absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent flex items-center justify-center'
+          style={{ height: `${THUMBNAIL_AREA_HEIGHT}px` }}
+        >
+          <div className='flex gap-2 sm:gap-3 overflow-x-auto scrollbar-hide px-4 py-3'>
             {images.map((image, index) => (
               <button
                 key={`thumb-${index}`}
@@ -373,22 +494,17 @@ const ImageGalleryModal = ({
                   e.stopPropagation();
                   goToImage(index);
                 }}
-                className={`
-                  flex-shrink-0 border-2 transition-all duration-200
-                  overflow-hidden rounded-lg focus:outline-none
-                  w-16 h-16 lg:w-20 lg:h-20
-                  ${
-                    currentIndex === index
-                      ? 'border-white ring-2 ring-white/50 scale-105'
-                      : 'border-transparent opacity-60 hover:opacity-100 hover:border-white/50'
-                  }
-                `}
+                className={`flex-shrink-0 border-2 transition-all duration-200 overflow-hidden rounded-lg focus:outline-none ${
+                  currentIndex === index
+                    ? 'border-white scale-105 shadow-lg shadow-white/30'
+                    : 'border-transparent opacity-50 hover:opacity-100 hover:border-white/50'
+                }`}
                 aria-label={`Ir para imagem ${index + 1}`}
               >
                 <img
                   src={image}
                   alt={`Miniatura ${index + 1}`}
-                  className='w-full h-full object-cover'
+                  className='w-16 h-16 sm:w-20 sm:h-20 object-cover'
                   loading='lazy'
                 />
               </button>
@@ -397,182 +513,15 @@ const ImageGalleryModal = ({
         </div>
       )}
 
-      {/* ============================================ */}
-      {/* ÁREA PRINCIPAL DA IMAGEM */}
-      {/* ============================================ */}
-      <div className='flex-1 flex flex-col relative'>
-        
-        {/* Header com contador e botão fechar */}
-        <div className='absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4'>
-          {/* Contador */}
-          {showCounter && images.length > 1 && (
-            <div className='text-white bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full text-sm font-medium'>
-              {currentIndex + 1} / {images.length}
-            </div>
-          )}
-          
-          {/* Spacer */}
-          {!showCounter && <div />}
-          
-          {/* Botão Fechar */}
-          <button
-            onClick={onClose}
-            className='text-white bg-black/60 backdrop-blur-sm rounded-full w-11 h-11 flex items-center justify-center hover:bg-black/80 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50'
-            aria-label='Fechar galeria'
-          >
-            <svg className='w-6 h-6' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-              <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
-            </svg>
-          </button>
-        </div>
-
-        {/* Zoom indicator */}
-        {enableZoom && isZoomed && (
-          <div className='absolute top-20 left-1/2 transform -translate-x-1/2 text-white bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full text-sm z-50'>
-            Zoom: {Math.round(zoomLevel * 100)}%
-          </div>
-        )}
-
-        {/* Container da imagem principal */}
-        <div
-          ref={imageContainerRef}
-          className='flex-1 flex items-center justify-center p-4 md:p-8'
-          onClick={e => e.stopPropagation()}
-          onTouchStart={enableSwipe ? handleTouchStart : undefined}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={enableSwipe ? handleTouchEnd : undefined}
-          onMouseDown={enableZoom ? handleDragStart : undefined}
-          onMouseMove={enableZoom ? handleDragMove : undefined}
-          onMouseUp={enableZoom ? handleDragEnd : undefined}
-          onMouseLeave={enableZoom ? handleDragEnd : undefined}
-          onWheel={enableZoom ? handleWheel : undefined}
-          style={{
-            cursor: isZoomed
-              ? isDragging
-                ? 'grabbing'
-                : 'grab'
-              : enableZoom
-              ? 'zoom-in'
-              : 'default',
-          }}
+      {/* Keyboard hints (desktop only) */}
+      {!isTouchDevice && !isZoomed && (
+        <div 
+          className='hidden sm:block absolute left-1/2 transform -translate-x-1/2 text-white/60 text-xs bg-black/40 px-4 py-2 rounded-full'
+          style={{ bottom: hasThumbnails ? `${THUMBNAIL_AREA_HEIGHT + 8}px` : '16px' }}
         >
-          {/* Loading state */}
-          {isImageLoading && (
-            <div className='absolute inset-0 flex items-center justify-center z-40'>
-              <div className='animate-spin rounded-full h-12 w-12 border-2 border-white border-t-transparent'></div>
-            </div>
-          )}
-
-          {/* Imagem principal */}
-          <img
-            src={currentImage}
-            alt={`${productName} - Imagem ${currentIndex + 1} de ${images.length}`}
-            className={`
-              max-w-full max-h-full object-contain select-none
-              transition-all duration-300
-              ${isImageLoading ? 'opacity-0' : 'opacity-100'}
-            `}
-            style={{
-              transform: `scale(${zoomLevel}) translate(${imagePosition.x / zoomLevel}px, ${imagePosition.y / zoomLevel}px)`,
-              userSelect: 'none',
-              WebkitUserDrag: 'none',
-              touchAction: 'none',
-              willChange: isZoomed ? 'transform' : 'auto',
-            }}
-            onClick={enableZoom ? handleDoubleTap : undefined}
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-            draggable={false}
-          />
-
-          {/* Setas de navegação - Desktop */}
-          {!isZoomed && images.length > 1 && (
-            <>
-              <button
-                onClick={e => {
-                  e.stopPropagation();
-                  goToPrevious();
-                }}
-                className={`
-                  hidden md:flex absolute left-4 top-1/2 -translate-y-1/2
-                  bg-white/90 backdrop-blur-sm rounded-full p-3 shadow-lg
-                  hover:bg-white hover:scale-110 transition-all duration-200
-                  disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100
-                  focus:outline-none focus:ring-2 focus:ring-primary
-                `}
-                disabled={currentIndex === 0}
-                aria-label='Imagem anterior'
-              >
-                <svg className='w-6 h-6 text-gray-800' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 19l-7-7 7-7' />
-                </svg>
-              </button>
-
-              <button
-                onClick={e => {
-                  e.stopPropagation();
-                  goToNext();
-                }}
-                className={`
-                  hidden md:flex absolute right-4 top-1/2 -translate-y-1/2
-                  bg-white/90 backdrop-blur-sm rounded-full p-3 shadow-lg
-                  hover:bg-white hover:scale-110 transition-all duration-200
-                  disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100
-                  focus:outline-none focus:ring-2 focus:ring-primary
-                `}
-                disabled={currentIndex === images.length - 1}
-                aria-label='Próxima imagem'
-              >
-                <svg className='w-6 h-6 text-gray-800' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M9 5l7 7-7 7' />
-                </svg>
-              </button>
-            </>
-          )}
+          ← → navegar • {enableZoom && 'Duplo clique zoom • '}ESC fechar
         </div>
-
-        {/* ============================================ */}
-        {/* DOTS MINIMALISTAS - MOBILE (em baixo) */}
-        {/* ============================================ */}
-        {showThumbnails && !isZoomed && images.length > 1 && (
-          <div className='md:hidden flex justify-center items-center gap-2 pb-6 pt-2'>
-            {images.map((_, index) => (
-              <button
-                key={`dot-${index}`}
-                onClick={e => {
-                  e.stopPropagation();
-                  goToImage(index);
-                }}
-                className={`
-                  transition-all duration-300 rounded-full
-                  ${
-                    currentIndex === index
-                      ? 'w-8 h-2 bg-white'
-                      : 'w-2 h-2 bg-white/40 hover:bg-white/60'
-                  }
-                `}
-                aria-label={`Ir para imagem ${index + 1}`}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Instruções - Mobile */}
-        {showInstructions && isTouchDevice && !isZoomed && (
-          <div className='md:hidden absolute bottom-16 left-1/2 transform -translate-x-1/2 text-white/70 text-xs bg-black/40 backdrop-blur-sm px-4 py-2 rounded-full animate-pulse'>
-            {enableSwipe && 'Deslize para navegar'}
-            {enableSwipe && enableZoom && ' • '}
-            {enableZoom && 'Duplo toque para zoom'}
-          </div>
-        )}
-
-        {/* Instruções - Desktop */}
-        {!isTouchDevice && !isZoomed && (
-          <div className='hidden md:block absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white/50 text-xs bg-black/30 backdrop-blur-sm px-4 py-2 rounded-full'>
-            ← → navegar • {enableZoom && 'Duplo clique zoom • '}ESC fechar
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };
