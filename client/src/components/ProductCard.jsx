@@ -221,7 +221,7 @@ const ProductCard = memo(({ product }) => {
 
         {/* 🆕 BOLINHAS DE COR */}
         {familyProducts.length > 1 && (
-          <div className='flex items-center gap-1.5 mt-2 flex-wrap'>
+          <div className='flex items-center gap-2.5 mt-2 flex-wrap'>
             {familyProducts.slice(0, 5).map((familyProduct) => {
               const isSelected = familyProduct._id === displayProduct._id;
               const familyStock = familyProduct.stock || 0;
