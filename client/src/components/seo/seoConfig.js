@@ -1,8 +1,17 @@
+/**
+ * SEO Configuration - Elite Surfing Portugal
+ * 
+ * REGRAS:
+ * 1. URLs SEM trailing slash (exceto homepage que usa '')
+ * 2. URLs devem ser idênticas às do sitemap.xml
+ * 3. Descrições entre 120-160 caracteres para melhor exibição no Google
+ */
+
 const seoConfig = {
   home: {
-    title: null,
+    title: null, // Usa título padrão
     description: 'Loja online de equipamento de surf em Portugal. Decks, leashes, quilhas, capas, wax e acessórios de surf. Entregas em Portugal Continental. Qualidade e preços competitivos.',
-    url: '/'
+    url: '' // Homepage - será convertido para https://www.elitesurfing.pt
   },
   products: {
     title: 'Todos os Produtos',
@@ -13,7 +22,7 @@ const seoConfig = {
     title: 'Carrinho de Compras',
     description: 'O seu carrinho de compras na Elite Surfing Portugal. Finalize a sua encomenda de equipamento de surf.',
     url: '/cart',
-    noindex: true
+    noindex: true // Página privada - não indexar
   },
   contact: {
     title: 'Contacto',
@@ -44,39 +53,80 @@ const seoConfig = {
     title: 'Os Meus Pedidos',
     description: 'Consulte o histórico dos seus pedidos na Elite Surfing Portugal.',
     url: '/my-orders',
-    noindex: true
+    noindex: true // Página privada - não indexar
+  },
+  addAddress: {
+    title: 'Adicionar Morada',
+    description: 'Adicione uma nova morada de entrega na Elite Surfing Portugal.',
+    url: '/add-address',
+    noindex: true // Página privada - não indexar
+  },
+  writeReview: {
+    title: 'Escrever Review',
+    description: 'Partilhe a sua opinião sobre os produtos Elite Surfing Portugal.',
+    url: '/write-review',
+    noindex: true // Página privada - não indexar
+  },
+  orderSuccess: {
+    title: 'Encomenda Confirmada',
+    description: 'A sua encomenda foi confirmada com sucesso na Elite Surfing Portugal.',
+    url: '/order-success',
+    noindex: true // Página privada - não indexar
   }
 };
 
+/**
+ * Descrições SEO para páginas de categoria
+ * Slug DEVE corresponder ao usado nas rotas e no sitemap
+ */
 export const categoryDescriptions = {
   'deck-tahiti': {
     title: 'Deck Tahiti - Decks de Tracção',
-    description: 'Decks Tahiti de alta qualidade com E.V.A fresado em ângulo diamantado. Peça única com kicktail de 26mm. Várias cores disponíveis. Envio rápido para Portugal.'
+    description: 'Decks Tahiti de alta qualidade com E.V.A fresado em ângulo diamantado. Peça única com kicktail de 26mm. Várias cores disponíveis. Envio rápido para Portugal.',
+    url: '/products/deck-tahiti'
   },
   'deck-hawaii-grom': {
     title: 'Deck Hawaii Grom - Decks de Surf',
-    description: 'Decks Hawaii Grom em 3 partes com E.V.A fresado em ângulo diamantado. Kicktail de 26mm e fita adesiva alemã. Ideal para groms e surfistas de todos os níveis.'
+    description: 'Decks Hawaii Grom em 3 partes com E.V.A fresado em ângulo diamantado. Kicktail de 26mm e fita adesiva alemã. Ideal para groms e surfistas de todos os níveis.',
+    url: '/products/deck-hawaii-grom'
   },
   'deck-saquarema': {
     title: 'Deck Saquarema - Decks Premium',
-    description: 'Decks Saquarema com EVA lixado e fresa dupla (Double Square Groove). 3 partes, barra central super soft e kicktail rígido de 25mm. Fita adesiva 3M.'
+    description: 'Decks Saquarema com EVA lixado e fresa dupla (Double Square Groove). 3 partes, barra central super soft e kicktail rígido de 25mm. Fita adesiva 3M.',
+    url: '/products/deck-saquarema'
   },
   'deck-noronha': {
     title: 'Deck Noronha - Decks de Tracção',
-    description: 'Decks Noronha com EVA lixado e fresa dupla em formato de quadrados. Barra central super soft com detalhes CNC. Várias cores disponíveis.'
+    description: 'Decks Noronha com EVA lixado e fresa dupla em formato de quadrados. Barra central super soft com detalhes CNC. Várias cores disponíveis.',
+    url: '/products/deck-noronha'
   },
   'deck-fiji-classic': {
     title: 'Deck Fiji Classic - Decks Clássicos',
-    description: 'Decks Fiji Classic em 3 partes com E.V.A fresado em ângulo diamantado. Design clássico com várias combinações de cores. Kicktail de 26mm.'
+    description: 'Decks Fiji Classic em 3 partes com E.V.A fresado em ângulo diamantado. Design clássico com várias combinações de cores. Kicktail de 26mm.',
+    url: '/products/deck-fiji-classic'
   },
   'deck-j-bay': {
     title: 'Deck J-Bay - Decks de Surf',
-    description: 'Decks J-Bay em 3 partes com E.V.A fresado em ângulo diamantado. Inspirados na famosa onda sul-africana. Várias cores e combinações disponíveis.'
+    description: 'Decks J-Bay em 3 partes com E.V.A fresado em ângulo diamantado. Inspirados na famosa onda sul-africana. Várias cores e combinações disponíveis.',
+    url: '/products/deck-j-bay'
   },
   'fuwax-cool': {
     title: 'Fu Wax Cool - Parafina para Surf',
-    description: 'Parafina Fu Wax Cool Water para águas entre 11°C e 17°C. Utilizada por surfistas profissionais como Kelly Slater e Gabriel Medina. Alto desempenho garantido.'
+    description: 'Parafina Fu Wax Cool Water para águas entre 11°C e 17°C. Utilizada por surfistas profissionais como Kelly Slater e Gabriel Medina. Alto desempenho garantido.',
+    url: '/products/fuwax-cool'
   }
+};
+
+/**
+ * Helper: Obter configuração SEO para uma categoria
+ */
+export const getCategorySEO = (categorySlug) => {
+  const slug = (categorySlug || '').toLowerCase();
+  return categoryDescriptions[slug] || {
+    title: `${categorySlug} - Elite Surfing Portugal`,
+    description: `Produtos ${categorySlug} na Elite Surfing Portugal. Equipamento de surf de alta qualidade com envio para todo Portugal.`,
+    url: `/products/${slug}`
+  };
 };
 
 export default seoConfig;

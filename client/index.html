@@ -4,33 +4,41 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     
+    <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
     
+    <!-- 
+      ⚠️ IMPORTANTE: NÃO adicionar canonical tag aqui!
+      O React-Helmet-Async gerencia as canonical tags dinamicamente por página.
+      Ter canonical estática aqui causa conflito com as dinâmicas.
+    -->
+    
+    <!-- Meta tags base (serão sobrescritas pelo React-Helmet-Async) -->
     <title>Elite Surfing Portugal - Loja Online de Acessórios de Surf</title>
     <meta name="description" content="Loja online de equipamento de surf em Portugal. Decks, leashes, quilhas, capas, wax e acessórios. Entregas em Portugal Continental." />
     
-    <link rel="canonical" href="https://www.elitesurfing.pt" />
-    
-    <link rel="alternate" hreflang="pt-PT" href="https://www.elitesurfing.pt" />
-    <link rel="alternate" hreflang="x-default" href="https://www.elitesurfing.pt" />
-    
+    <!-- Open Graph base -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Elite Surfing Portugal" />
     <meta property="og:locale" content="pt_PT" />
     <meta property="og:image" content="https://www.elitesurfing.pt/og-image.jpg" />
-    <meta property="og:url" content="https://www.elitesurfing.pt" />
     
+    <!-- Twitter Card base -->
     <meta name="twitter:card" content="summary_large_image" />
     
+    <!-- Theme -->
     <meta name="theme-color" content="#0ea5e9" />
     <meta name="msapplication-TileColor" content="#0ea5e9" />
     
+    <!-- Geo -->
     <meta name="geo.region" content="PT-15" />
     <meta name="geo.placename" content="Oeiras, Portugal" />
     
+    <!-- Language -->
     <meta http-equiv="content-language" content="pt-PT" />
     
+    <!-- Preconnect para performance -->
     <link rel="preconnect" href="https://elitesurfingeu-backend.vercel.app" />
     <link rel="preconnect" href="https://res.cloudinary.com" />
     <link rel="dns-prefetch" href="https://res.cloudinary.com" />

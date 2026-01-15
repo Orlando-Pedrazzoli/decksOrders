@@ -1,3 +1,11 @@
+/**
+ * JSON-LD Structured Data - Elite Surfing Portugal
+ * 
+ * IMPORTANTE: Todas as URLs devem usar www.elitesurfing.pt
+ */
+
+const BASE_URL = 'https://www.elitesurfing.pt';
+
 // Organization Schema
 export const OrganizationSchema = () => {
   const schema = {
@@ -5,9 +13,9 @@ export const OrganizationSchema = () => {
     "@type": "Organization",
     "name": "Elite Surfing Portugal",
     "alternateName": "Elite Surfing",
-    "url": "https://www.elitesurfing.pt",
-    "logo": "https://www.elitesurfing.pt/logo.png",
-    "image": "https://www.elitesurfing.pt/og-image.jpg",
+    "url": BASE_URL,
+    "logo": `${BASE_URL}/logo.png`,
+    "image": `${BASE_URL}/og-image.jpg`,
     "description": "Loja online de equipamento e acessórios de surf em Portugal. Decks, leashes, quilhas, capas, wax e muito mais.",
     "address": {
       "@type": "PostalAddress",
@@ -40,12 +48,12 @@ export const WebSiteSchema = () => {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Elite Surfing Portugal",
-    "url": "https://www.elitesurfing.pt",
+    "url": BASE_URL,
     "potentialAction": {
       "@type": "SearchAction",
       "target": {
         "@type": "EntryPoint",
-        "urlTemplate": "https://www.elitesurfing.pt/products?search={search_term_string}"
+        "urlTemplate": `${BASE_URL}/products?search={search_term_string}`
       },
       "query-input": "required name=search_term_string"
     }
@@ -61,14 +69,14 @@ export const WebSiteSchema = () => {
 // SiteNavigationElement Schema - Define os sitelinks corretos para o Google
 export const SiteNavigationSchema = () => {
   const navigationItems = [
-    { name: "Produtos", url: "https://www.elitesurfing.pt/products" },
-    { name: "Deck Tahiti", url: "https://www.elitesurfing.pt/products/deck-tahiti" },
-    { name: "Deck Saquarema", url: "https://www.elitesurfing.pt/products/deck-saquarema" },
-    { name: "Deck Noronha", url: "https://www.elitesurfing.pt/products/deck-noronha" },
-    { name: "Deck Fiji Classic", url: "https://www.elitesurfing.pt/products/deck-fiji-classic" },
-    { name: "Deck J-Bay", url: "https://www.elitesurfing.pt/products/deck-j-bay" },
-    { name: "Contacto", url: "https://www.elitesurfing.pt/contact" },
-    { name: "FAQ", url: "https://www.elitesurfing.pt/faq" }
+    { name: "Produtos", url: "/products" },
+    { name: "Deck Tahiti", url: "/products/deck-tahiti" },
+    { name: "Deck Saquarema", url: "/products/deck-saquarema" },
+    { name: "Deck Noronha", url: "/products/deck-noronha" },
+    { name: "Deck Fiji Classic", url: "/products/deck-fiji-classic" },
+    { name: "Deck J-Bay", url: "/products/deck-j-bay" },
+    { name: "Contacto", url: "/contact" },
+    { name: "FAQ", url: "/faq" }
   ];
 
   const schema = {
@@ -78,7 +86,7 @@ export const SiteNavigationSchema = () => {
       "@type": "SiteNavigationElement",
       "position": index + 1,
       "name": item.name,
-      "url": item.url
+      "url": `${BASE_URL}${item.url}`
     }))
   };
 
@@ -92,6 +100,9 @@ export const SiteNavigationSchema = () => {
 // Product Schema
 export const ProductSchema = ({ product }) => {
   if (!product) return null;
+
+  const category = (product.category || '').toLowerCase();
+  const productUrl = `${BASE_URL}/products/${category}/${product._id}`;
 
   const schema = {
     "@context": "https://schema.org",
@@ -108,7 +119,7 @@ export const ProductSchema = ({ product }) => {
     },
     "offers": {
       "@type": "Offer",
-      "url": `https://www.elitesurfing.pt/products/${product.category?.toLowerCase()}/${product._id}`,
+      "url": productUrl,
       "priceCurrency": "EUR",
       "price": product.offerPrice || product.price,
       "priceValidUntil": new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
@@ -122,11 +133,14 @@ export const ProductSchema = ({ product }) => {
     }
   };
 
+  // Adicionar ratings se disponíveis
   if (product.averageRating && product.reviewCount) {
     schema.aggregateRating = {
       "@type": "AggregateRating",
       "ratingValue": product.averageRating,
-      "reviewCount": product.reviewCount
+      "reviewCount": product.reviewCount,
+      "bestRating": 5,
+      "worstRating": 1
     };
   }
 
@@ -139,6 +153,8 @@ export const ProductSchema = ({ product }) => {
 
 // BreadcrumbList Schema
 export const BreadcrumbSchema = ({ items }) => {
+  if (!items || items.length === 0) return null;
+
   const schema = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -146,7 +162,7 @@ export const BreadcrumbSchema = ({ items }) => {
       "@type": "ListItem",
       "position": index + 1,
       "name": item.name,
-      "item": item.url ? `https://www.elitesurfing.pt${item.url}` : undefined
+      "item": item.url ? `${BASE_URL}${item.url}` : undefined
     }))
   };
 
@@ -159,6 +175,8 @@ export const BreadcrumbSchema = ({ items }) => {
 
 // FAQPage Schema
 export const FAQSchema = ({ faqs }) => {
+  if (!faqs || faqs.length === 0) return null;
+
   const schema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -185,8 +203,8 @@ export const LocalBusinessSchema = () => {
     "@context": "https://schema.org",
     "@type": "Store",
     "name": "Elite Surfing Portugal",
-    "image": "https://www.elitesurfing.pt/og-image.jpg",
-    "url": "https://www.elitesurfing.pt",
+    "image": `${BASE_URL}/og-image.jpg`,
+    "url": BASE_URL,
     "telephone": "+351912164220",
     "email": "pedrazzoliorlando@gmail.com",
     "address": {
@@ -196,7 +214,9 @@ export const LocalBusinessSchema = () => {
       "postalCode": "2780-241",
       "addressCountry": "PT"
     },
-    "priceRange": "€€"
+    "priceRange": "€€",
+    "paymentAccepted": ["Cash", "Credit Card", "Multibanco", "MB Way"],
+    "currenciesAccepted": "EUR"
   };
 
   return (

@@ -1,3 +1,4 @@
+// SEO Components - Elite Surfing Portugal
 export { default as SEO } from './SEO';
 export { 
   OrganizationSchema, 
@@ -8,3 +9,4 @@ export {
   FAQSchema,
   LocalBusinessSchema 
 } from './JsonLd';
+export { default as seoConfig, categoryDescriptions, getCategorySEO } from './seoConfig';
