@@ -1,9 +1,10 @@
 import React from 'react';
 import MainBanner from '../components/MainBanner';
 import Categories from '../components/Categories';
+import CollectionsGrid from '../components/CollectionsGrid';
+import FeatureBanners from '../components/FeatureBanners';
 import NewsLetter from '../components/NewsLetter';
 import ReviewsCarousel from '../components/ReviewsCarousel';
-import AllProducts from './AllProducts';
 import { SEO, OrganizationSchema, WebSiteSchema, SiteNavigationSchema } from '../components/seo';
 import seoConfig from '../components/seo/seoConfig';
 
@@ -23,7 +24,8 @@ const Home = () => {
       <div className='mt-10'>
         <MainBanner />
         <Categories />
-        <AllProducts />
+        <CollectionsGrid />
+        <FeatureBanners />
         <ReviewsCarousel />
         <NewsLetter />
       </div>
