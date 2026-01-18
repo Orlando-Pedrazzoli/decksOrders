@@ -3,45 +3,27 @@
 # https://www.elitesurfing.pt
 # =====================================================
 
-# Regras para todos os crawlers
 User-agent: *
-
-# Permitir acesso geral
 Allow: /
 
-# Páginas privadas - não indexar
+# Páginas privadas (noindex no seoConfig.js)
 Disallow: /seller
 Disallow: /seller/
 Disallow: /my-orders
 Disallow: /add-address
 Disallow: /write-review
-Disallow: /write-review/
 Disallow: /order-success
-Disallow: /order-success/
 Disallow: /cart
 
-# URLs antigas/inválidas
+# URLs removidas
 Disallow: /products/Deck-Bells
 Disallow: /products/deck-bells
 
-# Assets que não precisam ser indexados
-Disallow: /assets/
-Disallow: /*.js$
-Disallow: /*.css$
-Disallow: /*.map$
-
-# =====================================================
 # Sitemap
-# =====================================================
 Sitemap: https://www.elitesurfing.pt/sitemap.xml
 
 # =====================================================
-# Crawl delay (opcional - alguns bots respeitam)
-# =====================================================
-Crawl-delay: 1
-
-# =====================================================
-# Regras específicas para Googlebot (melhor performance)
+# Googlebot
 # =====================================================
 User-agent: Googlebot
 Allow: /
@@ -53,15 +35,13 @@ Disallow: /order-success
 Disallow: /cart
 
 # =====================================================
-# Regras para bots de imagens
+# Google Images
 # =====================================================
 User-agent: Googlebot-Image
 Allow: /
-Disallow: /seller
 
 # =====================================================
-# Regras para bots de ADS (permitir para remarketing)
+# AdsBot
 # =====================================================
 User-agent: AdsBot-Google
 Allow: /
-Disallow: /seller
