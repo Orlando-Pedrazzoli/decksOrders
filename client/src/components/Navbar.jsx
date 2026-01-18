@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { Lock, LogOut } from 'lucide-react';
 import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
@@ -7,6 +7,10 @@ import { useAppContext } from '../context/AppContext';
 const Navbar = () => {
   const [open, setOpen] = useState(false);
   const [localSearchInput, setLocalSearchInput] = useState('');
+  const [scrolled, setScrolled] = useState(false);
+  
+  const location = useLocation();
+  const isHomepage = location.pathname === '/';
 
   const {
     user,
@@ -20,6 +24,21 @@ const Navbar = () => {
     isSeller,
     setShowCartSidebar,
   } = useAppContext();
+
+  // Detectar scroll para mudar o fundo na homepage
+  useEffect(() => {
+    const handleScroll = () => {
+      const isScrolled = window.scrollY > 50;
+      setScrolled(isScrolled);
+    };
+
+    if (isHomepage) {
+      window.addEventListener('scroll', handleScroll);
+      handleScroll(); // Check initial position
+    }
+
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isHomepage]);
 
   useEffect(() => {
     if (typeof searchQuery === 'string') {
@@ -103,17 +122,24 @@ const Navbar = () => {
     setShowCartSidebar(true);
   };
 
+  // Determinar se deve usar estilo transparente
+  const isTransparent = isHomepage && !scrolled;
+
   const renderSearchInput = (isMobile = false) => (
     <div
-      className={`flex items-center gap-2 border border-gray-300 px-3 rounded-full relative ${
-        isMobile ? 'w-full px-4 py-2' : 'text-sm py-1.5'
+      className={`flex items-center gap-2 px-3 rounded-full relative ${
+        isMobile 
+          ? 'w-full px-4 py-2 border border-gray-300' 
+          : `text-sm py-1.5 border ${isTransparent ? 'border-white/30 bg-white/10' : 'border-gray-300'}`
       }`}
     >
       <input
         onChange={isMobile ? handleMobileSearch : handleSearch}
         value={localSearchInput}
-        className={`w-full bg-transparent outline-none placeholder-gray-500 ${
-          isMobile ? 'text-base' : ''
+        className={`w-full bg-transparent outline-none ${
+          isMobile 
+            ? 'text-base placeholder-gray-500' 
+            : `${isTransparent ? 'placeholder-white/70 text-white' : 'placeholder-gray-500'}`
         }`}
         type='text'
         placeholder='Pesquisar produtos'
@@ -134,7 +160,9 @@ const Navbar = () => {
       {localSearchInput.length > 0 ? (
         <button
           onClick={clearSearch}
-          className='w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors'
+          className={`w-4 h-4 flex items-center justify-center transition-colors ${
+            isTransparent ? 'text-white/70 hover:text-white' : 'text-gray-400 hover:text-gray-600'
+          }`}
           aria-label='Limpar pesquisa'
         >
           ✕
@@ -143,7 +171,9 @@ const Navbar = () => {
         <img
           src={assets.search_icon}
           alt='Pesquisar'
-          className='w-4 h-4 cursor-pointer opacity-60 hover:opacity-100 transition-opacity'
+          className={`w-4 h-4 cursor-pointer transition-opacity ${
+            isTransparent ? 'invert opacity-70 hover:opacity-100' : 'opacity-60 hover:opacity-100'
+          }`}
           onClick={() => {
             if (localSearchInput.trim()) {
               if (isMobile) {
@@ -159,7 +189,13 @@ const Navbar = () => {
   );
 
   return (
-   <nav className='sticky top-0 flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b border-gray-300 bg-white shadow-sm z-50'>
+    <nav 
+      className={`sticky top-0 flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 z-50 transition-all duration-300 ${
+        isTransparent 
+          ? 'bg-transparent border-b border-white/10' 
+          : 'bg-white border-b border-gray-300 shadow-sm'
+      }`}
+    >
       <NavLink 
         to='/' 
         onClick={() => setOpen(false)}
@@ -167,7 +203,7 @@ const Navbar = () => {
         title='Ir para página inicial'
       >
         <img 
-          className='h-9' 
+          className={`h-9 transition-all duration-300 ${isTransparent ? 'brightness-0 invert' : ''}`}
           src={assets.logo_es} 
           alt='Elite Surfing Portugal - Loja de Surf'
         />
@@ -176,19 +212,34 @@ const Navbar = () => {
       <div className='hidden sm:flex items-center gap-8'>
         <NavLink
           to='/'
-          className={({ isActive }) => (isActive ? 'text-primary' : '')}
+          className={({ isActive }) => 
+            `transition-colors ${isTransparent 
+              ? `text-white hover:text-white/80 ${isActive ? 'text-white font-medium' : ''}` 
+              : `hover:text-primary ${isActive ? 'text-primary' : ''}`
+            }`
+          }
         >
           Home
         </NavLink>
         <NavLink
           to='/products'
-          className={({ isActive }) => (isActive ? 'text-primary' : '')}
+          className={({ isActive }) => 
+            `transition-colors ${isTransparent 
+              ? `text-white hover:text-white/80 ${isActive ? 'text-white font-medium' : ''}` 
+              : `hover:text-primary ${isActive ? 'text-primary' : ''}`
+            }`
+          }
         >
           Produtos
         </NavLink>
         <NavLink
           to='/contact'
-          className={({ isActive }) => (isActive ? 'text-primary' : '')}
+          className={({ isActive }) => 
+            `transition-colors ${isTransparent 
+              ? `text-white hover:text-white/80 ${isActive ? 'text-white font-medium' : ''}` 
+              : `hover:text-primary ${isActive ? 'text-primary' : ''}`
+            }`
+          }
         >
           Contacto
         </NavLink>
@@ -198,10 +249,14 @@ const Navbar = () => {
         <div className='relative group'>
           <button
             onClick={handleAdminAccess}
-            className='relative group cursor-pointer p-2 hover:bg-gray-100 rounded-lg transition-all duration-200'
+            className={`relative group cursor-pointer p-2 rounded-lg transition-all duration-200 ${
+              isTransparent ? 'hover:bg-white/10' : 'hover:bg-gray-100'
+            }`}
             title='Área de Administração'
           >
-            <Lock className='w-5 h-5 text-gray-600 group-hover:text-primary transition-colors' />
+            <Lock className={`w-5 h-5 transition-colors ${
+              isTransparent ? 'text-white' : 'text-gray-600 group-hover:text-primary'
+            }`} />
             {isSeller && (
               <span className='absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full border border-white'></span>
             )}
@@ -231,7 +286,9 @@ const Navbar = () => {
           <img
             src={assets.nav_cart_icon}
             alt='Carrinho de compras'
-            className='w-6 opacity-80'
+            className={`w-6 transition-all duration-300 ${
+              isTransparent ? 'invert brightness-0 opacity-100' : 'opacity-80'
+            }`}
           />
           <button className='absolute -top-2 -right-3 text-xs text-white bg-primary w-[18px] h-[18px] rounded-full'>
             {getCartCount()}
@@ -241,34 +298,42 @@ const Navbar = () => {
         {!user ? (
           <button
             onClick={() => setShowUserLogin(true)}
-            className='cursor-pointer px-8 py-2 bg-primary hover:bg-primary-dull transition text-white rounded-full'
+            className={`cursor-pointer px-8 py-2 transition rounded-full ${
+              isTransparent 
+                ? 'bg-white text-gray-900 hover:bg-white/90' 
+                : 'bg-primary hover:bg-primary-dull text-white'
+            }`}
           >
             Login
           </button>
         ) : (
           <div className='relative group flex flex-col items-center'>
-            <img src={assets.profile_icon} className='w-10' alt='Perfil do utilizador' />
-            <span className='text-xs text-gray-600 mt-1 max-w-20 truncate'>
+            <img 
+              src={assets.profile_icon} 
+              className={`w-10 transition-all duration-300 ${isTransparent ? 'invert brightness-0' : ''}`}
+              alt='Perfil do utilizador' 
+            />
+            <span className={`text-xs mt-1 max-w-20 truncate ${isTransparent ? 'text-white/80' : 'text-gray-600'}`}>
               {user.name}
             </span>
             <ul className='hidden group-hover:block absolute top-12 right-0 bg-white shadow-lg border border-gray-200 py-2.5 w-44 rounded-md text-sm z-40'>
               <li
                 onClick={() => navigate('/my-orders')}
-                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2'
+                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 text-gray-700'
               >
                 <span className='text-primary'>📦</span>
                 Os meus Pedidos
               </li>
               <li
                 onClick={() => navigate('/write-review')}
-                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2'
+                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 text-gray-700'
               >
                 <span className='text-primary'>⭐</span>
                 Escrever Reviews
               </li>
               <li
                 onClick={handleLogout}
-                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 border-t border-gray-100 mt-1'
+                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 border-t border-gray-100 mt-1 text-gray-700'
               >
                 <LogOut className='w-4 h-4 text-red-500' />
                 <span>Sair</span>
@@ -286,7 +351,9 @@ const Navbar = () => {
           <img
             src={assets.nav_cart_icon}
             alt='Carrinho de compras'
-            className='w-6 opacity-80'
+            className={`w-6 transition-all duration-300 ${
+              isTransparent ? 'invert brightness-0 opacity-100' : 'opacity-80'
+            }`}
           />
           <button className='absolute -top-2 -right-3 text-xs text-white bg-primary w-[18px] h-[18px] rounded-full'>
             {getCartCount()}
@@ -298,28 +365,35 @@ const Navbar = () => {
           aria-label='Menu de navegação'
           className='focus:outline-none'
         >
-          <img src={assets.menu_icon} alt='Menu' className='w-7 h-7' />
+          <img 
+            src={assets.menu_icon} 
+            alt='Menu' 
+            className={`w-7 h-7 transition-all duration-300 ${isTransparent ? 'invert brightness-0' : ''}`}
+          />
         </button>
       </div>
 
+      {/* Mobile Menu Overlay + Drawer */}
       {open && (
         <div
-          className='fixed inset-0 bg-black bg-opacity-50 z-40 sm:hidden'
+          className='fixed inset-0 bg-black/50 z-[60] sm:hidden'
           onClick={() => setOpen(false)}
         >
           <div
-            className='absolute top-0 right-0 h-full w-3/4 bg-white shadow-lg flex flex-col overflow-hidden'
+            className='absolute top-0 right-0 h-full w-[80%] max-w-[320px] bg-white shadow-2xl flex flex-col'
             onClick={e => e.stopPropagation()}
           >
-            <div className='p-6 pb-4 border-b border-gray-100 bg-white'>
+            {/* Header do Menu Mobile */}
+            <div className='flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50'>
+              <span className='text-lg font-semibold text-gray-800'>Menu</span>
               <button
                 onClick={() => setOpen(false)}
-                className='float-right text-gray-500 hover:text-gray-800 -mt-2'
+                className='p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-full transition-colors'
                 aria-label='Fechar menu'
               >
                 <svg
                   xmlns='http://www.w3.org/2000/svg'
-                  className='h-7 w-7'
+                  className='h-6 w-6'
                   fill='none'
                   viewBox='0 0 24 24'
                   stroke='currentColor'
@@ -332,131 +406,147 @@ const Navbar = () => {
                   />
                 </svg>
               </button>
-              <div className='clear-both'></div>
-              <div className='mt-2'>{renderSearchInput(true)}</div>
             </div>
 
-            <div className='flex-1 overflow-y-auto p-6 space-y-4'>
-              <NavLink
-                to='/'
-                className={({ isActive }) =>
-                  `block w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100 ${
-                    isActive ? 'text-primary' : ''
-                  }`
-                }
-                onClick={() => handleNavLinkClick('/')}
-              >
-                Home
-              </NavLink>
+            {/* Search Input */}
+            <div className='p-4 border-b border-gray-100'>
+              {renderSearchInput(true)}
+            </div>
 
-              <NavLink
-                to='/products'
-                className={({ isActive }) =>
-                  `block w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100 ${
-                    isActive ? 'text-primary' : ''
-                  }`
-                }
-                onClick={() => handleNavLinkClick('/products')}
-              >
-                Produtos
-              </NavLink>
-
-              <NavLink
-                to='/contact'
-                className={({ isActive }) =>
-                  `block w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100 ${
-                    isActive ? 'text-primary' : ''
-                  }`
-                }
-                onClick={() => handleNavLinkClick('/contact')}
-              >
-                Contacto
-              </NavLink>
-
-              <button
-                onClick={handleAdminAccess}
-                className='flex items-center gap-2 w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100'
-              >
-                <Lock className='w-5 h-5' />
-                <span>Área Admin</span>
-                {isSeller && (
-                  <span className='ml-auto text-xs bg-green-500 text-white px-2 py-0.5 rounded-full'>
-                    Ativo
-                  </span>
-                )}
-              </button>
-
-              {isSeller && (
-                <button
-                  onClick={handleSellerLogout}
-                  className='flex items-center gap-2 w-full text-left py-2.5 px-3 bg-red-50 text-red-600 hover:bg-red-100 text-base font-medium rounded-lg border border-red-200'
+            {/* Navigation Links */}
+            <div className='flex-1 overflow-y-auto'>
+              <nav className='p-4'>
+                <NavLink
+                  to='/'
+                  className={({ isActive }) =>
+                    `block py-3 px-2 text-base font-medium border-b border-gray-100 transition-colors ${
+                      isActive ? 'text-primary' : 'text-gray-700 hover:text-primary'
+                    }`
+                  }
+                  onClick={() => handleNavLinkClick('/')}
                 >
-                  <LogOut className='w-5 h-5' />
-                  <span>Logout Admin</span>
-                </button>
-              )}
+                  Home
+                </NavLink>
 
-              {user ? (
-                <>
-                  <div className='w-full p-3 bg-primary/5 rounded-lg border border-primary/20 mt-4'>
-                    <div className='flex items-center gap-3'>
+                <NavLink
+                  to='/products'
+                  className={({ isActive }) =>
+                    `block py-3 px-2 text-base font-medium border-b border-gray-100 transition-colors ${
+                      isActive ? 'text-primary' : 'text-gray-700 hover:text-primary'
+                    }`
+                  }
+                  onClick={() => handleNavLinkClick('/products')}
+                >
+                  Produtos
+                </NavLink>
+
+                <NavLink
+                  to='/contact'
+                  className={({ isActive }) =>
+                    `block py-3 px-2 text-base font-medium border-b border-gray-100 transition-colors ${
+                      isActive ? 'text-primary' : 'text-gray-700 hover:text-primary'
+                    }`
+                  }
+                  onClick={() => handleNavLinkClick('/contact')}
+                >
+                  Contacto
+                </NavLink>
+
+                <button
+                  onClick={handleAdminAccess}
+                  className='flex items-center gap-3 w-full py-3 px-2 text-base font-medium border-b border-gray-100 text-gray-700 hover:text-primary transition-colors'
+                >
+                  <Lock className='w-5 h-5' />
+                  <span>Área Admin</span>
+                  {isSeller && (
+                    <span className='ml-auto text-xs bg-green-500 text-white px-2 py-0.5 rounded-full'>
+                      Ativo
+                    </span>
+                  )}
+                </button>
+
+                {isSeller && (
+                  <button
+                    onClick={handleSellerLogout}
+                    className='flex items-center gap-2 w-full mt-3 py-3 px-3 bg-red-50 text-red-600 hover:bg-red-100 text-sm font-medium rounded-lg border border-red-200 transition-colors'
+                  >
+                    <LogOut className='w-4 h-4' />
+                    <span>Logout Admin</span>
+                  </button>
+                )}
+              </nav>
+
+              {/* User Section */}
+              <div className='p-4 border-t border-gray-100'>
+                {user ? (
+                  <div className='space-y-3'>
+                    {/* User Info Card */}
+                    <div className='flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/20'>
                       <img
                         src={assets.profile_icon}
                         className='w-10 h-10'
                         alt='Perfil'
                       />
-                      <div>
-                        <p className='font-semibold text-gray-800 text-base'>
+                      <div className='flex-1 min-w-0'>
+                        <p className='font-semibold text-gray-800 text-sm truncate'>
                           {user.name}
                         </p>
-                        <p className='text-xs text-gray-500'>Usuário logado</p>
+                        <p className='text-xs text-gray-500'>Conta ativa</p>
                       </div>
                     </div>
+
+                    {/* User Links */}
+                    <NavLink
+                      to='/my-orders'
+                      className={({ isActive }) =>
+                        `flex items-center gap-2 py-2.5 px-2 text-sm font-medium rounded-lg transition-colors ${
+                          isActive 
+                            ? 'text-primary bg-primary/10' 
+                            : 'text-gray-700 hover:text-primary hover:bg-gray-50'
+                        }`
+                      }
+                      onClick={() => handleNavLinkClick('/my-orders')}
+                    >
+                      <span>📦</span>
+                      Os meus Pedidos
+                    </NavLink>
+
+                    <NavLink
+                      to='/write-review'
+                      className={({ isActive }) =>
+                        `flex items-center gap-2 py-2.5 px-2 text-sm font-medium rounded-lg transition-colors ${
+                          isActive 
+                            ? 'text-primary bg-primary/10' 
+                            : 'text-gray-700 hover:text-primary hover:bg-gray-50'
+                        }`
+                      }
+                      onClick={() => handleNavLinkClick('/write-review')}
+                    >
+                      <span>⭐</span>
+                      Escrever Reviews
+                    </NavLink>
+
+                    {/* Logout Button */}
+                    <button
+                      onClick={handleLogout}
+                      className='w-full flex items-center justify-center gap-2 py-3 mt-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg text-sm font-semibold transition-colors'
+                    >
+                      <LogOut className='w-4 h-4' />
+                      <span>Terminar Sessão</span>
+                    </button>
                   </div>
-
-                  <NavLink
-                    to='/my-orders'
-                    className={({ isActive }) =>
-                      `block w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100 ${
-                        isActive ? 'text-primary' : ''
-                      }`
-                    }
-                    onClick={() => handleNavLinkClick('/my-orders')}
-                  >
-                    📦 Os meus Pedidos
-                  </NavLink>
-
-                  <NavLink
-                    to='/write-review'
-                    className={({ isActive }) =>
-                      `block w-full text-left py-2.5 text-gray-700 hover:text-primary text-base font-medium border-b border-gray-100 ${
-                        isActive ? 'text-primary' : ''
-                      }`
-                    }
-                    onClick={() => handleNavLinkClick('/write-review')}
-                  >
-                    ⭐ Escrever Reviews
-                  </NavLink>
-
+                ) : (
                   <button
-                    onClick={handleLogout}
-                    className='w-full flex items-center justify-center gap-2 px-6 py-3.5 mt-4 mb-4 bg-red-50 hover:bg-red-100 border-2 border-red-200 text-red-600 rounded-lg text-base font-semibold transition-colors active:scale-95'
+                    onClick={() => {
+                      setOpen(false);
+                      setShowUserLogin(true);
+                    }}
+                    className='w-full py-3 bg-primary hover:bg-primary-dull text-white rounded-lg text-base font-semibold transition-colors'
                   >
-                    <LogOut className='w-5 h-5' />
-                    <span>Sair</span>
+                    Entrar / Registar
                   </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => {
-                    setOpen(false);
-                    setShowUserLogin(true);
-                  }}
-                  className='w-full cursor-pointer px-6 py-3.5 mt-4 mb-4 bg-primary hover:bg-primary-dull transition text-white rounded-lg text-base font-semibold active:scale-95'
-                >
-                  Login
-                </button>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>

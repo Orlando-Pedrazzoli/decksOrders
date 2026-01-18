@@ -21,7 +21,8 @@ const Home = () => {
         <SiteNavigationSchema />
       </SEO>
       
-      <div className='mt-10'>
+      {/* Removido mt-10 - O MainBanner agora vai edge-to-edge */}
+      <div>
         <MainBanner />
         <Categories />
         <CollectionsGrid />

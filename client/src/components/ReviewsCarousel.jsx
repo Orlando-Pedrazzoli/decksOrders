@@ -136,7 +136,7 @@ export default function ReviewsCarousel() {
 
   if (loading) {
     return (
-      <div className='relative container mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-gray-50 mt-10'>
+      <div className='relative py-16 bg-gray-50 mt-10 px-6 md:px-16 lg:px-24 xl:px-32'>
         <div className='flex justify-center items-center h-40'>
           <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary'></div>
         </div>
@@ -145,7 +145,7 @@ export default function ReviewsCarousel() {
   }
 
   return (
-    <div className='relative container mx-auto px-4 sm:px-6 lg:px-8 py-16 bg-gray-50 mt-10'>
+    <div className='relative py-16 bg-gray-50 mt-10 px-6 md:px-16 lg:px-24 xl:px-32'>
       <h2 className='text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-12'>
         O que os nossos clientes dizem sobre a Elite Surfing
       </h2>
@@ -206,11 +206,11 @@ export default function ReviewsCarousel() {
         ))}
       </Swiper>
 
-      {/* Custom Navigation Arrows */}
-      <div className='swiper-button-prev-custom absolute top-1/2 -translate-y-1/2 left-4 md:left-8 z-10 cursor-pointer bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors duration-200 hidden sm:block'>
+      {/* Custom Navigation Arrows - posicionadas dentro do padding */}
+      <div className='swiper-button-prev-custom absolute top-1/2 -translate-y-1/2 left-8 md:left-20 lg:left-28 xl:left-36 z-10 cursor-pointer bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors duration-200 hidden sm:block'>
         <ChevronLeftIcon />
       </div>
-      <div className='swiper-button-next-custom absolute top-1/2 -translate-y-1/2 right-4 md:right-8 z-10 cursor-pointer bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors duration-200 hidden sm:block'>
+      <div className='swiper-button-next-custom absolute top-1/2 -translate-y-1/2 right-8 md:right-20 lg:right-28 xl:right-36 z-10 cursor-pointer bg-white/80 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors duration-200 hidden sm:block'>
         <ChevronRightIcon />
       </div>
     </div>
