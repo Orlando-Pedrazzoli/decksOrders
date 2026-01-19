@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { Lock, LogOut, Menu } from 'lucide-react';
-import { assets } from '../assets/assets';
+import { NavLink, useLocation, Link } from 'react-router-dom';
+import { Lock, LogOut, Menu, ChevronDown, ChevronRight } from 'lucide-react';
+import { assets, groups } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 
 const Navbar = () => {
   const [open, setOpen] = useState(false);
   const [localSearchInput, setLocalSearchInput] = useState('');
   const [scrolled, setScrolled] = useState(false);
+  const [productsExpanded, setProductsExpanded] = useState(false); // 🆕 Para mobile
   
   const location = useLocation();
   const isHomepage = location.pathname === '/';
@@ -34,7 +35,7 @@ const Navbar = () => {
 
     if (isHomepage) {
       window.addEventListener('scroll', handleScroll);
-      handleScroll(); // Check initial position
+      handleScroll();
     }
 
     return () => window.removeEventListener('scroll', handleScroll);
@@ -107,6 +108,7 @@ const Navbar = () => {
 
   const handleNavLinkClick = path => {
     setOpen(false);
+    setProductsExpanded(false);
     if (path !== '/products') {
       clearSearch();
     }
@@ -250,17 +252,55 @@ const Navbar = () => {
         >
           Home
         </NavLink>
-        <NavLink
-          to='/products'
-          className={({ isActive }) => 
-            `transition-colors ${isTransparent 
-              ? `text-white hover:text-white/80 ${isActive ? 'text-white font-medium' : ''}` 
-              : `hover:text-primary ${isActive ? 'text-primary' : ''}`
-            }`
-          }
-        >
-          Produtos
-        </NavLink>
+        
+        {/* 🆕 PRODUTOS COM DROPDOWN */}
+        <div className='relative group'>
+          <NavLink
+            to='/products'
+            className={({ isActive }) => 
+              `flex items-center gap-1 transition-colors ${isTransparent 
+                ? `text-white hover:text-white/80 ${isActive ? 'text-white font-medium' : ''}` 
+                : `hover:text-primary ${isActive ? 'text-primary' : ''}`
+              }`
+            }
+          >
+            Produtos
+            <ChevronDown className={`w-4 h-4 transition-transform group-hover:rotate-180 ${
+              isTransparent ? 'text-white' : ''
+            }`} />
+          </NavLink>
+          
+          {/* Dropdown Menu */}
+          <div className='invisible group-hover:visible opacity-0 group-hover:opacity-100 absolute top-full left-0 mt-2 bg-white shadow-xl border border-gray-200 rounded-lg py-2 min-w-[200px] transition-all duration-200 z-50'>
+            {/* Ver Todos */}
+            <Link
+              to='/products'
+              className='block px-4 py-2.5 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition-colors font-medium border-b border-gray-100'
+            >
+              Ver Todos os Produtos
+            </Link>
+            
+            {/* Groups */}
+            <div className='py-1'>
+              <p className='px-4 py-2 text-xs text-gray-400 uppercase tracking-wider'>Coleções</p>
+              {groups.map((group) => (
+                <Link
+                  key={group.id}
+                  to={`/collections/${group.slug}`}
+                  className='flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition-colors'
+                >
+                  <img 
+                    src={group.image} 
+                    alt={group.name}
+                    className='w-8 h-8 rounded object-cover'
+                  />
+                  <span>{group.name}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <NavLink
           to='/contact'
           className={({ isActive }) => 
@@ -446,17 +486,59 @@ const Navbar = () => {
                   Home
                 </NavLink>
 
-                <NavLink
-                  to='/products'
-                  className={({ isActive }) =>
-                    `block py-3 px-2 text-base font-medium border-b border-gray-100 transition-colors ${
-                      isActive ? 'text-primary' : 'text-gray-700 hover:text-primary'
-                    }`
-                  }
-                  onClick={() => handleNavLinkClick('/products')}
-                >
-                  Produtos
-                </NavLink>
+                {/* 🆕 PRODUTOS COM SUBMENU EXPANSÍVEL */}
+                <div className='border-b border-gray-100'>
+                  <button
+                    onClick={() => setProductsExpanded(!productsExpanded)}
+                    className='flex items-center justify-between w-full py-3 px-2 text-base font-medium text-gray-700 hover:text-primary transition-colors'
+                  >
+                    <span>Produtos</span>
+                    <ChevronDown 
+                      className={`w-5 h-5 transition-transform duration-200 ${
+                        productsExpanded ? 'rotate-180' : ''
+                      }`} 
+                    />
+                  </button>
+                  
+                  {/* Submenu */}
+                  <div className={`overflow-hidden transition-all duration-300 ${
+                    productsExpanded ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0'
+                  }`}>
+                    <div className='pl-4 pb-3 space-y-1'>
+                      {/* Ver Todos */}
+                      <Link
+                        to='/products'
+                        onClick={() => handleNavLinkClick('/products')}
+                        className='flex items-center gap-2 py-2 px-3 text-sm text-gray-600 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors'
+                      >
+                        <ChevronRight className='w-4 h-4' />
+                        <span>Ver Todos</span>
+                      </Link>
+                      
+                      {/* Separador */}
+                      <p className='px-3 pt-2 pb-1 text-xs text-gray-400 uppercase tracking-wider'>
+                        Coleções
+                      </p>
+                      
+                      {/* Groups */}
+                      {groups.map((group) => (
+                        <Link
+                          key={group.id}
+                          to={`/collections/${group.slug}`}
+                          onClick={() => handleNavLinkClick(`/collections/${group.slug}`)}
+                          className='flex items-center gap-3 py-2 px-3 text-sm text-gray-600 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors'
+                        >
+                          <img 
+                            src={group.image} 
+                            alt={group.name}
+                            className='w-8 h-8 rounded object-cover'
+                          />
+                          <span>{group.name}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
                 <NavLink
                   to='/contact'

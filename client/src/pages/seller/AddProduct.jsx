@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { assets, categories } from '../../assets/assets';
+import React, { useState, useMemo } from 'react';
+import { assets, categories, groups, getCategoriesByGroup } from '../../assets/assets';
 import { useAppContext } from '../../context/AppContext';
 import toast from 'react-hot-toast';
 
@@ -25,14 +25,18 @@ const AddProduct = () => {
   const [files, setFiles] = useState([]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  
+  // 🆕 GROUP + CATEGORY
+  const [selectedGroup, setSelectedGroup] = useState('');
   const [category, setCategory] = useState('');
+  
   const [price, setPrice] = useState('');
   const [offerPrice, setOfferPrice] = useState('');
   
-  // 🆕 STOCK
+  // STOCK
   const [stock, setStock] = useState('');
   
-  // 🆕 SISTEMA DE FAMÍLIA/COR
+  // SISTEMA DE FAMÍLIA/COR
   const [productFamily, setProductFamily] = useState('');
   const [hasColor, setHasColor] = useState(false);
   const [color, setColor] = useState('');
@@ -40,6 +44,19 @@ const AddProduct = () => {
   const [isMainVariant, setIsMainVariant] = useState(true);
 
   const { axios, fetchProducts } = useAppContext();
+
+  // 🆕 Filtrar categorias baseado no grupo selecionado
+  const filteredCategories = useMemo(() => {
+    if (!selectedGroup) return [];
+    return getCategoriesByGroup(selectedGroup);
+  }, [selectedGroup]);
+
+  // 🆕 Quando o grupo muda, limpar a categoria selecionada
+  const handleGroupChange = (e) => {
+    const newGroup = e.target.value;
+    setSelectedGroup(newGroup);
+    setCategory(''); // Reset categoria quando grupo muda
+  };
 
   // 🎯 GERAR SLUG PARA FAMÍLIA
   const generateFamilySlug = (text) => {
@@ -66,6 +83,17 @@ const AddProduct = () => {
         return;
       }
 
+      // 🆕 Validar grupo
+      if (!selectedGroup) {
+        toast.error('Selecione um grupo');
+        return;
+      }
+
+      if (!category) {
+        toast.error('Selecione uma categoria');
+        return;
+      }
+
       if (stock === '' || parseInt(stock) < 0) {
         toast.error('Defina a quantidade em stock');
         return;
@@ -79,6 +107,7 @@ const AddProduct = () => {
       const productData = {
         name,
         description: description.split('\n').filter(line => line.trim()),
+        group: selectedGroup,  // 🆕 Incluir group
         category,
         price: Number(price),
         offerPrice: Number(offerPrice),
@@ -115,12 +144,13 @@ const AddProduct = () => {
       if (data.success) {
         toast.success('Produto adicionado com sucesso!');
         
-        // 🆕 Sincronizar produtos globais
+        // Sincronizar produtos globais
         await fetchProducts();
         
         // Reset form
         setName('');
         setDescription('');
+        setSelectedGroup('');
         setCategory('');
         setPrice('');
         setOfferPrice('');
@@ -211,25 +241,60 @@ const AddProduct = () => {
           <p className='text-xs text-gray-500'>Cada linha será um item da lista</p>
         </div>
 
-        {/* Categoria */}
-        <div className='flex flex-col gap-1'>
-          <label className='text-base font-medium' htmlFor='category'>
-            Categoria
-          </label>
-          <select
-            onChange={e => setCategory(e.target.value)}
-            value={category}
-            id='category'
-            className='outline-none py-2.5 px-3 rounded-lg border border-gray-300 focus:border-primary transition-colors'
-            required
-          >
-            <option value=''>Selecionar Categoria</option>
-            {categories.map((item, index) => (
-              <option key={index} value={item.path}>
-                {item.path}
+        {/* 🆕 GROUP + CATEGORIA em linha */}
+        <div className='flex items-start gap-4 flex-wrap'>
+          {/* Grupo */}
+          <div className='flex-1 flex flex-col gap-1 min-w-[180px]'>
+            <label className='text-base font-medium' htmlFor='group'>
+              Grupo
+            </label>
+            <select
+              onChange={handleGroupChange}
+              value={selectedGroup}
+              id='group'
+              className='outline-none py-2.5 px-3 rounded-lg border border-gray-300 focus:border-primary transition-colors'
+              required
+            >
+              <option value=''>Selecionar Grupo</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.slug}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+            <p className='text-xs text-gray-500'>Selecione primeiro o grupo</p>
+          </div>
+
+          {/* Categoria */}
+          <div className='flex-1 flex flex-col gap-1 min-w-[180px]'>
+            <label className='text-base font-medium' htmlFor='category'>
+              Categoria
+            </label>
+            <select
+              onChange={e => setCategory(e.target.value)}
+              value={category}
+              id='category'
+              className={`outline-none py-2.5 px-3 rounded-lg border transition-colors ${
+                !selectedGroup 
+                  ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed' 
+                  : 'border-gray-300 focus:border-primary'
+              }`}
+              disabled={!selectedGroup}
+              required
+            >
+              <option value=''>
+                {selectedGroup ? 'Selecionar Categoria' : 'Selecione um grupo primeiro'}
               </option>
-            ))}
-          </select>
+              {filteredCategories.map((item, index) => (
+                <option key={index} value={item.path}>
+                  {item.text}
+                </option>
+              ))}
+            </select>
+            {selectedGroup && filteredCategories.length === 0 && (
+              <p className='text-xs text-amber-600'>Nenhuma categoria neste grupo ainda</p>
+            )}
+          </div>
         </div>
 
         {/* Preços */}
@@ -266,7 +331,7 @@ const AddProduct = () => {
           </div>
         </div>
 
-        {/* 🆕 STOCK */}
+        {/* STOCK */}
         <div className='flex flex-col gap-1'>
           <label className='text-base font-medium' htmlFor='stock'>
             Quantidade em Stock
@@ -284,7 +349,7 @@ const AddProduct = () => {
           <p className='text-xs text-gray-500'>Defina 0 para produto esgotado</p>
         </div>
 
-        {/* 🆕 FAMÍLIA DE PRODUTOS */}
+        {/* FAMÍLIA DE PRODUTOS */}
         <div className='border-t border-gray-200 pt-6 mt-6'>
           <h3 className='text-lg font-semibold text-gray-800 mb-4'>
             Família de Produtos (Variantes de Cor)

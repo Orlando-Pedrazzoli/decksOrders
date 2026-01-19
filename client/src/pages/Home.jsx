@@ -1,6 +1,5 @@
 import React from 'react';
 import MainBanner from '../components/MainBanner';
-import Categories from '../components/Categories';
 import CollectionsGrid from '../components/CollectionsGrid';
 import FeatureBanners from '../components/FeatureBanners';
 import NewsLetter from '../components/NewsLetter';
@@ -24,7 +23,6 @@ const Home = () => {
       {/* Removido mt-10 - O MainBanner agora vai edge-to-edge */}
       <div>
         <MainBanner />
-        <Categories />
         <CollectionsGrid />
         <FeatureBanners />
         <ReviewsCarousel />

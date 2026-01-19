@@ -30,6 +30,7 @@ import ScrollToTop from './components/ScrollToTop';
 import HealthCheck from './components/HealthCheck';
 import WhatsAppButton from './components/WhatsAppButton';
 import CartSidebar from './components/CartSidebar';
+import GroupPage from './pages/GroupPage'; // 🆕 Import GroupPage
 
 // ✅ Importa o CookieConsent
 import CookieConsent from 'react-cookie-consent';
@@ -38,6 +39,7 @@ const App = () => {
   const location = useLocation();
   const isSellerPath = location.pathname.includes('seller');
   const isHomepage = location.pathname === '/';
+  const isCollectionPage = location.pathname.startsWith('/collections/'); // 🆕 Detectar página de coleção
   const { showUserLogin, isSeller, isSellerLoading } = useAppContext();
 
   // ✅ OTIMIZADO: Loading APENAS na área de seller
@@ -90,18 +92,19 @@ const App = () => {
       />
       <ScrollToTop />
       
-      {/* ✅ Condicional: Homepage sem padding lateral para hero full-bleed */}
+      {/* ✅ Condicional: Homepage e Collections sem padding lateral para hero full-bleed */}
       <div
         className={`${
           isSellerPath 
             ? '' 
-            : isHomepage 
+            : (isHomepage || isCollectionPage)
               ? '' 
               : 'px-4 md:px-16 lg:px-24 xl:px-32'
         }`}
       >
         <Routes>
           <Route path='/' element={<Home />} />
+          <Route path='/collections/:group' element={<GroupPage />} /> {/* 🆕 Nova rota */}
           <Route path='/products' element={<AllProducts />} />
           <Route path='/products/:category' element={<ProductCategory />} />
           <Route path='/products/:category/:id' element={<ProductDetails />} />

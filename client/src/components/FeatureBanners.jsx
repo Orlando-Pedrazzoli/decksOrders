@@ -5,21 +5,21 @@ import { motion } from 'framer-motion';
 const banners = [
   {
     id: 1,
-    heading: 'LATEST TRACTION',
-    description: 'The latest in EVA technology, glueing and textured patterns. Incredible individualised traction that will stand the test of time.',
-    ctaText: 'SHOP NOW',
-    ctaLink: '/collections/grips',
+    heading: 'DECKS',
+    description: 'A mais recente tecnologia EVA, colagem e padrões texturizados. Tração individualizada incrível que resistirá ao teste do tempo.',
+    ctaText: 'VER COLEÇÃO',
+    ctaLink: '/collections/decks', // 🆕 Link para group decks
     image: 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=1200&q=80',
-    imagePosition: 'right', // imagem à direita, texto à esquerda
+    imagePosition: 'right',
   },
   {
     id: 2,
-    heading: 'LEGROPES',
-    description: 'Premium quality leashes designed for maximum durability and performance. Built to handle the toughest conditions and keep you connected to your board.',
-    ctaText: 'SHOP NOW',
-    ctaLink: '/collections/legropes',
+    heading: 'LEASHES',
+    description: 'Leashes de qualidade premium projetados para máxima durabilidade e performance. Construídos para suportar as condições mais exigentes.',
+    ctaText: 'VER COLEÇÃO',
+    ctaLink: '/collections/leashes', // 🆕 Link para group leashes
     image: 'https://images.unsplash.com/photo-1455264745730-cb3b76250ae8?w=1200&q=80',
-    imagePosition: 'left', // imagem à esquerda, texto à direita
+    imagePosition: 'left',
   },
 ];
 
