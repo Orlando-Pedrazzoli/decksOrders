@@ -27,13 +27,6 @@ import empty_cart from './empty_cart.svg';
 import black_arrow_icon from './black_arrow_icon.svg';
 import white_arrow_icon from './white_arrow_icon.svg';
 import add_address_iamge from './add_address_image.svg';
-import deck_noronha from './noronhastroke.png';
-import deck_saquarema from './SAQUAREMA.png';
-import deck_Jbay from './J-BAY.png';
-import deck_tahiti from './tahiti.png';
-import deck_hawaii_grom from './hawaii-grom.png';
-import deck_fiji_classic from './fiji-classic.png';
-import fuwaxImg from './fuwax.jpg';
 
 export const assets = {
   logo,
@@ -60,16 +53,10 @@ export const assets = {
   white_arrow_icon,
   add_address_iamge,
   box_icon,
-  deck_Jbay,
-  deck_saquarema,
-  deck_hawaii_grom,
-  deck_fiji_classic,
-  deck_tahiti,
   arrow_right,
   arrow_left,
   arrow_up,
   arrow_down,
-  fuwaxImg,
   empty_cart,
 };
 
@@ -112,79 +99,26 @@ export const groups = [
 ];
 
 // ═══════════════════════════════════════════════════════════════════
-// 🎯 CATEGORIES - Agora com campo 'group' para organização
+// 🎯 CATEGORIES - Simplificado (apenas text, path e group)
 // ═══════════════════════════════════════════════════════════════════
 export const categories = [
   // ═══ DECKS ═══
-  {
-    text: 'Deck J-Bay',
-    path: 'Deck-J-Bay',
-    image: deck_Jbay,
-    bgColor: '#FEF6DA',
-    group: 'decks',  // 🆕
-  },
-  {
-    text: 'Deck Fiji Classic',
-    path: 'Deck-Fiji-Classic',
-    image: deck_fiji_classic,
-    bgColor: '#FEE0E0',
-    group: 'decks',  // 🆕
-  },
-  {
-    text: 'Deck Noronha',
-    path: 'Deck-Noronha',
-    image: deck_noronha,
-    bgColor: '#F0F5DE',
-    group: 'decks',  // 🆕
-  },
-  {
-    text: 'Deck Saquarema',
-    path: 'Deck-Saquarema',
-    image: deck_saquarema,
-    bgColor: '#E1F5EC',
-    group: 'decks',  // 🆕
-  },
-  {
-    text: 'Deck Hawaii Grom',
-    path: 'Deck-Hawaii-Grom',
-    image: deck_hawaii_grom,
-    bgColor: '#FEE6CD',
-    group: 'decks',  // 🆕
-  },
-  {
-    text: 'Deck Tahiti',
-    path: 'Deck-Tahiti',
-    image: deck_tahiti,
-    bgColor: '#E0F6FE',
-    group: 'decks',  // 🆕
-  },
+  { text: 'Deck J-Bay', path: 'Deck-J-Bay', group: 'decks' },
+  { text: 'Deck Fiji Classic', path: 'Deck-Fiji-Classic', group: 'decks' },
+  { text: 'Deck Noronha', path: 'Deck-Noronha', group: 'decks' },
+  { text: 'Deck Saquarema', path: 'Deck-Saquarema', group: 'decks' },
+  { text: 'Deck Hawaii Grom', path: 'Deck-Hawaii-Grom', group: 'decks' },
+  { text: 'Deck Tahiti', path: 'Deck-Tahiti', group: 'decks' },
   
   // ═══ WAX ═══
-  {
-    text: 'Fu Wax Cool',
-    path: 'Fuwax-Cool',
-    image: fuwaxImg,
-    bgColor: '#E0F6FE',
-    group: 'wax',  // 🆕
-  },
+  { text: 'Fu Wax Cool', path: 'Fuwax-Cool', group: 'wax' },
+  { text: 'Bull Wax Cool', path: 'Bullwax-Cool', group: 'wax' },
   
   // ═══ LEASHES ═══ (adicionar quando tiveres produtos)
-  // {
-  //   text: 'Leash 6ft Comp',
-  //   path: 'Leash-6ft-Comp',
-  //   image: leashImg,
-  //   bgColor: '#E8F4FD',
-  //   group: 'leashes',
-  // },
+  // { text: 'Leash 6ft Comp', path: 'Leash-6ft-Comp', group: 'leashes' },
   
   // ═══ CAPAS ═══ (adicionar quando tiveres produtos)
-  // {
-  //   text: 'Capa Shortboard',
-  //   path: 'Capa-Shortboard',
-  //   image: capaImg,
-  //   bgColor: '#FDF4E8',
-  //   group: 'capas',
-  // },
+  // { text: 'Capa Shortboard', path: 'Capa-Shortboard', group: 'capas' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════

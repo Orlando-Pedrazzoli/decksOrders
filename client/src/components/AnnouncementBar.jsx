@@ -11,7 +11,7 @@ const AnnouncementBar = () => {
           className='flex items-center justify-center gap-2 text-xs tracking-widest uppercase text-zinc-300 hover:text-white transition-colors'
         >
           <Truck className='w-4 h-4' />
-          <span>Portes Grátis em encomendas +50€</span>
+          <span>Portes Grátis em encomendas +25€</span>
         </Link>
       </div>
     </div>
