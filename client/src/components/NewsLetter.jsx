@@ -46,7 +46,7 @@ const NewsLetter = () => {
   };
 
   return (
-    <div className='flex flex-col items-center justify-center text-center space-y-2 mt-24 pb-14'>
+    <div className='flex flex-col items-center justify-center text-center space-y-2 mt-24 pb-14 px-6 md:px-16 lg:px-24 xl:px-32'>
       <h1 className='md:text-4xl text-2xl font-semibold'>
         Nunca percas uma oportunidade!
       </h1>
