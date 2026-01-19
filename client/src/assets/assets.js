@@ -115,10 +115,19 @@ export const categories = [
   { text: 'Bull Wax Cool', path: 'Bullwax-Cool', group: 'wax' },
   
   // ═══ LEASHES ═══ (adicionar quando tiveres produtos)
-  // { text: 'Leash 6ft Comp', path: 'Leash-6ft-Comp', group: 'leashes' },
+   { text: 'Leash 6ft-6mm', path: 'Leash-6ft-6mm', group: 'leashes' },
+   { text: 'Leash 6ft-7mm', path: 'Leash-6ft-6mm', group: 'leashes' },
+   { text: 'Leash 7ft-7mm', path: 'Leash-7ft-7mm', group: 'leashes' },
+   { text: 'Leash 8ft-7mm', path: 'Leash-8ft-7mm', group: 'leashes' },
   
   // ═══ CAPAS ═══ (adicionar quando tiveres produtos)
-  // { text: 'Capa Shortboard', path: 'Capa-Shortboard', group: 'capas' },
+   { text: 'Capa Shortboard 5-8', path: 'Capa-Shortboard-5-8', group: 'capas' },
+   { text: 'Capa Shortboard 6-0', path: 'Capa-Shortboard-6-0', group: 'capas' },
+   { text: 'Capa Shortboard 6-4', path: 'Capa-Shortboard-6-4', group: 'capas' },
+   { text: 'Capa Fish-Hibrid 5-8', path: 'Capa-Fish-Hibrid-5-8', group: 'capas' },
+   { text: 'Capa Fish-Hibrid 6-0', path: 'Capa-Fish-Hibrid-6-0', group: 'capas' },
+   { text: 'Capa Fish-Hibrid 6-4', path: 'Capa-Fish-Hibrid-6-4', group: 'capas' },
+   { text: 'Capa Fish-Hibrid 6-8', path: 'Capa-Fish-Hibrid-6-8', group: 'capas' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
