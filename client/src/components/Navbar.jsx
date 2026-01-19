@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Lock, LogOut } from 'lucide-react';
+import { Lock, LogOut, Menu } from 'lucide-react';
 import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 
@@ -189,18 +189,31 @@ const Navbar = () => {
   );
 
   return (
-    <nav 
-      className={`sticky top-0 flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 z-50 transition-all duration-300 ${
-        isTransparent 
-          ? 'bg-transparent border-b border-white/10' 
-          : 'bg-white border-b border-gray-300 shadow-sm'
-      }`}
-    >
+   <nav className={`sticky top-0 flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b z-50 transition-all duration-300 ${
+     isTransparent 
+       ? 'bg-transparent border-white/10' 
+       : 'bg-white border-gray-300 shadow-sm'
+   }`}>
+      
+      {/* ===== MOBILE: Menu Icon (Left) ===== */}
+      <button
+        onClick={() => setOpen(!open)}
+        aria-label='Menu de navegação'
+        className='sm:hidden focus:outline-none p-1'
+      >
+        <Menu 
+          className={`w-6 h-6 transition-all duration-300 ${isTransparent ? 'text-white' : 'text-gray-700'}`}
+          strokeWidth={2}
+        />
+      </button>
+
+      {/* ===== DESKTOP: Logo (Left) ===== */}
       <NavLink 
         to='/' 
         onClick={() => setOpen(false)}
         aria-label='Elite Surfing Portugal - Página Inicial'
         title='Ir para página inicial'
+        className='hidden sm:block'
       >
         <img 
           className={`h-9 transition-all duration-300 ${isTransparent ? 'brightness-0 invert' : ''}`}
@@ -209,6 +222,22 @@ const Navbar = () => {
         />
       </NavLink>
 
+      {/* ===== MOBILE: Logo (Center) ===== */}
+      <NavLink 
+        to='/' 
+        onClick={() => setOpen(false)}
+        aria-label='Elite Surfing Portugal - Página Inicial'
+        title='Ir para página inicial'
+        className='sm:hidden'
+      >
+        <img 
+          className={`h-9 transition-all duration-300 ${isTransparent ? 'brightness-0 invert' : ''}`}
+          src={assets.logo_es} 
+          alt='Elite Surfing Portugal - Loja de Surf'
+        />
+      </NavLink>
+
+      {/* ===== DESKTOP: Navigation ===== */}
       <div className='hidden sm:flex items-center gap-8'>
         <NavLink
           to='/'
@@ -343,6 +372,7 @@ const Navbar = () => {
         )}
       </div>
 
+      {/* ===== MOBILE: Cart (Right) ===== */}
       <div className='flex items-center gap-4 sm:hidden'>
         <div
           onClick={handleCartClick}
@@ -359,21 +389,9 @@ const Navbar = () => {
             {getCartCount()}
           </button>
         </div>
-
-        <button
-          onClick={() => setOpen(!open)}
-          aria-label='Menu de navegação'
-          className='focus:outline-none'
-        >
-          <img 
-            src={assets.menu_icon} 
-            alt='Menu' 
-            className={`w-7 h-7 transition-all duration-300 ${isTransparent ? 'invert brightness-0' : ''}`}
-          />
-        </button>
       </div>
 
-      {/* Mobile Menu Overlay + Drawer */}
+      {/* ===== MOBILE MENU DRAWER ===== */}
       {open && (
         <div
           className='fixed inset-0 bg-black/50 z-[60] sm:hidden'
