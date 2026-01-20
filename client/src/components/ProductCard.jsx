@@ -3,6 +3,53 @@ import { assets } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 import { ShoppingBag, Plus, Minus } from 'lucide-react';
 
+// 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+const ColorBall = ({ code1, code2, size = 20, selected = false, onClick, onMouseEnter, title, outOfStock = false }) => {
+  const isDual = code2 && code2 !== code1;
+  const isLight = (code) => ['#FFFFFF', '#FFF', '#ffffff', '#fff', '#F5F5F5', '#FAFAFA'].includes(code);
+  
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      title={title}
+      className={`
+        relative rounded-full transition-all duration-200
+        ${selected ? 'ring-2 ring-offset-1 ring-gray-800' : 'hover:scale-110'}
+        ${outOfStock ? 'opacity-40' : ''}
+        ${!isDual && isLight(code1) ? 'border border-gray-300' : ''}
+      `}
+      style={{ width: size, height: size }}
+    >
+      {isDual ? (
+        // Bolinha dividida na diagonal
+        <div 
+          className='w-full h-full rounded-full overflow-hidden'
+          style={{
+            background: `linear-gradient(135deg, ${code1} 50%, ${code2} 50%)`,
+            border: (isLight(code1) || isLight(code2)) ? '1px solid #d1d5db' : 'none'
+          }}
+        />
+      ) : (
+        // Bolinha simples
+        <div 
+          className='w-full h-full rounded-full'
+          style={{ backgroundColor: code1 }}
+        />
+      )}
+      
+      {/* X para esgotado */}
+      {outOfStock && (
+        <span className='absolute inset-0 flex items-center justify-center'>
+          <svg className='w-2.5 h-2.5 text-gray-600' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3'>
+            <path d='M18 6L6 18M6 6l12 12' />
+          </svg>
+        </span>
+      )}
+    </button>
+  );
+};
+
 const ProductCard = memo(({ product }) => {
   const { currency, addToCart, removeFromCart, cartItems, navigate, getProductFamily } =
     useAppContext();
@@ -189,40 +236,25 @@ const ProductCard = memo(({ product }) => {
       {/* Product Info */}
       <div className='pt-3 pb-2 px-1 flex flex-col flex-grow'>
         
-        {/* Bolinhas de Cor */}
+        {/* 🆕 Bolinhas de Cor - suporta cores duplas */}
         {familyProducts.length > 1 && (
           <div className='flex items-center gap-2 mb-2'>
             {familyProducts.slice(0, 5).map((familyProduct) => {
               const isSelected = familyProduct._id === displayProduct._id;
               const familyOutOfStock = (familyProduct.stock || 0) <= 0;
-              const isLightColor = familyProduct.colorCode && 
-                ['#FFFFFF', '#FFF', '#ffffff', '#fff'].includes(familyProduct.colorCode);
 
               return (
-                <button
+                <ColorBall
                   key={familyProduct._id}
+                  code1={familyProduct.colorCode || '#ccc'}
+                  code2={familyProduct.colorCode2}
+                  size={20}
+                  selected={isSelected}
+                  outOfStock={familyOutOfStock}
                   onClick={(e) => handleColorClick(familyProduct, e)}
                   onMouseEnter={() => handleColorHover(familyProduct)}
                   title={`${familyProduct.color || familyProduct.name}${familyOutOfStock ? ' (Esgotado)' : ''}`}
-                  className={`
-                    relative w-5 h-5 rounded-full transition-all duration-200
-                    ${isSelected 
-                      ? 'ring-2 ring-offset-1 ring-gray-800' 
-                      : 'hover:scale-110'
-                    }
-                    ${familyOutOfStock ? 'opacity-40' : ''}
-                    ${isLightColor ? 'border border-gray-300' : ''}
-                  `}
-                  style={{ backgroundColor: familyProduct.colorCode || '#ccc' }}
-                >
-                  {familyOutOfStock && (
-                    <span className='absolute inset-0 flex items-center justify-center'>
-                      <svg className='w-2.5 h-2.5 text-gray-600' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3'>
-                        <path d='M18 6L6 18M6 6l12 12' />
-                      </svg>
-                    </span>
-                  )}
-                </button>
+                />
               );
             })}
             {familyProducts.length > 5 && (
