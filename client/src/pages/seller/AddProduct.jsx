@@ -10,7 +10,6 @@ const PRESET_COLORS = [
   { name: 'Cinza', code: '#6B7280' },
   { name: 'Vermelho', code: '#DC2626' },
   { name: 'Azul', code: '#2563EB' },
-  { name: 'Azul Marinho', code: '#1E3A5F' },
   { name: 'Verde', code: '#16A34A' },
   { name: 'Amarelo', code: '#EAB308' },
   { name: 'Laranja', code: '#EA580C' },
@@ -23,18 +22,14 @@ const PRESET_COLORS = [
 
 // 🆕 CORES DUPLAS PRÉ-DEFINIDAS
 const PRESET_DUAL_COLORS = [
-  { name: 'Preto/Azul', code1: '#000000', code2: '#2563EB' },
-  { name: 'Preto/Vermelho', code1: '#000000', code2: '#DC2626' },
-  { name: 'Preto/Verde', code1: '#000000', code2: '#16A34A' },
-  { name: 'Preto/Laranja', code1: '#000000', code2: '#EA580C' },
-  { name: 'Preto/Amarelo', code1: '#000000', code2: '#EAB308' },
-  { name: 'Preto/Rosa', code1: '#000000', code2: '#EC4899' },
-  { name: 'Preto/Turquesa', code1: '#000000', code2: '#14B8A6' },
-  { name: 'Preto/Branco', code1: '#000000', code2: '#FFFFFF' },
-  { name: 'Azul/Branco', code1: '#2563EB', code2: '#FFFFFF' },
-  { name: 'Vermelho/Branco', code1: '#DC2626', code2: '#FFFFFF' },
-  { name: 'Azul Marinho/Azul', code1: '#1E3A5F', code2: '#2563EB' },
-  { name: 'Cinza/Preto', code1: '#6B7280', code2: '#000000' },
+  { name: 'Preto/Azul', code1: '#000000', code2: '#2096d7' },
+  { name: 'Preto/Cinza', code1: '#000000', code2: '#6a727f' },
+  { name: 'Preto/Musgo', code1: '#000000', code2: '#3b6343' },
+  { name: 'Preto/Verde', code1: '#000000', code2: '#87be47' },
+  { name: 'Preto/Amarelo', code1: '#000000', code2: '#d9c214' },
+  { name: 'Preto/Rosa', code1: '#000000', code2: '#d2336e' },
+  { name: 'Preto/Branco', code1: '#000000', code2: '#dfdfe1' },
+  { name: 'Preto/Vermelho', code1: '#000000', code2: '#dc2333' },
 ];
 
 // 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
