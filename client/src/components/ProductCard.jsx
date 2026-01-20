@@ -40,7 +40,6 @@ const ProductCard = memo(({ product }) => {
 
   const displayProduct = selectedProduct || product;
   const isInactive = !displayProduct.inStock || displayProduct.stock <= 0;
-  const isLowStock = displayProduct.stock > 0 && displayProduct.stock <= 3;
 
   // Trocar para outro produto da família
   const handleColorClick = (familyProduct, e) => {
@@ -141,17 +140,10 @@ const ProductCard = memo(({ product }) => {
           />
         </div>
 
-        {/* Badge Esgotado */}
+        {/* Badge Esgotado - único badge */}
         {isInactive && (
           <div className='absolute top-2 left-2 bg-gray-900/80 text-white text-[10px] px-2 py-1 rounded font-medium uppercase tracking-wider'>
             Esgotado
-          </div>
-        )}
-
-        {/* Badge Stock Baixo */}
-        {isLowStock && !isInactive && (
-          <div className='absolute top-2 left-2 bg-orange-500 text-white text-[10px] px-2 py-1 rounded font-medium'>
-            Últimas {displayProduct.stock}!
           </div>
         )}
 
