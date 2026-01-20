@@ -5,6 +5,76 @@ import toast from 'react-hot-toast';
 import EditProductModal from '../../components/seller/EditProductModal';
 import { Package, Layers, Eye, EyeOff, Search, Filter, X, Grid3X3, List, AlertTriangle } from 'lucide-react';
 
+// 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+const ColorBall = ({ code1, code2, size = 32, selected = false, onClick, title, className = '' }) => {
+  const isDual = code2 && code2 !== code1;
+  const isLight = (code) => {
+    if (!code) return false;
+    const lightColors = ['#FFFFFF', '#FFF', '#ffffff', '#fff', '#F5F5F5', '#FAFAFA', '#f5f5f5', '#fafafa'];
+    if (lightColors.includes(code)) return true;
+    // Verificar luminosidade
+    const hex = code.replace('#', '');
+    if (hex.length !== 6) return false;
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 200;
+  };
+  
+  const baseClasses = onClick 
+    ? `rounded-full transition-all hover:scale-110 cursor-pointer ${
+        selected 
+          ? 'ring-2 ring-primary ring-offset-2' 
+          : 'border-2 border-gray-300'
+      }`
+    : 'rounded-full';
+
+  const content = isDual ? (
+    // Bolinha dividida na diagonal
+    <div 
+      className='w-full h-full rounded-full overflow-hidden'
+      style={{
+        background: `linear-gradient(135deg, ${code1} 50%, ${code2} 50%)`,
+        border: (isLight(code1) || isLight(code2)) ? '1px solid #d1d5db' : 'none'
+      }}
+    />
+  ) : (
+    // Bolinha simples
+    <div 
+      className='w-full h-full rounded-full'
+      style={{ 
+        backgroundColor: code1,
+        border: isLight(code1) ? '1px solid #d1d5db' : 'none'
+      }}
+    />
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type='button'
+        onClick={onClick}
+        className={`${baseClasses} ${className}`}
+        style={{ width: size, height: size }}
+        title={title}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className={`${baseClasses} ${className}`}
+      style={{ width: size, height: size }}
+      title={title}
+    >
+      {content}
+    </div>
+  );
+};
+
 const ProductList = () => {
   const { products, currency, axios, fetchProducts } = useAppContext();
   const [updatingProducts, setUpdatingProducts] = useState(new Set());
@@ -181,17 +251,6 @@ const ProductList = () => {
     } finally {
       setIsDeleting(false);
     }
-  };
-
-  const isLightColor = (color) => {
-    if (!color) return false;
-    const hex = color.replace('#', '');
-    if (hex.length !== 6) return false;
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness > 200;
   };
 
   if (isLoading) {
@@ -558,6 +617,8 @@ const ProductList = () => {
                     const currentStock = product.stock || 0;
                     const isLowStock = currentStock > 0 && currentStock <= 3;
                     const isMainVariant = product.isMainVariant !== false;
+                    // 🆕 Verificar se tem cor dupla
+                    const hasDualColor = product.colorCode && product.colorCode2 && product.colorCode !== product.colorCode2;
 
                     return (
                       <tr
@@ -601,18 +662,22 @@ const ProductList = () => {
                           </div>
                         </td>
 
-                        {/* Cor */}
+                        {/* 🆕 Cor - Atualizado para suportar dual colors */}
                         <td className='px-4 py-3'>
                           {product.colorCode ? (
                             <div className='flex items-center gap-2'>
-                              <div
-                                className={`w-7 h-7 rounded-full border-2 flex-shrink-0 ${
-                                  isLightColor(product.colorCode) ? 'border-gray-300' : 'border-gray-200'
-                                }`}
-                                style={{ backgroundColor: product.colorCode }}
+                              <ColorBall
+                                code1={product.colorCode}
+                                code2={product.colorCode2}
+                                size={28}
                                 title={product.color}
                               />
-                              <span className='text-xs text-gray-600 hidden xl:block'>{product.color}</span>
+                              <div className='hidden xl:block'>
+                                <span className='text-xs text-gray-600'>{product.color}</span>
+                                {hasDualColor && (
+                                  <span className='block text-[10px] text-gray-400'>Bicolor</span>
+                                )}
+                              </div>
                             </div>
                           ) : (
                             <span className='text-gray-400 text-xs'>-</span>
@@ -794,14 +859,14 @@ const ProductList = () => {
                       )}
                     </div>
 
-                    {/* Cor */}
+                    {/* 🆕 Cor - Atualizado para suportar dual colors */}
                     {product.colorCode && (
-                      <div
-                        className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 ${
-                          isLightColor(product.colorCode) ? 'border-gray-400' : 'border-white'
-                        } shadow-sm`}
-                        style={{ backgroundColor: product.colorCode }}
+                      <ColorBall
+                        code1={product.colorCode}
+                        code2={product.colorCode2}
+                        size={24}
                         title={product.color}
+                        className='absolute top-2 right-2 shadow-sm border-2 border-white'
                       />
                     )}
 

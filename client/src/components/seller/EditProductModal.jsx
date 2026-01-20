@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { assets, categories } from '../../assets/assets';
 import toast from 'react-hot-toast';
 
-// 🎯 CORES PRÉ-DEFINIDAS
+// 🎯 CORES PRÉ-DEFINIDAS (SIMPLES)
 const PRESET_COLORS = [
   { name: 'Preto', code: '#000000' },
   { name: 'Branco', code: '#FFFFFF' },
@@ -20,6 +20,69 @@ const PRESET_COLORS = [
   { name: 'Turquesa', code: '#14B8A6' },
 ];
 
+// 🆕 CORES DUPLAS PRÉ-DEFINIDAS
+const PRESET_DUAL_COLORS = [
+  { name: 'Preto/Azul', code1: '#000000', code2: '#2096d7' },
+  { name: 'Preto/Cinza', code1: '#000000', code2: '#6a727f' },
+  { name: 'Preto/Musgo', code1: '#000000', code2: '#3b6343' },
+  { name: 'Preto/Verde', code1: '#000000', code2: '#87be47' },
+  { name: 'Preto/Amarelo', code1: '#000000', code2: '#d9c214' },
+  { name: 'Preto/Rosa', code1: '#000000', code2: '#d2336e' },
+  { name: 'Preto/Branco', code1: '#000000', code2: '#dfdfe1' },
+  { name: 'Preto/Vermelho', code1: '#000000', code2: '#dc2333' },
+];
+
+// 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+const ColorBall = ({ code1, code2, size = 32, selected = false, onClick, title }) => {
+  const isDual = code2 && code2 !== code1;
+  const isLight = (code) => {
+    if (!code) return false;
+    const lightColors = ['#FFFFFF', '#FFF', '#ffffff', '#fff', '#F5F5F5', '#FAFAFA', '#f5f5f5', '#fafafa'];
+    if (lightColors.includes(code)) return true;
+    const hex = code.replace('#', '');
+    if (hex.length !== 6) return false;
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 200;
+  };
+  
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      className={`rounded-full transition-all hover:scale-110 ${
+        selected 
+          ? 'ring-2 ring-primary ring-offset-2' 
+          : 'border-2 border-gray-300'
+      }`}
+      style={{ width: size, height: size }}
+      title={title}
+    >
+      {isDual ? (
+        // Bolinha dividida na diagonal
+        <div 
+          className='w-full h-full rounded-full overflow-hidden'
+          style={{
+            background: `linear-gradient(135deg, ${code1} 50%, ${code2} 50%)`,
+            border: (isLight(code1) || isLight(code2)) ? '1px solid #d1d5db' : 'none'
+          }}
+        />
+      ) : (
+        // Bolinha simples
+        <div 
+          className='w-full h-full rounded-full'
+          style={{ 
+            backgroundColor: code1,
+            border: isLight(code1) ? '1px solid #d1d5db' : 'none'
+          }}
+        />
+      )}
+    </button>
+  );
+};
+
 const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
   const [files, setFiles] = useState([]);
   const [name, setName] = useState('');
@@ -29,14 +92,19 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
   const [offerPrice, setOfferPrice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 🆕 CAMPOS DE STOCK
+  // CAMPOS DE STOCK
   const [stock, setStock] = useState('');
 
-  // 🆕 CAMPOS DE FAMÍLIA/COR
+  // CAMPOS DE FAMÍLIA/COR
   const [productFamily, setProductFamily] = useState('');
   const [hasColor, setHasColor] = useState(false);
   const [color, setColor] = useState('');
   const [colorCode, setColorCode] = useState('#000000');
+  
+  // 🆕 COR DUPLA
+  const [isDualColor, setIsDualColor] = useState(false);
+  const [colorCode2, setColorCode2] = useState('#2563EB');
+  
   const [isMainVariant, setIsMainVariant] = useState(true);
 
   useEffect(() => {
@@ -47,10 +115,10 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
       setPrice(product.price.toString());
       setOfferPrice(product.offerPrice.toString());
       
-      // 🆕 Carregar campos de stock
+      // Carregar campos de stock
       setStock((product.stock || 0).toString());
       
-      // 🆕 Carregar campos de família/cor
+      // Carregar campos de família/cor
       setProductFamily(product.productFamily || '');
       setIsMainVariant(product.isMainVariant !== false);
       
@@ -58,15 +126,26 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
         setHasColor(true);
         setColor(product.color || '');
         setColorCode(product.colorCode || '#000000');
+        
+        // 🆕 Carregar segunda cor se existir
+        if (product.colorCode2 && product.colorCode2 !== product.colorCode) {
+          setIsDualColor(true);
+          setColorCode2(product.colorCode2);
+        } else {
+          setIsDualColor(false);
+          setColorCode2('#2563EB');
+        }
       } else {
         setHasColor(false);
         setColor('');
         setColorCode('#000000');
+        setIsDualColor(false);
+        setColorCode2('#2563EB');
       }
     }
   }, [product]);
 
-  // 🎯 GERAR SLUG PARA FAMÍLIA
+  // GERAR SLUG PARA FAMÍLIA
   const generateFamilySlug = (text) => {
     return text
       .toLowerCase()
@@ -76,10 +155,19 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
       .replace(/(^-|-$)/g, '');
   };
 
-  // 🎯 SELECIONAR COR PRÉ-DEFINIDA
+  // 🎯 SELECIONAR COR SIMPLES
   const selectPresetColor = (preset) => {
     setColor(preset.name);
     setColorCode(preset.code);
+    setIsDualColor(false);
+  };
+
+  // 🆕 SELECIONAR COR DUPLA
+  const selectPresetDualColor = (preset) => {
+    setColor(preset.name);
+    setColorCode(preset.code1);
+    setColorCode2(preset.code2);
+    setIsDualColor(true);
   };
 
   const handleSubmit = async event => {
@@ -120,6 +208,13 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
         productData.color = color;
         productData.colorCode = colorCode;
         
+        // 🆕 Adicionar segunda cor se for dual
+        if (isDualColor && colorCode2) {
+          productData.colorCode2 = colorCode2;
+        } else {
+          productData.colorCode2 = null;
+        }
+        
         // Se tem cor mas não tem família, usar o nome base como família
         if (!productFamily.trim()) {
           const baseName = name.replace(new RegExp(color, 'gi'), '').trim();
@@ -130,6 +225,7 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
       } else {
         productData.color = null;
         productData.colorCode = null;
+        productData.colorCode2 = null;
       }
 
       const formData = new FormData();
@@ -318,7 +414,7 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
             </div>
           </div>
 
-          {/* 🆕 STOCK */}
+          {/* STOCK */}
           <div className='flex flex-col gap-1'>
             <label className='text-base font-medium' htmlFor='stock'>Quantidade em Stock</label>
             <input
@@ -335,7 +431,7 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
             <p className='text-xs text-gray-500'>Defina 0 para produto esgotado</p>
           </div>
 
-          {/* 🆕 FAMÍLIA DE PRODUTOS */}
+          {/* FAMÍLIA DE PRODUTOS */}
           <div className='border-t border-gray-200 pt-5 mt-5'>
             <h3 className='text-lg font-semibold text-gray-800 mb-4'>Família de Produtos (Variantes de Cor)</h3>
 
@@ -372,6 +468,38 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
             {/* Campos de Cor */}
             {hasColor && (
               <div className='bg-gray-50 p-4 rounded-lg space-y-4 border border-gray-200'>
+                
+                {/* 🆕 Toggle Cor Simples / Dupla */}
+                <div className='flex items-center gap-4 p-3 bg-white rounded-lg border border-gray-200'>
+                  <label className='flex items-center gap-2 cursor-pointer'>
+                    <input
+                      type='radio'
+                      name='colorType'
+                      checked={!isDualColor}
+                      onChange={() => setIsDualColor(false)}
+                      className='w-4 h-4 text-primary focus:ring-primary'
+                      disabled={isSubmitting}
+                    />
+                    <span className='text-sm font-medium'>Cor Única</span>
+                    <div className='w-5 h-5 rounded-full bg-primary'></div>
+                  </label>
+                  <label className='flex items-center gap-2 cursor-pointer'>
+                    <input
+                      type='radio'
+                      name='colorType'
+                      checked={isDualColor}
+                      onChange={() => setIsDualColor(true)}
+                      className='w-4 h-4 text-primary focus:ring-primary'
+                      disabled={isSubmitting}
+                    />
+                    <span className='text-sm font-medium'>Duas Cores</span>
+                    <div 
+                      className='w-5 h-5 rounded-full'
+                      style={{ background: 'linear-gradient(135deg, #2563EB 50%, #000000 50%)' }}
+                    ></div>
+                  </label>
+                </div>
+
                 {/* Nome da Cor */}
                 <div className='flex flex-col gap-1'>
                   <label className='text-sm font-medium'>Nome da Cor</label>
@@ -379,66 +507,136 @@ const EditProductModal = ({ product, onClose, onSuccess, axios }) => {
                     type='text'
                     value={color}
                     onChange={e => setColor(e.target.value)}
-                    placeholder='Ex: Preto, Azul Marinho'
+                    placeholder={isDualColor ? 'Ex: Preto/Azul' : 'Ex: Preto, Azul Marinho'}
                     className='outline-none py-2 px-3 rounded-lg border border-gray-300 focus:border-primary transition-colors'
                     disabled={isSubmitting}
                   />
                 </div>
 
-                {/* Código da Cor */}
-                <div className='flex flex-col gap-1'>
-                  <label className='text-sm font-medium'>Código da Cor</label>
-                  <div className='flex items-center gap-3'>
-                    <input
-                      type='color'
-                      value={colorCode}
-                      onChange={e => setColorCode(e.target.value)}
-                      className='w-12 h-10 rounded border border-gray-300 cursor-pointer'
-                      disabled={isSubmitting}
-                    />
-                    <input
-                      type='text'
-                      value={colorCode}
-                      onChange={e => setColorCode(e.target.value)}
-                      placeholder='#000000'
-                      className='outline-none py-2 px-3 rounded-lg border border-gray-300 focus:border-primary transition-colors flex-1 font-mono'
-                      disabled={isSubmitting}
-                    />
-                  </div>
-                </div>
+                {/* 🆕 Seletor de Cores - Simples ou Dupla */}
+                {!isDualColor ? (
+                  // COR ÚNICA
+                  <>
+                    <div className='flex flex-col gap-1'>
+                      <label className='text-sm font-medium'>Código da Cor</label>
+                      <div className='flex items-center gap-3'>
+                        <input
+                          type='color'
+                          value={colorCode}
+                          onChange={e => setColorCode(e.target.value)}
+                          className='w-12 h-10 rounded border border-gray-300 cursor-pointer'
+                          disabled={isSubmitting}
+                        />
+                        <input
+                          type='text'
+                          value={colorCode}
+                          onChange={e => setColorCode(e.target.value)}
+                          placeholder='#000000'
+                          className='outline-none py-2 px-3 rounded-lg border border-gray-300 focus:border-primary transition-colors flex-1 font-mono'
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                    </div>
 
-                {/* Cores Rápidas */}
-                <div>
-                  <p className='text-sm font-medium mb-2'>Cores Rápidas:</p>
-                  <div className='flex flex-wrap gap-2'>
-                    {PRESET_COLORS.map((preset, index) => (
-                      <button
-                        key={index}
-                        type='button'
-                        onClick={() => selectPresetColor(preset)}
-                        disabled={isSubmitting}
-                        className={`w-8 h-8 rounded-full border-2 transition-all hover:scale-110 ${
-                          colorCode === preset.code 
-                            ? 'ring-2 ring-primary ring-offset-2 border-primary' 
-                            : 'border-gray-300'
-                        }`}
-                        style={{ backgroundColor: preset.code }}
-                        title={preset.name}
-                      />
-                    ))}
-                  </div>
-                </div>
+                    {/* Cores Rápidas - Simples */}
+                    <div>
+                      <p className='text-sm font-medium mb-2'>Cores Rápidas:</p>
+                      <div className='flex flex-wrap gap-2'>
+                        {PRESET_COLORS.map((preset, index) => (
+                          <ColorBall
+                            key={index}
+                            code1={preset.code}
+                            size={32}
+                            selected={colorCode === preset.code && !isDualColor}
+                            onClick={() => !isSubmitting && selectPresetColor(preset)}
+                            title={preset.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  // 🆕 DUAS CORES
+                  <>
+                    <div className='grid grid-cols-2 gap-4'>
+                      {/* Cor 1 */}
+                      <div className='flex flex-col gap-1'>
+                        <label className='text-sm font-medium'>Cor 1 (Esquerda)</label>
+                        <div className='flex items-center gap-2'>
+                          <input
+                            type='color'
+                            value={colorCode}
+                            onChange={e => setColorCode(e.target.value)}
+                            className='w-10 h-10 rounded border border-gray-300 cursor-pointer'
+                            disabled={isSubmitting}
+                          />
+                          <input
+                            type='text'
+                            value={colorCode}
+                            onChange={e => setColorCode(e.target.value)}
+                            placeholder='#000000'
+                            className='outline-none py-2 px-3 rounded-lg border border-gray-300 focus:border-primary transition-colors flex-1 font-mono text-sm'
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                      </div>
+                      
+                      {/* Cor 2 */}
+                      <div className='flex flex-col gap-1'>
+                        <label className='text-sm font-medium'>Cor 2 (Direita)</label>
+                        <div className='flex items-center gap-2'>
+                          <input
+                            type='color'
+                            value={colorCode2}
+                            onChange={e => setColorCode2(e.target.value)}
+                            className='w-10 h-10 rounded border border-gray-300 cursor-pointer'
+                            disabled={isSubmitting}
+                          />
+                          <input
+                            type='text'
+                            value={colorCode2}
+                            onChange={e => setColorCode2(e.target.value)}
+                            placeholder='#2563EB'
+                            className='outline-none py-2 px-3 rounded-lg border border-gray-300 focus:border-primary transition-colors flex-1 font-mono text-sm'
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cores Rápidas - Duplas */}
+                    <div>
+                      <p className='text-sm font-medium mb-2'>Combinações Rápidas:</p>
+                      <div className='flex flex-wrap gap-2'>
+                        {PRESET_DUAL_COLORS.map((preset, index) => (
+                          <ColorBall
+                            key={index}
+                            code1={preset.code1}
+                            code2={preset.code2}
+                            size={32}
+                            selected={isDualColor && colorCode === preset.code1 && colorCode2 === preset.code2}
+                            onClick={() => !isSubmitting && selectPresetDualColor(preset)}
+                            title={preset.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {/* Preview da Cor */}
                 {color && (
                   <div className='flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200'>
-                    <div
-                      className='w-10 h-10 rounded-full border-2 border-gray-300'
-                      style={{ backgroundColor: colorCode }}
+                    <ColorBall 
+                      code1={colorCode} 
+                      code2={isDualColor ? colorCode2 : null} 
+                      size={40}
                     />
                     <div>
                       <p className='font-medium'>{color}</p>
-                      <p className='text-xs text-gray-500 font-mono'>{colorCode}</p>
+                      <p className='text-xs text-gray-500 font-mono'>
+                        {isDualColor ? `${colorCode} / ${colorCode2}` : colorCode}
+                      </p>
                     </div>
                   </div>
                 )}

@@ -504,11 +504,71 @@ const ProductDetails = () => {
   const isLightColor = (color) => {
     if (!color) return false;
     const hex = color.replace('#', '');
+    if (hex.length !== 6) return false;
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
     const brightness = (r * 299 + g * 587 + b * 114) / 1000;
     return brightness > 200;
+  };
+
+  // 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+  const ColorBall = ({ code1, code2, size = 40, isSelected = false, isOutOfStock = false, onClick, title }) => {
+    const isDual = code2 && code2 !== code1;
+    const isLight1 = isLightColor(code1);
+    const isLight2 = isLightColor(code2);
+    const needsBorder = isLight1 || (isDual && isLight2);
+    
+    return (
+      <button
+        onClick={onClick}
+        disabled={isColorTransitioning}
+        title={title}
+        className={`
+          relative rounded-full transition-all duration-200
+          transform hover:scale-110 active:scale-95
+          ${isSelected ? 'ring-[3px] ring-offset-2 ring-gray-800 scale-110' : ''}
+          ${isOutOfStock && !isSelected ? 'opacity-50' : ''}
+          ${isColorTransitioning ? 'pointer-events-none' : ''}
+          ${needsBorder ? 'border-2 border-gray-300' : 'border border-gray-200'}
+        `}
+        style={{ width: size, height: size }}
+      >
+        {isDual ? (
+          // Bolinha dividida na diagonal
+          <div 
+            className='w-full h-full rounded-full overflow-hidden'
+            style={{
+              background: `linear-gradient(135deg, ${code1} 50%, ${code2} 50%)`,
+            }}
+          />
+        ) : (
+          // Bolinha simples
+          <div 
+            className='w-full h-full rounded-full'
+            style={{ backgroundColor: code1 || '#ccc' }}
+          />
+        )}
+        
+        {/* X para esgotado */}
+        {isOutOfStock && (
+          <span className='absolute inset-0 flex items-center justify-center'>
+            <svg className='w-5 h-5 text-gray-600 drop-shadow' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3'>
+              <path d='M18 6L6 18M6 6l12 12' />
+            </svg>
+          </span>
+        )}
+        
+        {/* Check para selecionado */}
+        {isSelected && !isOutOfStock && (
+          <span className='absolute inset-0 flex items-center justify-center'>
+            <svg className={`w-5 h-5 drop-shadow ${(isLight1 && !isDual) || (isDual && isLight1 && isLight2) ? 'text-gray-800' : 'text-white'}`} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3'>
+              <path strokeLinecap='round' strokeLinejoin='round' d='M5 13l4 4L19 7' />
+            </svg>
+          </span>
+        )}
+      </button>
+    );
   };
 
   if (!product || !displayProduct) {
@@ -921,7 +981,7 @@ const ProductDetails = () => {
               </div>
             </div>
 
-            {/* 🆕 SELETOR DE CORES */}
+            {/* 🆕 SELETOR DE CORES - ATUALIZADO PARA DUAL COLORS */}
             {familyProducts.length > 1 && (
               <div className='bg-white border border-gray-200 p-4 rounded-lg'>
                 <div className='flex items-center justify-between mb-3'>
@@ -935,41 +995,18 @@ const ProductDetails = () => {
                     const fpStock = familyProduct.stock || 0;
                     const fpOutOfStock = fpStock <= 0;
                     const isSelected = familyProduct._id === displayProduct._id;
-                    const isLight = isLightColor(familyProduct.colorCode);
                     
                     return (
-                      <button
+                      <ColorBall
                         key={familyProduct._id}
+                        code1={familyProduct.colorCode}
+                        code2={familyProduct.colorCode2}
+                        size={44}
+                        isSelected={isSelected}
+                        isOutOfStock={fpOutOfStock}
                         onClick={() => handleColorClick(familyProduct._id)}
-                        disabled={isColorTransitioning}
                         title={`${familyProduct.color || familyProduct.name}${fpOutOfStock ? ' (Esgotado)' : ` - ${fpStock} disponíveis`}`}
-                        className={`
-                          relative w-10 h-10 md:w-11 md:h-11 rounded-full transition-all duration-200
-                          transform hover:scale-110 active:scale-95
-                          ${isSelected ? 'ring-[3px] ring-offset-2 ring-gray-800 scale-110' : ''}
-                          ${fpOutOfStock && !isSelected ? 'opacity-50' : ''}
-                          ${isColorTransitioning ? 'pointer-events-none' : ''}
-                          ${isLight ? 'border-2 border-gray-300' : 'border border-gray-200'}
-                        `}
-                        style={{ backgroundColor: familyProduct.colorCode || '#ccc' }}
-                      >
-                        {/* X para esgotado */}
-                        {fpOutOfStock && (
-                          <span className='absolute inset-0 flex items-center justify-center'>
-                            <svg className='w-5 h-5 text-gray-600 drop-shadow' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3'>
-                              <path d='M18 6L6 18M6 6l12 12' />
-                            </svg>
-                          </span>
-                        )}
-                        {/* Check para selecionado */}
-                        {isSelected && !fpOutOfStock && (
-                          <span className='absolute inset-0 flex items-center justify-center'>
-                            <svg className={`w-5 h-5 drop-shadow ${isLight ? 'text-gray-800' : 'text-white'}`} viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3'>
-                              <path strokeLinecap='round' strokeLinejoin='round' d='M5 13l4 4L19 7' />
-                            </svg>
-                          </span>
-                        )}
-                      </button>
+                      />
                     );
                   })}
                 </div>
