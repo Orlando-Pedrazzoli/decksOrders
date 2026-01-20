@@ -47,7 +47,7 @@ const DesktopCard = ({ name, slug, image }) => (
 
 const CollectionsGrid = () => {
   return (
-    <section className="py-10 md:py-16 px-6 md:px-16 lg:px-24 xl:px-32 bg-white">
+    <section className="pt-4 pb-8 md:py-16 px-6 md:px-16 lg:px-24 xl:px-32 bg-white">
       {/* Mobile: Grid 2x2 - texto abaixo */}
       <div className="md:hidden">
         <div className="grid grid-cols-2 gap-x-4 gap-y-6">
