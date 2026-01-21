@@ -124,6 +124,40 @@ const CartSidebar = () => {
     return brightness > 200;
   };
 
+  // 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+  const ColorBall = ({ code1, code2, size = 20, title }) => {
+    const isDual = code2 && code2 !== code1;
+    const isLight1 = isLightColor(code1);
+    const isLight2 = isLightColor(code2);
+    const needsBorder = isLight1 || (isDual && isLight2);
+    
+    return (
+      <div
+        className={`absolute -bottom-1 -right-1 rounded-full border-2 border-white shadow-sm ${
+          needsBorder ? 'ring-1 ring-gray-300' : ''
+        }`}
+        style={{ width: size, height: size }}
+        title={title}
+      >
+        {isDual ? (
+          // Bolinha dividida na diagonal
+          <div 
+            className='w-full h-full rounded-full overflow-hidden'
+            style={{
+              background: `linear-gradient(135deg, ${code1} 50%, ${code2} 50%)`,
+            }}
+          />
+        ) : (
+          // Bolinha simples
+          <div 
+            className='w-full h-full rounded-full'
+            style={{ backgroundColor: code1 || '#ccc' }}
+          />
+        )}
+      </div>
+    );
+  };
+
   if (!showCartSidebar) return null;
 
   return (
@@ -215,13 +249,12 @@ const CartSidebar = () => {
                           className='w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0'
                           onClick={() => handleProductClick(product)}
                         />
-                        {/* 🆕 Bolinha de Cor */}
+                        {/* 🆕 Bolinha de Cor - Suporta Dual Colors */}
                         {product.colorCode && (
-                          <div
-                            className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white shadow-sm ${
-                              isLightColor(product.colorCode) ? 'ring-1 ring-gray-300' : ''
-                            }`}
-                            style={{ backgroundColor: product.colorCode }}
+                          <ColorBall
+                            code1={product.colorCode}
+                            code2={product.colorCode2}
+                            size={20}
                             title={product.color || 'Cor'}
                           />
                         )}

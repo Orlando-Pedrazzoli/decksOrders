@@ -217,11 +217,16 @@ const Login = () => {
 
             {/* Conteúdo */}
             <div className='relative z-10 flex flex-col justify-between p-8 text-white w-full'>
-              {/* Header */}
+              {/* Header com Logo */}
               <div>
-                <div className='flex items-center gap-2 mb-6'>
-                  <div className='w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm'>
-                    <ShoppingBag className='w-5 h-5 text-white' />
+                <div className='flex items-center gap-3 mb-6'>
+                  {/* 🆕 Logo da loja */}
+                  <div className='w-14 h-14 bg-white rounded-xl flex items-center justify-center shadow-lg'>
+                    <img 
+                      src='/logo.png' 
+                      alt='Elite Surfing Logo' 
+                      className='w-10 h-10 object-contain'
+                    />
                   </div>
                   <div>
                     <h1 className='text-xl font-bold'>Elite Surfing</h1>
@@ -246,7 +251,7 @@ const Login = () => {
                   {benefits.map((benefit, index) => (
                     <div
                       key={index}
-                      className='bg-white/10 rounded-xl p-3 backdrop-blur-sm'
+                      className='bg-white/10 rounded-xl p-3 backdrop-blur-sm hover:bg-white/20 transition-colors'
                     >
                       <benefit.icon className='w-5 h-5 mb-2 text-white/90' />
                       <p className='text-sm font-medium'>{benefit.title}</p>
@@ -258,21 +263,32 @@ const Login = () => {
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className='text-white/50 text-xs'>
-                <p>© 2025 Elite Surfing</p>
+              {/* Footer com Logo pequeno */}
+              <div className='flex items-center gap-2 text-white/50 text-xs'>
+                <img 
+                  src='/logo.png' 
+                  alt='Elite Surfing' 
+                  className='w-4 h-4 object-contain opacity-50'
+                />
+                <p>© 2025 Elite Surfing Portugal</p>
               </div>
             </div>
           </div>
 
           {/* Lado Direito - Formulário */}
           <div className='w-full md:w-7/12 p-6 sm:p-8 md:p-10 overflow-y-auto max-h-[95vh] md:max-h-none'>
-            {/* Header Mobile */}
+            {/* Header Mobile com Logo */}
             <div className='md:hidden text-center mb-6'>
-              <div className='inline-flex items-center justify-center w-14 h-14 bg-primary/10 rounded-2xl mb-4'>
-                <ShoppingBag className='w-7 h-7 text-primary' />
+              {/* 🆕 Logo para mobile */}
+              <div className='inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl mb-4 shadow-sm'>
+                <img 
+                  src='/logo.png' 
+                  alt='Elite Surfing Logo' 
+                  className='w-10 h-10 object-contain'
+                />
               </div>
               <h1 className='text-xl font-bold text-gray-900'>Elite Surfing</h1>
+              <p className='text-sm text-gray-500'>Surf Shop Premium</p>
             </div>
 
             {/* Tabs */}

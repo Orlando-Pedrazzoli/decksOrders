@@ -130,6 +130,54 @@ const MyOrders = () => {
     return Math.max(0, total).toFixed(2);
   };
 
+  // 🆕 Helper: verificar se cor é clara
+  const isLightColor = (color) => {
+    if (!color) return false;
+    const hex = color.replace('#', '');
+    if (hex.length !== 6) return false;
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 200;
+  };
+
+  // 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+  const ColorBall = ({ code1, code2, size = 22, title }) => {
+    if (!code1) return null;
+    
+    const isDual = code2 && code2 !== code1;
+    const isLight1 = isLightColor(code1);
+    const isLight2 = isLightColor(code2);
+    const needsBorder = isLight1 || (isDual && isLight2);
+    
+    return (
+      <div
+        className={`absolute -bottom-1 -right-1 rounded-full border-2 border-white shadow-sm ${
+          needsBorder ? 'ring-1 ring-gray-300' : ''
+        }`}
+        style={{ width: size, height: size }}
+        title={title}
+      >
+        {isDual ? (
+          // Bolinha dividida na diagonal
+          <div 
+            className='w-full h-full rounded-full overflow-hidden'
+            style={{
+              background: `linear-gradient(135deg, ${code1} 50%, ${code2} 50%)`,
+            }}
+          />
+        ) : (
+          // Bolinha simples
+          <div 
+            className='w-full h-full rounded-full'
+            style={{ backgroundColor: code1 }}
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       {/* SEO - Página privada, não indexar */}
@@ -251,8 +299,8 @@ const MyOrders = () => {
                           key={item?.product?._id || itemIndex}
                           className='flex flex-col sm:flex-row items-center p-4 sm:p-5 gap-4'
                         >
-                          {/* Product Image */}
-                          <div className='flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 rounded-lg overflow-hidden border border-gray-200'>
+                          {/* 🆕 Product Image com bolinha de cor */}
+                          <div className='relative flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 rounded-lg overflow-hidden border border-gray-200'>
                             <img
                               src={
                                 item?.product?.image?.[0] ||
@@ -260,6 +308,13 @@ const MyOrders = () => {
                               }
                               alt={item?.product?.name || 'Imagem do Produto'}
                               className='w-full h-full object-contain'
+                            />
+                            {/* 🆕 Bolinha de Cor - Suporta Dual Colors */}
+                            <ColorBall
+                              code1={item?.product?.colorCode}
+                              code2={item?.product?.colorCode2}
+                              size={22}
+                              title={item?.product?.color || 'Cor'}
                             />
                           </div>
 
@@ -271,6 +326,14 @@ const MyOrders = () => {
                             <p className='text-sm text-gray-600'>
                               Categoria: {item?.product?.category || 'N/D'}
                             </p>
+                            
+                            {/* 🆕 Nome da Cor */}
+                            {item?.product?.color && (
+                              <p className='text-sm text-gray-600'>
+                                Cor: {item.product.color}
+                              </p>
+                            )}
+                            
                             <div className='flex flex-col sm:flex-row gap-2 mt-2'>
                               <p className='text-sm text-gray-600'>
                                 Quantidade:{' '}

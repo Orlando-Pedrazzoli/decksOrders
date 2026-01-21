@@ -237,6 +237,40 @@ const Cart = () => {
     return brightness > 200;
   };
 
+  // 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+  const ColorBall = ({ code1, code2, size = 24, title }) => {
+    const isDual = code2 && code2 !== code1;
+    const isLight1 = isLightColor(code1);
+    const isLight2 = isLightColor(code2);
+    const needsBorder = isLight1 || (isDual && isLight2);
+    
+    return (
+      <div
+        className={`absolute -bottom-1 -right-1 rounded-full border-2 border-white shadow-sm ${
+          needsBorder ? 'ring-1 ring-gray-300' : ''
+        }`}
+        style={{ width: size, height: size }}
+        title={title}
+      >
+        {isDual ? (
+          // Bolinha dividida na diagonal
+          <div 
+            className='w-full h-full rounded-full overflow-hidden'
+            style={{
+              background: `linear-gradient(135deg, ${code1} 50%, ${code2} 50%)`,
+            }}
+          />
+        ) : (
+          // Bolinha simples
+          <div 
+            className='w-full h-full rounded-full'
+            style={{ backgroundColor: code1 || '#ccc' }}
+          />
+        )}
+      </div>
+    );
+  };
+
   // Empty cart
   if (!products.length || !cartItems || Object.keys(cartItems).length === 0) {
     return (
@@ -281,7 +315,7 @@ const Cart = () => {
                 return (
                   <div key={product._id} className={`flex flex-col sm:flex-row items-center p-4 sm:p-6 ${hasStockWarning ? 'bg-red-50' : ''}`}>
                     <div className='flex items-center w-full sm:w-2/3 mb-4 sm:mb-0'>
-                      {/* 🆕 Imagem com bolinha de cor */}
+                      {/* 🆕 Imagem com bolinha de cor - Suporta Dual Colors */}
                       <div className='relative'>
                         <img
                           src={product.image[0]}
@@ -289,13 +323,12 @@ const Cart = () => {
                           className='w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border border-gray-200 shadow-sm cursor-pointer transition-transform duration-200 hover:scale-[1.02]'
                           onClick={() => navigate(`/products/${product.category.toLowerCase()}/${product._id}`)}
                         />
-                        {/* Bolinha de Cor */}
+                        {/* 🆕 Bolinha de Cor - Suporta Dual Colors */}
                         {product.colorCode && (
-                          <div
-                            className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white shadow-sm ${
-                              isLightColor(product.colorCode) ? 'ring-1 ring-gray-300' : ''
-                            }`}
-                            style={{ backgroundColor: product.colorCode }}
+                          <ColorBall
+                            code1={product.colorCode}
+                            code2={product.colorCode2}
+                            size={24}
                             title={product.color || 'Cor'}
                           />
                         )}
