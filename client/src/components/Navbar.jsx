@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation, Link } from 'react-router-dom';
-import { Lock, LogOut, Menu, ChevronDown, ChevronRight } from 'lucide-react';
+import { Lock, LogOut, Menu, ChevronDown, ChevronRight, User, Package, Star } from 'lucide-react';
 import { assets, groups } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 
@@ -8,7 +8,7 @@ const Navbar = () => {
   const [open, setOpen] = useState(false);
   const [localSearchInput, setLocalSearchInput] = useState('');
   const [scrolled, setScrolled] = useState(false);
-  const [productsExpanded, setProductsExpanded] = useState(false); // 🆕 Para mobile
+  const [productsExpanded, setProductsExpanded] = useState(false);
   
   const location = useLocation();
   const isHomepage = location.pathname === '/';
@@ -253,12 +253,12 @@ const Navbar = () => {
           Home
         </NavLink>
         
-        {/* 🆕 PRODUTOS COM DROPDOWN */}
+        {/* PRODUTOS COM DROPDOWN */}
         <div className='relative group'>
           <NavLink
             to='/products'
             className={({ isActive }) => 
-              `flex items-center gap-1 transition-colors ${isTransparent 
+              `flex items-center gap-1 transition-colors py-2 ${isTransparent 
                 ? `text-white hover:text-white/80 ${isActive ? 'text-white font-medium' : ''}` 
                 : `hover:text-primary ${isActive ? 'text-primary' : ''}`
               }`
@@ -270,33 +270,34 @@ const Navbar = () => {
             }`} />
           </NavLink>
           
-          {/* Dropdown Menu */}
-          <div className='invisible group-hover:visible opacity-0 group-hover:opacity-100 absolute top-full left-0 mt-2 bg-white shadow-xl border border-gray-200 rounded-lg py-2 min-w-[200px] transition-all duration-200 z-50'>
-            {/* Ver Todos */}
-            <Link
-              to='/products'
-              className='block px-4 py-2.5 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition-colors font-medium border-b border-gray-100'
-            >
-              Ver Todos os Produtos
-            </Link>
-            
-            {/* Groups */}
-            <div className='py-1'>
-              <p className='px-4 py-2 text-xs text-gray-400 uppercase tracking-wider'>Coleções</p>
-              {groups.map((group) => (
-                <Link
-                  key={group.id}
-                  to={`/collections/${group.slug}`}
-                  className='flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition-colors'
-                >
-                  <img 
-                    src={group.image} 
-                    alt={group.name}
-                    className='w-8 h-8 rounded object-cover'
-                  />
-                  <span>{group.name}</span>
-                </Link>
-              ))}
+          {/* Dropdown Menu - Sem gap */}
+          <div className='invisible group-hover:visible opacity-0 group-hover:opacity-100 absolute top-full left-0 pt-0 transition-all duration-200 z-50'>
+            <div className='h-2' />
+            <div className='bg-white shadow-xl border border-gray-200 rounded-lg py-2 min-w-[200px]'>
+              <Link
+                to='/products'
+                className='block px-4 py-2.5 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition-colors font-medium border-b border-gray-100'
+              >
+                Ver Todos os Produtos
+              </Link>
+              
+              <div className='py-1'>
+                <p className='px-4 py-2 text-xs text-gray-400 uppercase tracking-wider'>Coleções</p>
+                {groups.map((group) => (
+                  <Link
+                    key={group.id}
+                    to={`/collections/${group.slug}`}
+                    className='flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary/10 hover:text-primary transition-colors'
+                  >
+                    <img 
+                      src={group.image} 
+                      alt={group.name}
+                      className='w-8 h-8 rounded object-cover'
+                    />
+                    <span>{group.name}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -315,10 +316,11 @@ const Navbar = () => {
 
         <div className='hidden lg:flex items-center'>{renderSearchInput()}</div>
 
+        {/* Admin Lock Icon */}
         <div className='relative group'>
           <button
             onClick={handleAdminAccess}
-            className={`relative group cursor-pointer p-2 rounded-lg transition-all duration-200 ${
+            className={`relative cursor-pointer p-2 rounded-lg transition-all duration-200 ${
               isTransparent ? 'hover:bg-white/10' : 'hover:bg-gray-100'
             }`}
             title='Área de Administração'
@@ -332,22 +334,25 @@ const Navbar = () => {
           </button>
 
           {isSeller && (
-            <div className='hidden group-hover:block absolute top-full right-0 mt-2 bg-white shadow-lg border border-gray-200 py-2 w-48 rounded-md text-sm z-50'>
-              <div className='px-4 py-2 border-b border-gray-100'>
-                <p className='font-semibold text-gray-800'>Admin Panel</p>
-                <p className='text-xs text-gray-500'>Sessão ativa</p>
+            <div className='hidden group-hover:block absolute top-full right-0 pt-2 z-50'>
+              <div className='bg-white shadow-lg border border-gray-200 py-2 w-48 rounded-md text-sm'>
+                <div className='px-4 py-2 border-b border-gray-100'>
+                  <p className='font-semibold text-gray-800'>Admin Panel</p>
+                  <p className='text-xs text-gray-500'>Sessão ativa</p>
+                </div>
+                <button
+                  onClick={handleSellerLogout}
+                  className='w-full px-4 py-2 text-left hover:bg-red-50 text-red-600 flex items-center gap-2 transition-colors'
+                >
+                  <LogOut className='w-4 h-4' />
+                  Logout Admin
+                </button>
               </div>
-              <button
-                onClick={handleSellerLogout}
-                className='w-full px-4 py-2 text-left hover:bg-red-50 text-red-600 flex items-center gap-2 transition-colors'
-              >
-                <LogOut className='w-4 h-4' />
-                Logout Admin
-              </button>
             </div>
           )}
         </div>
 
+        {/* Cart Icon */}
         <div
           onClick={handleCartClick}
           className='relative cursor-pointer'
@@ -364,7 +369,9 @@ const Navbar = () => {
           </button>
         </div>
 
+        {/* ===== USER ACCOUNT - BEST PRACTICE UX ===== */}
         {!user ? (
+          // Logged Out: Botão Login simples
           <button
             onClick={() => setShowUserLogin(true)}
             className={`cursor-pointer px-8 py-2 transition rounded-full ${
@@ -376,38 +383,68 @@ const Navbar = () => {
             Login
           </button>
         ) : (
-          <div className='relative group flex flex-col items-center'>
-            <img 
-              src={assets.profile_icon} 
-              className={`w-10 transition-all duration-300 ${isTransparent ? 'invert brightness-0' : ''}`}
-              alt='Perfil do utilizador' 
-            />
-            <span className={`text-xs mt-1 max-w-20 truncate ${isTransparent ? 'text-white/80' : 'text-gray-600'}`}>
-              {user.name}
-            </span>
-            <ul className='hidden group-hover:block absolute top-12 right-0 bg-white shadow-lg border border-gray-200 py-2.5 w-44 rounded-md text-sm z-40'>
-              <li
-                onClick={() => navigate('/my-orders')}
-                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 text-gray-700'
-              >
-                <span className='text-primary'>📦</span>
-                Os meus Pedidos
-              </li>
-              <li
-                onClick={() => navigate('/write-review')}
-                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 text-gray-700'
-              >
-                <span className='text-primary'>⭐</span>
-                Escrever Reviews
-              </li>
-              <li
-                onClick={handleLogout}
-                className='p-3 pl-4 hover:bg-primary/10 cursor-pointer flex items-center gap-2 border-t border-gray-100 mt-1 text-gray-700'
-              >
-                <LogOut className='w-4 h-4 text-red-500' />
-                <span>Sair</span>
-              </li>
-            </ul>
+          // Logged In: Apenas ícone com indicador + dropdown
+          <div className='relative group'>
+            <button
+              className={`relative p-2 rounded-full transition-all duration-200 cursor-pointer ${
+                isTransparent 
+                  ? 'hover:bg-white/10' 
+                  : 'hover:bg-gray-100'
+              }`}
+              aria-label='Minha conta'
+            >
+              {/* User Icon - Preenchido quando logado */}
+              <User 
+                className={`w-6 h-6 transition-colors ${
+                  isTransparent 
+                    ? 'text-white' 
+                    : 'text-gray-700'
+                }`}
+                fill={isTransparent ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'}
+              />
+              {/* Indicador de logado - ponto verde discreto */}
+              <span className='absolute bottom-1 right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white'></span>
+            </button>
+            
+            {/* Dropdown - Aparece no hover */}
+            <div className='hidden group-hover:block absolute top-full right-0 pt-2 z-50'>
+              <div className='bg-white shadow-xl border border-gray-200 rounded-xl py-2 w-52 text-sm'>
+                {/* Header com nome */}
+                <div className='px-4 py-3 border-b border-gray-100'>
+                  <p className='font-semibold text-gray-800 truncate'>{user.name}</p>
+                  <p className='text-xs text-gray-400 mt-0.5'>A minha conta</p>
+                </div>
+                
+                {/* Menu Items */}
+                <div className='py-1'>
+                  <button
+                    onClick={() => navigate('/my-orders')}
+                    className='w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-gray-700 transition-colors'
+                  >
+                    <Package className='w-4 h-4 text-gray-400' />
+                    <span>Os meus Pedidos</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/write-review')}
+                    className='w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 text-gray-700 transition-colors'
+                  >
+                    <Star className='w-4 h-4 text-gray-400' />
+                    <span>Escrever Reviews</span>
+                  </button>
+                </div>
+                
+                {/* Logout */}
+                <div className='border-t border-gray-100 pt-1'>
+                  <button
+                    onClick={handleLogout}
+                    className='w-full px-4 py-2.5 text-left hover:bg-red-50 flex items-center gap-3 text-red-600 transition-colors'
+                  >
+                    <LogOut className='w-4 h-4' />
+                    <span>Terminar Sessão</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -486,7 +523,7 @@ const Navbar = () => {
                   Home
                 </NavLink>
 
-                {/* 🆕 PRODUTOS COM SUBMENU EXPANSÍVEL */}
+                {/* PRODUTOS COM SUBMENU EXPANSÍVEL */}
                 <div className='border-b border-gray-100'>
                   <button
                     onClick={() => setProductsExpanded(!productsExpanded)}
@@ -505,7 +542,6 @@ const Navbar = () => {
                     productsExpanded ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0'
                   }`}>
                     <div className='pl-4 pb-3 space-y-1'>
-                      {/* Ver Todos */}
                       <Link
                         to='/products'
                         onClick={() => handleNavLinkClick('/products')}
@@ -515,12 +551,10 @@ const Navbar = () => {
                         <span>Ver Todos</span>
                       </Link>
                       
-                      {/* Separador */}
                       <p className='px-3 pt-2 pb-1 text-xs text-gray-400 uppercase tracking-wider'>
                         Coleções
                       </p>
                       
-                      {/* Groups */}
                       {groups.map((group) => (
                         <Link
                           key={group.id}
@@ -580,18 +614,19 @@ const Navbar = () => {
               <div className='p-4 border-t border-gray-100'>
                 {user ? (
                   <div className='space-y-3'>
-                    {/* User Info Card */}
-                    <div className='flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/20'>
-                      <img
-                        src={assets.profile_icon}
-                        className='w-10 h-10'
-                        alt='Perfil'
-                      />
+                    {/* User Info - Discreto */}
+                    <div className='flex items-center gap-3 p-3 bg-gray-50 rounded-lg'>
+                      <div className='relative'>
+                        <div className='w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center'>
+                          <User className='w-5 h-5 text-gray-500' />
+                        </div>
+                        <span className='absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white'></span>
+                      </div>
                       <div className='flex-1 min-w-0'>
-                        <p className='font-semibold text-gray-800 text-sm truncate'>
+                        <p className='font-medium text-gray-800 text-sm truncate'>
                           {user.name}
                         </p>
-                        <p className='text-xs text-gray-500'>Conta ativa</p>
+                        <p className='text-xs text-gray-400'>Conta ativa</p>
                       </div>
                     </div>
 
@@ -599,7 +634,7 @@ const Navbar = () => {
                     <NavLink
                       to='/my-orders'
                       className={({ isActive }) =>
-                        `flex items-center gap-2 py-2.5 px-2 text-sm font-medium rounded-lg transition-colors ${
+                        `flex items-center gap-3 py-2.5 px-3 text-sm font-medium rounded-lg transition-colors ${
                           isActive 
                             ? 'text-primary bg-primary/10' 
                             : 'text-gray-700 hover:text-primary hover:bg-gray-50'
@@ -607,14 +642,14 @@ const Navbar = () => {
                       }
                       onClick={() => handleNavLinkClick('/my-orders')}
                     >
-                      <span>📦</span>
+                      <Package className='w-4 h-4 text-gray-400' />
                       Os meus Pedidos
                     </NavLink>
 
                     <NavLink
                       to='/write-review'
                       className={({ isActive }) =>
-                        `flex items-center gap-2 py-2.5 px-2 text-sm font-medium rounded-lg transition-colors ${
+                        `flex items-center gap-3 py-2.5 px-3 text-sm font-medium rounded-lg transition-colors ${
                           isActive 
                             ? 'text-primary bg-primary/10' 
                             : 'text-gray-700 hover:text-primary hover:bg-gray-50'
@@ -622,14 +657,14 @@ const Navbar = () => {
                       }
                       onClick={() => handleNavLinkClick('/write-review')}
                     >
-                      <span>⭐</span>
+                      <Star className='w-4 h-4 text-gray-400' />
                       Escrever Reviews
                     </NavLink>
 
                     {/* Logout Button */}
                     <button
                       onClick={handleLogout}
-                      className='w-full flex items-center justify-center gap-2 py-3 mt-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg text-sm font-semibold transition-colors'
+                      className='w-full flex items-center justify-center gap-2 py-3 mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors'
                     >
                       <LogOut className='w-4 h-4' />
                       <span>Terminar Sessão</span>

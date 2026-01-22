@@ -4,6 +4,8 @@ import { assets } from '../assets/assets';
 import toast from 'react-hot-toast';
 import { SEO } from '../components/seo';
 import seoConfig from '../components/seo/seoConfig';
+import AddressFormModal from '../components/AddressFormModal';
+import { MapPin, Plus, Edit3, ChevronDown, ChevronUp, Truck, Shield, CreditCard } from 'lucide-react';
 
 const Cart = () => {
   const {
@@ -21,19 +23,31 @@ const Cart = () => {
     setShowUserLogin,
     isMobile,
     saveCartToStorage,
-    findProduct, // 🆕 Para encontrar variantes
+    findProduct,
   } = useAppContext();
 
   const [cartArray, setCartArray] = useState([]);
   const [addresses, setAddresses] = useState([]);
-  const [showAddress, setShowAddress] = useState(false);
+  const [showAddressList, setShowAddressList] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [promoCode, setPromoCode] = useState('');
   const [discountApplied, setDiscountApplied] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [stockWarnings, setStockWarnings] = useState({}); // 🆕 Avisos de stock
+  const [stockWarnings, setStockWarnings] = useState({});
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(null);
+  const [guestAddress, setGuestAddress] = useState(null); // 🆕 Morada para guests
+  const [isAddressLoading, setIsAddressLoading] = useState(false);
   const validPromoCode = 'BROTHER';
+
+  // 🆕 Carregar morada de guest do localStorage
+  useEffect(() => {
+    const savedGuestAddress = localStorage.getItem('guest_checkout_address');
+    if (savedGuestAddress && !user) {
+      setGuestAddress(JSON.parse(savedGuestAddress));
+    }
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -42,28 +56,23 @@ const Cart = () => {
     }
     if (user) {
       loadUserAddresses();
+      // Se tinha morada de guest, limpar após login
+      const savedGuestAddress = localStorage.getItem('guest_checkout_address');
+      if (savedGuestAddress) {
+        setGuestAddress(JSON.parse(savedGuestAddress));
+      }
     }
   }, [products, cartItems, user]);
-
-  const requireLogin = action => {
-    if (!user) {
-      setShowUserLogin(true);
-      toast.error(`Por favor, inicie sessão para ${action}.`);
-      return false;
-    }
-    return true;
-  };
 
   const updateCartArray = () => {
     const tempArray = Object.keys(cartItems)
       .map(key => {
-        const product = findProduct(key); // 🆕 Usar findProduct para encontrar variantes
+        const product = findProduct(key);
         return product ? { ...product, quantity: cartItems[key] } : null;
       })
       .filter(Boolean);
     setCartArray(tempArray);
 
-    // 🆕 Verificar stock e gerar avisos
     const warnings = {};
     tempArray.forEach(product => {
       const availableStock = product.stock || 0;
@@ -80,14 +89,44 @@ const Cart = () => {
       if (data.success) {
         setAddresses(data.addresses);
         if (data.addresses.length > 0) {
-          setSelectedAddress(prev => prev || data.addresses[0]);
-        } else {
-          setSelectedAddress(null);
+          // Se tinha morada de guest guardada e fez login, usar essa como selecionada
+          if (guestAddress) {
+            // Verificar se já existe uma morada igual
+            const existingMatch = data.addresses.find(a => 
+              a.street === guestAddress.street && 
+              a.zipcode === guestAddress.zipcode
+            );
+            if (existingMatch) {
+              setSelectedAddress(existingMatch);
+            } else {
+              // Guardar a morada de guest no servidor
+              saveGuestAddressToServer(guestAddress);
+            }
+          } else {
+            setSelectedAddress(prev => prev || data.addresses[0]);
+          }
+        } else if (guestAddress) {
+          // User não tem moradas mas tinha guest address
+          saveGuestAddressToServer(guestAddress);
         }
       }
     } catch (error) {
       console.error('Falha ao carregar as moradas:', error);
-      toast.error('Falha ao carregar as moradas.');
+    }
+  };
+
+  // 🆕 Guardar morada de guest no servidor após login
+  const saveGuestAddressToServer = async (address) => {
+    try {
+      const { data } = await axios.post('/api/address/add', { address });
+      if (data.success) {
+        localStorage.removeItem('guest_checkout_address');
+        setGuestAddress(null);
+        loadUserAddresses();
+        toast.success('Morada guardada na sua conta!');
+      }
+    } catch (error) {
+      console.error('Erro ao guardar morada:', error);
     }
   };
 
@@ -101,16 +140,14 @@ const Cart = () => {
     return Math.max(0, totalBeforeDiscount).toFixed(2);
   };
 
-  // 🆕 VALIDAR STOCK ANTES DE ALTERAR QUANTIDADE
   const handleQuantityChange = (productId, newQuantity) => {
-    const product = findProduct(productId); // 🆕 Usar findProduct para encontrar variantes
+    const product = findProduct(productId);
     if (!product) return;
 
     const availableStock = product.stock || 0;
 
     if (newQuantity > availableStock) {
       toast.error(`Apenas ${availableStock} unidade(s) disponível(eis) para ${product.name}`);
-      // Ajustar para o máximo disponível
       if (availableStock > 0) {
         updateCartItem(productId, availableStock);
       }
@@ -120,7 +157,6 @@ const Cart = () => {
     updateCartItem(productId, newQuantity);
   };
 
-  // 🆕 VALIDAR STOCK ANTES DE FINALIZAR
   const validateStockBeforeCheckout = () => {
     const errors = [];
     
@@ -137,16 +173,37 @@ const Cart = () => {
     return errors;
   };
 
+  // 🆕 Obter morada atual (user ou guest)
+  const getCurrentAddress = () => {
+    if (user && selectedAddress) return selectedAddress;
+    if (guestAddress) return guestAddress;
+    return null;
+  };
+
+  // 🆕 Verificar se tem morada
+  const hasAddress = () => {
+    return !!(user ? selectedAddress : guestAddress);
+  };
+
   const handlePlaceOrder = async () => {
-    if (!requireLogin('fazer a encomenda')) return;
+    // 🆕 Se não está logado, pedir login AGORA (após ter morada)
+    if (!user) {
+      // Guardar morada no localStorage para usar após login
+      if (guestAddress) {
+        localStorage.setItem('guest_checkout_address', JSON.stringify(guestAddress));
+      }
+      toast('Por favor, inicie sessão para finalizar a compra', { icon: '🔐' });
+      setShowUserLogin(true);
+      return;
+    }
+
     if (!selectedAddress) {
-      return toast.error('Por favor, selecione uma morada de entrega.');
+      return toast.error('Por favor, adicione uma morada de entrega.');
     }
     if (cartArray.length === 0) {
       return toast.error('O seu carrinho está vazio.');
     }
 
-    // 🆕 VALIDAR STOCK ANTES DE PROSSEGUIR
     const stockErrors = validateStockBeforeCheckout();
     if (stockErrors.length > 0) {
       toast.error('Stock insuficiente:\n' + stockErrors.join('\n'));
@@ -201,7 +258,6 @@ const Cart = () => {
   };
 
   const handlePromoCode = () => {
-    if (!requireLogin('aplicar o código promocional')) return;
     if (promoCode.trim().toUpperCase() === validPromoCode) {
       setDiscountApplied(true);
       toast.success('Desconto de 30% aplicado!');
@@ -218,6 +274,7 @@ const Cart = () => {
 
   const getPaymentButtonText = () => {
     if (isProcessing) return 'A Processar...';
+    if (!user) return 'Continuar para Pagamento';
     switch (paymentMethod) {
       case 'mbway': return 'Pagar com MB Way';
       case 'multibanco': return 'Gerar Referência Multibanco';
@@ -225,7 +282,58 @@ const Cart = () => {
     }
   };
 
-  // 🆕 Helper: verificar se cor é clara
+  // 🆕 Handler para guardar morada
+  const handleSaveAddress = async (addressData) => {
+    setIsAddressLoading(true);
+    
+    try {
+      if (user) {
+        // User logado - guardar no servidor
+        if (editingAddress) {
+          // Atualizar morada existente
+          const { data } = await axios.put(`/api/address/update/${editingAddress._id}`, { address: addressData });
+          if (data.success) {
+            toast.success('Morada atualizada!');
+            loadUserAddresses();
+          }
+        } else {
+          // Criar nova morada
+          const { data } = await axios.post('/api/address/add', { address: addressData });
+          if (data.success) {
+            toast.success('Morada adicionada!');
+            loadUserAddresses();
+          }
+        }
+      } else {
+        // 🆕 Guest - guardar no localStorage
+        setGuestAddress(addressData);
+        localStorage.setItem('guest_checkout_address', JSON.stringify(addressData));
+        toast.success('Morada adicionada! Continue para finalizar.');
+      }
+      
+      setShowAddressModal(false);
+      setEditingAddress(null);
+    } catch (error) {
+      console.error('Erro ao guardar morada:', error);
+      toast.error('Erro ao guardar morada. Tente novamente.');
+    } finally {
+      setIsAddressLoading(false);
+    }
+  };
+
+  // 🆕 Abrir modal para adicionar morada
+  const handleAddAddress = () => {
+    setEditingAddress(null);
+    setShowAddressModal(true);
+  };
+
+  // 🆕 Abrir modal para editar morada
+  const handleEditAddress = (address) => {
+    setEditingAddress(address);
+    setShowAddressModal(true);
+  };
+
+  // Helper: verificar se cor é clara
   const isLightColor = (color) => {
     if (!color) return false;
     const hex = color.replace('#', '');
@@ -237,7 +345,7 @@ const Cart = () => {
     return brightness > 200;
   };
 
-  // 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+  // Componente para renderizar bolinha de cor (simples ou dupla)
   const ColorBall = ({ code1, code2, size = 24, title }) => {
     const isDual = code2 && code2 !== code1;
     const isLight1 = isLightColor(code1);
@@ -253,7 +361,6 @@ const Cart = () => {
         title={title}
       >
         {isDual ? (
-          // Bolinha dividida na diagonal
           <div 
             className='w-full h-full rounded-full overflow-hidden'
             style={{
@@ -261,7 +368,6 @@ const Cart = () => {
             }}
           />
         ) : (
-          // Bolinha simples
           <div 
             className='w-full h-full rounded-full'
             style={{ backgroundColor: code1 || '#ccc' }}
@@ -288,11 +394,60 @@ const Cart = () => {
     );
   }
 
+  const currentAddress = getCurrentAddress();
+
   return (
     <>
       <SEO title={seoConfig.cart.title} description={seoConfig.cart.description} url={seoConfig.cart.url} noindex={true} />
 
+      {/* 🆕 Modal de Morada */}
+      <AddressFormModal
+        isOpen={showAddressModal}
+        onClose={() => {
+          setShowAddressModal(false);
+          setEditingAddress(null);
+        }}
+        onSave={handleSaveAddress}
+        initialAddress={editingAddress || (user?.email ? { email: user.email } : null)}
+        isGuest={!user}
+        isLoading={isAddressLoading}
+      />
+
       <div className='container mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-50 min-h-[calc(100vh-60px)]'>
+        {/* 🆕 Progress Steps */}
+        <div className='max-w-2xl mx-auto mb-8'>
+          <div className='flex items-center justify-center'>
+            <div className='flex items-center'>
+              <div className='flex items-center justify-center w-8 h-8 bg-primary text-white rounded-full text-sm font-bold'>
+                1
+              </div>
+              <span className='ml-2 text-sm font-medium text-primary'>Carrinho</span>
+            </div>
+            <div className={`w-16 h-1 mx-3 rounded ${hasAddress() ? 'bg-primary' : 'bg-gray-300'}`}></div>
+            <div className='flex items-center'>
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
+                hasAddress() ? 'bg-primary text-white' : 'bg-gray-300 text-gray-500'
+              }`}>
+                2
+              </div>
+              <span className={`ml-2 text-sm font-medium ${hasAddress() ? 'text-primary' : 'text-gray-500'}`}>
+                Morada
+              </span>
+            </div>
+            <div className={`w-16 h-1 mx-3 rounded ${user && hasAddress() ? 'bg-primary' : 'bg-gray-300'}`}></div>
+            <div className='flex items-center'>
+              <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
+                user && hasAddress() ? 'bg-primary text-white' : 'bg-gray-300 text-gray-500'
+              }`}>
+                3
+              </div>
+              <span className={`ml-2 text-sm font-medium ${user && hasAddress() ? 'text-primary' : 'text-gray-500'}`}>
+                Pagamento
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div className='flex flex-col lg:flex-row gap-8'>
           {/* Cart Items Section */}
           <div className='lg:w-2/3'>
@@ -315,7 +470,6 @@ const Cart = () => {
                 return (
                   <div key={product._id} className={`flex flex-col sm:flex-row items-center p-4 sm:p-6 ${hasStockWarning ? 'bg-red-50' : ''}`}>
                     <div className='flex items-center w-full sm:w-2/3 mb-4 sm:mb-0'>
-                      {/* 🆕 Imagem com bolinha de cor - Suporta Dual Colors */}
                       <div className='relative'>
                         <img
                           src={product.image[0]}
@@ -323,7 +477,6 @@ const Cart = () => {
                           className='w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border border-gray-200 shadow-sm cursor-pointer transition-transform duration-200 hover:scale-[1.02]'
                           onClick={() => navigate(`/products/${product.category.toLowerCase()}/${product._id}`)}
                         />
-                        {/* 🆕 Bolinha de Cor - Suporta Dual Colors */}
                         {product.colorCode && (
                           <ColorBall
                             code1={product.colorCode}
@@ -337,19 +490,16 @@ const Cart = () => {
                       <div className='ml-4 flex-grow'>
                         <h3 className='font-semibold text-lg text-gray-800'>{product.name}</h3>
                         
-                        {/* 🆕 Nome da Cor */}
                         {product.color && (
                           <p className='text-sm text-gray-500 mt-0.5'>Cor: {product.color}</p>
                         )}
                         
                         <p className='text-sm text-gray-500 mt-1'>Peso: {product.weight || 'N/A'}</p>
                         
-                        {/* 🆕 Badge Stock Baixo */}
                         {isLowStock && !hasStockWarning && (
                           <p className='text-xs text-orange-600 font-medium mt-1'>Últimas {availableStock} unidades!</p>
                         )}
                         
-                        {/* 🆕 Aviso de Stock */}
                         {hasStockWarning && (
                           <p className='text-xs text-red-600 font-medium mt-1 bg-red-100 px-2 py-1 rounded'>
                             ⚠️ {hasStockWarning}
@@ -365,7 +515,6 @@ const Cart = () => {
                     <div className='flex justify-between items-center w-full sm:w-1/3 sm:justify-end sm:gap-8'>
                       <div className='flex items-center'>
                         <span className='mr-2 text-gray-600'>Qtd:</span>
-                        {/* 🆕 SELECT COM LIMITE DE STOCK */}
                         <select
                           value={cartItems[product._id]}
                           onChange={e => handleQuantityChange(product._id, Number(e.target.value))}
@@ -400,7 +549,6 @@ const Cart = () => {
               })}
             </div>
 
-            {/* 🆕 Aviso Global de Stock */}
             {Object.keys(stockWarnings).length > 0 && (
               <div className='mt-4 p-4 bg-red-50 border border-red-200 rounded-lg'>
                 <p className='text-red-700 font-medium'>⚠️ Alguns produtos excedem o stock disponível. Por favor, ajuste as quantidades antes de finalizar.</p>
@@ -413,46 +561,107 @@ const Cart = () => {
             <div className='bg-white rounded-xl shadow-lg p-6 sticky lg:top-8'>
               <h2 className='text-2xl font-bold mb-5 text-gray-800'>Finalizar Compra</h2>
 
-              {/* Address Selection */}
+              {/* 🆕 Address Section - Redesigned */}
               <div className='mb-6 border-b pb-6 border-gray-200'>
-                <div className='flex justify-between items-center mb-3'>
+                <div className='flex items-center gap-2 mb-4'>
+                  <MapPin className='w-5 h-5 text-primary' />
                   <h3 className='font-semibold text-gray-700'>Morada de Entrega</h3>
-                  <button onClick={() => requireLogin('selecionar morada') && setShowAddress(!showAddress)} className='text-primary-dark text-sm hover:underline font-medium'>
-                    {showAddress ? 'Fechar' : 'Alterar'}
-                  </button>
                 </div>
 
-                {selectedAddress ? (
-                  <div className='bg-gray-50 p-4 rounded-lg text-sm text-gray-700 border border-gray-200'>
-                    <p className='font-medium'>{selectedAddress.street}</p>
-                    <p>{selectedAddress.city}, {selectedAddress.state} {selectedAddress.zipcode}</p>
-                    <p>{selectedAddress.country}</p>
+                {currentAddress ? (
+                  // 🆕 Morada existente
+                  <div className='space-y-3'>
+                    <div className='bg-primary/5 border-2 border-primary/20 p-4 rounded-xl'>
+                      <div className='flex justify-between items-start'>
+                        <div className='text-sm text-gray-700'>
+                          <p className='font-semibold text-gray-800'>
+                            {currentAddress.firstName} {currentAddress.lastName}
+                          </p>
+                          <p className='mt-1'>{currentAddress.street}</p>
+                          <p>{currentAddress.city}, {currentAddress.state} {currentAddress.zipcode}</p>
+                          <p>{currentAddress.country}</p>
+                          <p className='mt-1 text-gray-500'>{currentAddress.phone}</p>
+                        </div>
+                        <button
+                          onClick={() => handleEditAddress(currentAddress)}
+                          className='p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors'
+                          title='Editar morada'
+                        >
+                          <Edit3 className='w-4 h-4' />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Lista de moradas alternativas (apenas para users logados) */}
+                    {user && addresses.length > 1 && (
+                      <div>
+                        <button
+                          onClick={() => setShowAddressList(!showAddressList)}
+                          className='w-full flex items-center justify-between px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors'
+                        >
+                          <span>Escolher outra morada ({addresses.length})</span>
+                          {showAddressList ? <ChevronUp className='w-4 h-4' /> : <ChevronDown className='w-4 h-4' />}
+                        </button>
+                        
+                        {showAddressList && (
+                          <div className='mt-2 border border-gray-200 rounded-lg overflow-hidden'>
+                            {addresses.map(address => (
+                              <div
+                                key={address._id}
+                                onClick={() => {
+                                  setSelectedAddress(address);
+                                  setShowAddressList(false);
+                                }}
+                                className={`p-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 cursor-pointer text-sm transition-colors ${
+                                  selectedAddress?._id === address._id ? 'bg-primary/5' : ''
+                                }`}
+                              >
+                                <p className='font-medium'>{address.firstName} {address.lastName}</p>
+                                <p className='text-gray-600'>{address.street}</p>
+                                <p className='text-gray-500'>{address.city}, {address.state}</p>
+                              </div>
+                            ))}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddAddress();
+                                setShowAddressList(false);
+                              }}
+                              className='w-full p-3 text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2 font-medium'
+                            >
+                              <Plus className='w-4 h-4' />
+                              Nova morada
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <p className='text-sm text-gray-500 italic p-4 bg-gray-50 rounded-lg border border-gray-200'>
-                    Nenhuma morada selecionada.
-                  </p>
-                )}
-
-                {showAddress && user && (
-                  <div className='mt-4 border border-gray-200 rounded-lg overflow-hidden bg-white'>
-                    {addresses.length > 0 ? (
-                      addresses.map(address => (
-                        <div
-                          key={address._id}
-                          onClick={() => { setSelectedAddress(address); setShowAddress(false); }}
-                          className={`p-3 border-b border-gray-100 last:border-b-0 hover:bg-primary-light/20 cursor-pointer text-sm text-gray-800 transition-colors duration-200 ${selectedAddress?._id === address._id ? 'bg-primary-light/30' : ''}`}
-                        >
-                          <p className='font-medium'>{address.street}</p>
-                          <p>{address.city}, {address.state}</p>
-                        </div>
-                      ))
-                    ) : (
-                      <p className='p-3 text-gray-600 text-sm text-center'>Nenhuma morada guardada.</p>
-                    )}
-                    <div onClick={() => { if (requireLogin('adicionar uma nova morada')) navigate('/add-address'); }} className='p-3 text-primary-dark hover:bg-primary-light/20 cursor-pointer text-center font-medium transition-colors duration-200 border-t border-gray-200'>
-                      + Adicionar Nova Morada
+                  // 🆕 Sem morada - CTA para adicionar
+                  <div className='text-center py-4'>
+                    <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3'>
+                      <MapPin className='w-8 h-8 text-gray-400' />
                     </div>
+                    <p className='text-gray-600 mb-4'>
+                      {user 
+                        ? 'Adicione uma morada para continuar'
+                        : 'Adicione os seus dados de entrega'
+                      }
+                    </p>
+                    <button
+                      onClick={handleAddAddress}
+                      className='w-full py-3 px-4 bg-primary/10 text-primary rounded-xl font-semibold hover:bg-primary/20 transition-colors flex items-center justify-center gap-2'
+                    >
+                      <Plus className='w-5 h-5' />
+                      Adicionar Morada
+                    </button>
+                    
+                    {!user && (
+                      <p className='text-xs text-gray-500 mt-3'>
+                        💡 Pode continuar sem conta
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -461,128 +670,120 @@ const Cart = () => {
               <div className='mb-6 border-b pb-6 border-gray-200'>
                 <h3 className='font-semibold text-gray-700 mb-3'>Código Promocional</h3>
                 <div className='flex w-full'>
-                  <input type='text' value={promoCode} onChange={e => setPromoCode(e.target.value)} placeholder='Introduza o código promocional' disabled={discountApplied} className='flex-1 min-w-0 border border-gray-300 rounded-l-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-gray-700 disabled:bg-gray-100 placeholder:text-center sm:placeholder:text-left' />
+                  <input 
+                    type='text' 
+                    value={promoCode} 
+                    onChange={e => setPromoCode(e.target.value)} 
+                    placeholder='Introduza o código' 
+                    disabled={discountApplied} 
+                    className='flex-1 min-w-0 border border-gray-300 rounded-l-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-gray-700 disabled:bg-gray-100' 
+                  />
                   {discountApplied ? (
-                    <button onClick={handleRemovePromo} className='bg-red-500 text-white px-5 py-2.5 rounded-r-lg hover:bg-red-600 transition-all duration-300 font-medium active:scale-95 flex-shrink-0'>Remover</button>
+                    <button onClick={handleRemovePromo} className='bg-red-500 text-white px-5 py-2.5 rounded-r-lg hover:bg-red-600 transition-all duration-300 font-medium active:scale-95 flex-shrink-0'>
+                      Remover
+                    </button>
                   ) : (
-                    <button onClick={handlePromoCode} className='bg-primary text-white px-5 py-2.5 rounded-r-lg hover:bg-primary-dull transition-all duration-300 font-medium active:scale-95 flex-shrink-0'>Aplicar</button>
+                    <button onClick={handlePromoCode} className='bg-primary text-white px-5 py-2.5 rounded-r-lg hover:bg-primary-dull transition-all duration-300 font-medium active:scale-95 flex-shrink-0'>
+                      Aplicar
+                    </button>
                   )}
                 </div>
               </div>
 
-              {/* Payment Method Selection */}
-              <div className='mb-6 border-b pb-6 border-gray-200'>
-                <h3 className='font-semibold text-gray-700 mb-3'>Escolha o método de pagamento</h3>
-                <div className='space-y-3'>
-                  {/* Card */}
-                  <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${paymentMethod === 'card' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
-                    <input type='radio' name='paymentMethod' value='card' checked={paymentMethod === 'card'} onChange={e => { if (requireLogin('selecionar método de pagamento')) setPaymentMethod(e.target.value); }} className='sr-only' />
-                    <div className='flex items-center flex-1'>
-                      <div className='w-10 h-10 flex items-center justify-center bg-indigo-100 rounded-lg mr-3'>
-                        <svg className='w-6 h-6 text-indigo-600' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                          <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' />
-                        </svg>
-                      </div>
-                      <div>
-                        <span className='font-medium text-gray-800'>Cartão de Crédito/Débito</span>
-                        <div className='flex gap-1 mt-1'>
-                          <span className='text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium'>Visa</span>
-                          <span className='text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded font-medium'>Mastercard</span>
+              {/* Payment Method Selection - Só mostrar se tem morada */}
+              {hasAddress() && (
+                <div className='mb-6 border-b pb-6 border-gray-200'>
+                  <h3 className='font-semibold text-gray-700 mb-3'>Método de Pagamento</h3>
+                  <div className='space-y-3'>
+                    {/* Card */}
+                    <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${paymentMethod === 'card' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
+                      <input type='radio' name='paymentMethod' value='card' checked={paymentMethod === 'card'} onChange={e => setPaymentMethod(e.target.value)} className='sr-only' />
+                      <div className='flex items-center flex-1'>
+                        <div className='w-10 h-10 flex items-center justify-center bg-indigo-100 rounded-lg mr-3'>
+                          <CreditCard className='w-5 h-5 text-indigo-600' />
+                        </div>
+                        <div>
+                          <span className='font-medium text-gray-800'>Cartão</span>
+                          <div className='flex gap-1 mt-0.5'>
+                            <span className='text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded'>Visa</span>
+                            <span className='text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded'>MC</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    {paymentMethod === 'card' && (
-                      <div className='w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center'>
-                        <svg className='w-3 h-3 text-white' fill='currentColor' viewBox='0 0 20 20'>
-                          <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
-                        </svg>
-                      </div>
-                    )}
-                  </label>
+                      {paymentMethod === 'card' && (
+                        <div className='w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center'>
+                          <svg className='w-3 h-3 text-white' fill='currentColor' viewBox='0 0 20 20'>
+                            <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
+                          </svg>
+                        </div>
+                      )}
+                    </label>
 
-                  {/* MB Way */}
-                  <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${paymentMethod === 'mbway' ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
-                    <input type='radio' name='paymentMethod' value='mbway' checked={paymentMethod === 'mbway'} onChange={e => { if (requireLogin('selecionar método de pagamento')) setPaymentMethod(e.target.value); }} className='sr-only' />
-                    <div className='flex items-center flex-1'>
-                      <div className='w-10 h-10 flex items-center justify-center rounded-lg mr-3 overflow-hidden'>
-                        <img src='/mbway.png' alt='MB Way' className='w-10 h-10 object-contain' />
+                    {/* MB Way */}
+                    <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${paymentMethod === 'mbway' ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
+                      <input type='radio' name='paymentMethod' value='mbway' checked={paymentMethod === 'mbway'} onChange={e => setPaymentMethod(e.target.value)} className='sr-only' />
+                      <div className='flex items-center flex-1'>
+                        <div className='w-10 h-10 flex items-center justify-center rounded-lg mr-3 overflow-hidden'>
+                          <img src='/mbway.png' alt='MB Way' className='w-10 h-10 object-contain' />
+                        </div>
+                        <div>
+                          <span className='font-medium text-gray-800'>MB Way</span>
+                          <p className='text-xs text-gray-500'>Pagamento instantâneo</p>
+                        </div>
                       </div>
-                      <div>
-                        <span className='font-medium text-gray-800'>MB Way</span>
-                        <p className='text-xs text-gray-500 mt-0.5'>Pagamento instantâneo via telemóvel</p>
-                      </div>
-                    </div>
-                    {paymentMethod === 'mbway' && (
-                      <div className='w-5 h-5 bg-red-500 rounded-full flex items-center justify-center'>
-                        <svg className='w-3 h-3 text-white' fill='currentColor' viewBox='0 0 20 20'>
-                          <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
-                        </svg>
-                      </div>
-                    )}
-                  </label>
+                      {paymentMethod === 'mbway' && (
+                        <div className='w-5 h-5 bg-red-500 rounded-full flex items-center justify-center'>
+                          <svg className='w-3 h-3 text-white' fill='currentColor' viewBox='0 0 20 20'>
+                            <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
+                          </svg>
+                        </div>
+                      )}
+                    </label>
 
-                  {/* Multibanco */}
-                  <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${paymentMethod === 'multibanco' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
-                    <input type='radio' name='paymentMethod' value='multibanco' checked={paymentMethod === 'multibanco'} onChange={e => { if (requireLogin('selecionar método de pagamento')) setPaymentMethod(e.target.value); }} className='sr-only' />
-                    <div className='flex items-center flex-1'>
-                      <div className='w-10 h-10 flex items-center justify-center rounded-lg mr-3 overflow-hidden'>
-                        <img src='/multibanco.png' alt='Multibanco' className='w-10 h-10 object-contain' />
+                    {/* Multibanco */}
+                    <label className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${paymentMethod === 'multibanco' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}>
+                      <input type='radio' name='paymentMethod' value='multibanco' checked={paymentMethod === 'multibanco'} onChange={e => setPaymentMethod(e.target.value)} className='sr-only' />
+                      <div className='flex items-center flex-1'>
+                        <div className='w-10 h-10 flex items-center justify-center rounded-lg mr-3 overflow-hidden'>
+                          <img src='/multibanco.png' alt='Multibanco' className='w-10 h-10 object-contain' />
+                        </div>
+                        <div>
+                          <span className='font-medium text-gray-800'>Multibanco</span>
+                          <p className='text-xs text-gray-500'>Referência (7 dias)</p>
+                        </div>
                       </div>
-                      <div>
-                        <span className='font-medium text-gray-800'>Multibanco</span>
-                        <p className='text-xs text-gray-500 mt-0.5'>Referência para ATM ou homebanking</p>
-                      </div>
-                    </div>
-                    {paymentMethod === 'multibanco' && (
-                      <div className='w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center'>
-                        <svg className='w-3 h-3 text-white' fill='currentColor' viewBox='0 0 20 20'>
-                          <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
-                        </svg>
-                      </div>
-                    )}
-                  </label>
+                      {paymentMethod === 'multibanco' && (
+                        <div className='w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center'>
+                          <svg className='w-3 h-3 text-white' fill='currentColor' viewBox='0 0 20 20'>
+                            <path fillRule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clipRule='evenodd' />
+                          </svg>
+                        </div>
+                      )}
+                    </label>
+                  </div>
                 </div>
-
-                {paymentMethod === 'card' && (
-                  <div className='mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg'>
-                    <p className='text-sm text-indigo-700'>🔒 Pagamento seguro processado pela Stripe.</p>
-                  </div>
-                )}
-                {paymentMethod === 'mbway' && (
-                  <div className='mt-4 p-3 bg-red-50 border border-red-200 rounded-lg'>
-                    <p className='text-sm text-red-700'>📱 Receberá uma notificação no telemóvel para confirmar.</p>
-                  </div>
-                )}
-                {paymentMethod === 'multibanco' && (
-                  <div className='mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg'>
-                    <p className='text-sm text-blue-700'>🏦 Será gerada uma referência Multibanco (7 dias).</p>
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Order Total */}
               <div className='pt-4'>
                 <div className='flex justify-between items-center mb-3 text-gray-700'>
                   <span>Subtotal ({getCartCount()} artigos):</span>
-                  <span className='font-medium text-lg flex items-baseline'>
-                    <span className='mr-0.5'>{currency}</span>
-                    <span>{parseFloat(getCartAmount()).toFixed(2)}</span>
+                  <span className='font-medium text-lg'>
+                    {currency} {parseFloat(getCartAmount()).toFixed(2)}
                   </span>
                 </div>
                 {discountApplied && (
                   <div className='flex justify-between items-center text-green-600 mb-3'>
                     <span>Desconto (30%):</span>
-                    <span className='font-medium text-lg flex items-baseline'>
-                      <span className='mr-0.5'>-{currency}</span>
-                      <span>{(parseFloat(getCartAmount()) * 0.3).toFixed(2)}</span>
+                    <span className='font-medium text-lg'>
+                      -{currency} {(parseFloat(getCartAmount()) * 0.3).toFixed(2)}
                     </span>
                   </div>
                 )}
                 <div className='flex justify-between font-bold text-xl mt-5 pt-3 border-t border-gray-200'>
                   <span>Total:</span>
-                  <span className='text-primary-dark flex items-baseline'>
-                    <span className='mr-0.5'>{currency}</span>
-                    <span>{calculateTotal()}</span>
+                  <span className='text-primary-dark'>
+                    {currency} {calculateTotal()}
                   </span>
                 </div>
               </div>
@@ -590,13 +791,17 @@ const Cart = () => {
               {/* Checkout Button */}
               <button
                 onClick={handlePlaceOrder}
-                disabled={isProcessing || !selectedAddress || cartArray.length === 0 || Object.keys(stockWarnings).length > 0}
-                className={`w-full mt-8 py-3.5 rounded-lg font-bold text-white text-lg shadow-md transition-all duration-300 active:scale-98 flex items-center justify-center gap-2
-                  ${isProcessing || !selectedAddress || cartArray.length === 0 || Object.keys(stockWarnings).length > 0
+                disabled={isProcessing || !hasAddress() || cartArray.length === 0 || Object.keys(stockWarnings).length > 0}
+                className={`w-full mt-8 py-3.5 rounded-xl font-bold text-white text-lg shadow-md transition-all duration-300 flex items-center justify-center gap-2
+                  ${isProcessing || !hasAddress() || cartArray.length === 0 || Object.keys(stockWarnings).length > 0
                     ? 'bg-gray-400 cursor-not-allowed'
-                    : paymentMethod === 'mbway' ? 'bg-red-600 hover:bg-red-700'
-                    : paymentMethod === 'multibanco' ? 'bg-blue-600 hover:bg-blue-700'
-                    : 'bg-indigo-600 hover:bg-indigo-700'
+                    : !user 
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : paymentMethod === 'mbway' 
+                        ? 'bg-red-600 hover:bg-red-700'
+                        : paymentMethod === 'multibanco' 
+                          ? 'bg-blue-600 hover:bg-blue-700'
+                          : 'bg-indigo-600 hover:bg-indigo-700'
                   }`}
               >
                 {isProcessing ? (
@@ -607,45 +812,44 @@ const Cart = () => {
                     </svg>
                     <span>A Processar...</span>
                   </>
+                ) : !hasAddress() ? (
+                  <span>Adicione uma morada</span>
                 ) : (
                   <>
-                    {paymentMethod === 'mbway' && <img src='/mbway.png' alt='MB Way' className='w-6 h-6 object-contain' />}
-                    {paymentMethod === 'multibanco' && <img src='/multibanco.png' alt='Multibanco' className='w-6 h-6 object-contain' />}
-                    {paymentMethod === 'card' && (
-                      <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
-                        <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' />
-                      </svg>
+                    {!user ? (
+                      <>
+                        <Shield className='w-5 h-5' />
+                        <span>Continuar para Pagamento</span>
+                      </>
+                    ) : (
+                      <>
+                        {paymentMethod === 'mbway' && <img src='/mbway.png' alt='MB Way' className='w-6 h-6 object-contain' />}
+                        {paymentMethod === 'multibanco' && <img src='/multibanco.png' alt='Multibanco' className='w-6 h-6 object-contain' />}
+                        {paymentMethod === 'card' && <CreditCard className='w-5 h-5' />}
+                        <span>{getPaymentButtonText()}</span>
+                      </>
                     )}
-                    <span>{getPaymentButtonText()}</span>
                   </>
                 )}
               </button>
 
-              {!isProcessing && (
-                <div className='mt-3 text-center'>
-                  <p className='text-xs text-gray-500'>
-                    {paymentMethod === 'mbway' ? 'Será redirecionado para introduzir o número de telemóvel'
-                      : paymentMethod === 'multibanco' ? 'Será gerada uma referência para pagamento'
-                      : 'Pagamento seguro processado pela Stripe'}
-                  </p>
-                </div>
+              {/* Info text */}
+              {hasAddress() && !user && (
+                <p className='mt-3 text-center text-sm text-gray-500'>
+                  🔐 Será pedido login antes do pagamento
+                </p>
               )}
 
               {/* Trust Badges */}
               <div className='mt-6 pt-4 border-t border-gray-200'>
                 <div className='flex items-center justify-center gap-4 text-xs text-gray-500'>
                   <div className='flex items-center gap-1'>
-                    <svg className='w-4 h-4 text-green-500' fill='currentColor' viewBox='0 0 20 20'>
-                      <path fillRule='evenodd' d='M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z' clipRule='evenodd' />
-                    </svg>
+                    <Shield className='w-4 h-4 text-green-500' />
                     <span>Pagamento Seguro</span>
                   </div>
                   <div className='flex items-center gap-1'>
-                    <svg className='w-4 h-4 text-blue-500' fill='currentColor' viewBox='0 0 20 20'>
-                      <path d='M9 2a1 1 0 000 2h2a1 1 0 100-2H9z' />
-                      <path fillRule='evenodd' d='M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z' clipRule='evenodd' />
-                    </svg>
-                    <span>Dados Protegidos</span>
+                    <Truck className='w-4 h-4 text-blue-500' />
+                    <span>Entrega Rápida</span>
                   </div>
                 </div>
               </div>
