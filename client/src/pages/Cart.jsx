@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { SEO } from '../components/seo';
 import seoConfig from '../components/seo/seoConfig';
 import AddressFormModal from '../components/AddressFormModal';
-import { MapPin, Plus, Edit3, ChevronDown, ChevronUp, Truck, Shield, CreditCard } from 'lucide-react';
+import { MapPin, Plus, Edit3, ChevronDown, ChevronUp, Truck, Shield, CreditCard, User } from 'lucide-react';
 
 const Cart = () => {
   const {
@@ -37,11 +37,15 @@ const Cart = () => {
   const [stockWarnings, setStockWarnings] = useState({});
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
-  const [guestAddress, setGuestAddress] = useState(null); // 🆕 Morada para guests
+  const [guestAddress, setGuestAddress] = useState(null);
   const [isAddressLoading, setIsAddressLoading] = useState(false);
+  
+  // 🆕 Estado para morada de guest guardada no servidor
+  const [guestAddressId, setGuestAddressId] = useState(null);
+  
   const validPromoCode = 'BROTHER';
 
-  // 🆕 Carregar morada de guest do localStorage
+  // Carregar morada de guest do localStorage
   useEffect(() => {
     const savedGuestAddress = localStorage.getItem('guest_checkout_address');
     if (savedGuestAddress && !user) {
@@ -56,11 +60,6 @@ const Cart = () => {
     }
     if (user) {
       loadUserAddresses();
-      // Se tinha morada de guest, limpar após login
-      const savedGuestAddress = localStorage.getItem('guest_checkout_address');
-      if (savedGuestAddress) {
-        setGuestAddress(JSON.parse(savedGuestAddress));
-      }
     }
   }, [products, cartItems, user]);
 
@@ -90,17 +89,20 @@ const Cart = () => {
         setAddresses(data.addresses);
         if (data.addresses.length > 0) {
           // Se tinha morada de guest guardada e fez login, usar essa como selecionada
-          if (guestAddress) {
+          const savedGuestAddress = localStorage.getItem('guest_checkout_address');
+          if (savedGuestAddress) {
+            const guestAddr = JSON.parse(savedGuestAddress);
             // Verificar se já existe uma morada igual
             const existingMatch = data.addresses.find(a => 
-              a.street === guestAddress.street && 
-              a.zipcode === guestAddress.zipcode
+              a.street === guestAddr.street && 
+              a.zipcode === guestAddr.zipcode
             );
             if (existingMatch) {
               setSelectedAddress(existingMatch);
+              localStorage.removeItem('guest_checkout_address');
             } else {
               // Guardar a morada de guest no servidor
-              saveGuestAddressToServer(guestAddress);
+              saveGuestAddressToServer(guestAddr);
             }
           } else {
             setSelectedAddress(prev => prev || data.addresses[0]);
@@ -115,7 +117,7 @@ const Cart = () => {
     }
   };
 
-  // 🆕 Guardar morada de guest no servidor após login
+  // Guardar morada de guest no servidor após login
   const saveGuestAddressToServer = async (address) => {
     try {
       const { data } = await axios.post('/api/address/add', { address });
@@ -173,31 +175,25 @@ const Cart = () => {
     return errors;
   };
 
-  // 🆕 Obter morada atual (user ou guest)
+  // Obter morada atual (user ou guest)
   const getCurrentAddress = () => {
     if (user && selectedAddress) return selectedAddress;
     if (guestAddress) return guestAddress;
     return null;
   };
 
-  // 🆕 Verificar se tem morada
+  // Verificar se tem morada
   const hasAddress = () => {
     return !!(user ? selectedAddress : guestAddress);
   };
 
+  // =============================================================================
+  // 🆕 HANDLE PLACE ORDER - SUPORTA GUEST CHECKOUT COMPLETO
+  // =============================================================================
   const handlePlaceOrder = async () => {
-    // 🆕 Se não está logado, pedir login AGORA (após ter morada)
-    if (!user) {
-      // Guardar morada no localStorage para usar após login
-      if (guestAddress) {
-        localStorage.setItem('guest_checkout_address', JSON.stringify(guestAddress));
-      }
-      toast('Por favor, inicie sessão para finalizar a compra', { icon: '🔐' });
-      setShowUserLogin(true);
-      return;
-    }
-
-    if (!selectedAddress) {
+    const currentAddress = getCurrentAddress();
+    
+    if (!currentAddress) {
       return toast.error('Por favor, adicione uma morada de entrega.');
     }
     if (cartArray.length === 0) {
@@ -211,18 +207,18 @@ const Cart = () => {
     }
 
     setIsProcessing(true);
+    
     try {
       const subtotal = parseFloat(getCartAmount());
       const discountAmount = discountApplied ? subtotal * 0.3 : 0;
       const finalAmount = subtotal - discountAmount;
 
+      // 🆕 Preparar dados base do pedido
       const orderData = {
-        userId: user._id,
         items: cartArray.map(item => ({
           product: item._id,
           quantity: item.quantity,
         })),
-        address: selectedAddress._id,
         originalAmount: subtotal,
         amount: finalAmount,
         discountAmount: discountAmount,
@@ -233,19 +229,59 @@ const Cart = () => {
         isPaid: false,
       };
 
-      const response = await axios.post('/api/order/stripe', orderData);
+      let endpoint;
+      let addressId;
+
+      if (user) {
+        // ========== USER AUTENTICADO ==========
+        orderData.userId = user._id;
+        orderData.address = selectedAddress._id;
+        orderData.isGuestOrder = false;
+        endpoint = '/api/order/stripe';
+        
+      } else {
+        // ========== GUEST CHECKOUT ==========
+        // Primeiro, criar/guardar a morada temporariamente
+        const addressResponse = await axios.post('/api/address/guest', { 
+          address: currentAddress 
+        });
+        
+        if (!addressResponse.data.success) {
+          throw new Error(addressResponse.data.message || 'Erro ao guardar morada');
+        }
+        
+        addressId = addressResponse.data.addressId;
+        
+        orderData.isGuestOrder = true;
+        orderData.guestEmail = currentAddress.email;
+        orderData.guestName = `${currentAddress.firstName} ${currentAddress.lastName}`;
+        orderData.guestPhone = currentAddress.phone;
+        orderData.address = addressId;
+        endpoint = '/api/order/guest/stripe';
+      }
+
+      const response = await axios.post(endpoint, orderData);
 
       if (response.data.success && response.data.url) {
+        // Limpar carrinho local
         const emptyCart = {};
         setCartItems(emptyCart);
         saveCartToStorage(emptyCart);
+        
+        // 🆕 Guardar email de guest para página de sucesso
+        if (!user && currentAddress.email) {
+          localStorage.setItem('guest_checkout_email', currentAddress.email);
+        }
+        
+        // Redirecionar para Stripe
         window.location.replace(response.data.url);
       } else {
         toast.error(response.data.message || 'Falha ao inicializar o pagamento.');
       }
     } catch (error) {
       console.error('❌ Erro na encomenda:', error);
-      if (error.response?.status === 401) {
+      
+      if (error.response?.status === 401 && user) {
         toast.error('Sessão expirada. Por favor, inicie sessão novamente.');
         if (isMobile) localStorage.removeItem('mobile_auth_token');
         setShowUserLogin(true);
@@ -274,7 +310,7 @@ const Cart = () => {
 
   const getPaymentButtonText = () => {
     if (isProcessing) return 'A Processar...';
-    if (!user) return 'Continuar para Pagamento';
+    
     switch (paymentMethod) {
       case 'mbway': return 'Pagar com MB Way';
       case 'multibanco': return 'Gerar Referência Multibanco';
@@ -282,7 +318,7 @@ const Cart = () => {
     }
   };
 
-  // 🆕 Handler para guardar morada
+  // Handler para guardar morada
   const handleSaveAddress = async (addressData) => {
     setIsAddressLoading(true);
     
@@ -290,14 +326,12 @@ const Cart = () => {
       if (user) {
         // User logado - guardar no servidor
         if (editingAddress) {
-          // Atualizar morada existente
           const { data } = await axios.put(`/api/address/update/${editingAddress._id}`, { address: addressData });
           if (data.success) {
             toast.success('Morada atualizada!');
             loadUserAddresses();
           }
         } else {
-          // Criar nova morada
           const { data } = await axios.post('/api/address/add', { address: addressData });
           if (data.success) {
             toast.success('Morada adicionada!');
@@ -305,10 +339,10 @@ const Cart = () => {
           }
         }
       } else {
-        // 🆕 Guest - guardar no localStorage
+        // Guest - guardar no localStorage
         setGuestAddress(addressData);
         localStorage.setItem('guest_checkout_address', JSON.stringify(addressData));
-        toast.success('Morada adicionada! Continue para finalizar.');
+        toast.success('Morada adicionada!');
       }
       
       setShowAddressModal(false);
@@ -321,13 +355,13 @@ const Cart = () => {
     }
   };
 
-  // 🆕 Abrir modal para adicionar morada
+  // Abrir modal para adicionar morada
   const handleAddAddress = () => {
     setEditingAddress(null);
     setShowAddressModal(true);
   };
 
-  // 🆕 Abrir modal para editar morada
+  // Abrir modal para editar morada
   const handleEditAddress = (address) => {
     setEditingAddress(address);
     setShowAddressModal(true);
@@ -345,7 +379,7 @@ const Cart = () => {
     return brightness > 200;
   };
 
-  // Componente para renderizar bolinha de cor (simples ou dupla)
+  // Componente para renderizar bolinha de cor
   const ColorBall = ({ code1, code2, size = 24, title }) => {
     const isDual = code2 && code2 !== code1;
     const isLight1 = isLightColor(code1);
@@ -400,7 +434,7 @@ const Cart = () => {
     <>
       <SEO title={seoConfig.cart.title} description={seoConfig.cart.description} url={seoConfig.cart.url} noindex={true} />
 
-      {/* 🆕 Modal de Morada */}
+      {/* Modal de Morada */}
       <AddressFormModal
         isOpen={showAddressModal}
         onClose={() => {
@@ -414,7 +448,7 @@ const Cart = () => {
       />
 
       <div className='container mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-50 min-h-[calc(100vh-60px)]'>
-        {/* 🆕 Progress Steps */}
+        {/* Progress Steps */}
         <div className='max-w-2xl mx-auto mb-8'>
           <div className='flex items-center justify-center'>
             <div className='flex items-center'>
@@ -434,14 +468,14 @@ const Cart = () => {
                 Morada
               </span>
             </div>
-            <div className={`w-16 h-1 mx-3 rounded ${user && hasAddress() ? 'bg-primary' : 'bg-gray-300'}`}></div>
+            <div className={`w-16 h-1 mx-3 rounded ${hasAddress() ? 'bg-primary' : 'bg-gray-300'}`}></div>
             <div className='flex items-center'>
               <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
-                user && hasAddress() ? 'bg-primary text-white' : 'bg-gray-300 text-gray-500'
+                hasAddress() ? 'bg-primary text-white' : 'bg-gray-300 text-gray-500'
               }`}>
                 3
               </div>
-              <span className={`ml-2 text-sm font-medium ${user && hasAddress() ? 'text-primary' : 'text-gray-500'}`}>
+              <span className={`ml-2 text-sm font-medium ${hasAddress() ? 'text-primary' : 'text-gray-500'}`}>
                 Pagamento
               </span>
             </div>
@@ -561,7 +595,20 @@ const Cart = () => {
             <div className='bg-white rounded-xl shadow-lg p-6 sticky lg:top-8'>
               <h2 className='text-2xl font-bold mb-5 text-gray-800'>Finalizar Compra</h2>
 
-              {/* 🆕 Address Section - Redesigned */}
+              {/* 🆕 Guest Checkout Banner */}
+              {!user && (
+                <div className='mb-4 p-3 bg-green-50 border border-green-200 rounded-lg'>
+                  <div className='flex items-center gap-2 text-green-800'>
+                    <Shield className='w-5 h-5' />
+                    <span className='font-medium text-sm'>Compre sem criar conta!</span>
+                  </div>
+                  <p className='text-xs text-green-700 mt-1'>
+                    Complete a compra rapidamente. Pode criar conta depois.
+                  </p>
+                </div>
+              )}
+
+              {/* Address Section */}
               <div className='mb-6 border-b pb-6 border-gray-200'>
                 <div className='flex items-center gap-2 mb-4'>
                   <MapPin className='w-5 h-5 text-primary' />
@@ -569,7 +616,6 @@ const Cart = () => {
                 </div>
 
                 {currentAddress ? (
-                  // 🆕 Morada existente
                   <div className='space-y-3'>
                     <div className='bg-primary/5 border-2 border-primary/20 p-4 rounded-xl'>
                       <div className='flex justify-between items-start'>
@@ -581,6 +627,9 @@ const Cart = () => {
                           <p>{currentAddress.city}, {currentAddress.state} {currentAddress.zipcode}</p>
                           <p>{currentAddress.country}</p>
                           <p className='mt-1 text-gray-500'>{currentAddress.phone}</p>
+                          {!user && currentAddress.email && (
+                            <p className='mt-1 text-primary font-medium'>{currentAddress.email}</p>
+                          )}
                         </div>
                         <button
                           onClick={() => handleEditAddress(currentAddress)}
@@ -638,7 +687,6 @@ const Cart = () => {
                     )}
                   </div>
                 ) : (
-                  // 🆕 Sem morada - CTA para adicionar
                   <div className='text-center py-4'>
                     <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3'>
                       <MapPin className='w-8 h-8 text-gray-400' />
@@ -656,12 +704,6 @@ const Cart = () => {
                       <Plus className='w-5 h-5' />
                       Adicionar Morada
                     </button>
-                    
-                    {!user && (
-                      <p className='text-xs text-gray-500 mt-3'>
-                        💡 Pode continuar sem conta
-                      </p>
-                    )}
                   </div>
                 )}
               </div>
@@ -690,7 +732,7 @@ const Cart = () => {
                 </div>
               </div>
 
-              {/* Payment Method Selection - Só mostrar se tem morada */}
+              {/* Payment Method Selection - Mostrar sempre que tem morada */}
               {hasAddress() && (
                 <div className='mb-6 border-b pb-6 border-gray-200'>
                   <h3 className='font-semibold text-gray-700 mb-3'>Método de Pagamento</h3>
@@ -795,13 +837,11 @@ const Cart = () => {
                 className={`w-full mt-8 py-3.5 rounded-xl font-bold text-white text-lg shadow-md transition-all duration-300 flex items-center justify-center gap-2
                   ${isProcessing || !hasAddress() || cartArray.length === 0 || Object.keys(stockWarnings).length > 0
                     ? 'bg-gray-400 cursor-not-allowed'
-                    : !user 
-                      ? 'bg-green-600 hover:bg-green-700'
-                      : paymentMethod === 'mbway' 
-                        ? 'bg-red-600 hover:bg-red-700'
-                        : paymentMethod === 'multibanco' 
-                          ? 'bg-blue-600 hover:bg-blue-700'
-                          : 'bg-indigo-600 hover:bg-indigo-700'
+                    : paymentMethod === 'mbway' 
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : paymentMethod === 'multibanco' 
+                        ? 'bg-blue-600 hover:bg-blue-700'
+                        : 'bg-indigo-600 hover:bg-indigo-700'
                   }`}
               >
                 {isProcessing ? (
@@ -816,28 +856,26 @@ const Cart = () => {
                   <span>Adicione uma morada</span>
                 ) : (
                   <>
-                    {!user ? (
-                      <>
-                        <Shield className='w-5 h-5' />
-                        <span>Continuar para Pagamento</span>
-                      </>
-                    ) : (
-                      <>
-                        {paymentMethod === 'mbway' && <img src='/mbway.png' alt='MB Way' className='w-6 h-6 object-contain' />}
-                        {paymentMethod === 'multibanco' && <img src='/multibanco.png' alt='Multibanco' className='w-6 h-6 object-contain' />}
-                        {paymentMethod === 'card' && <CreditCard className='w-5 h-5' />}
-                        <span>{getPaymentButtonText()}</span>
-                      </>
-                    )}
+                    {paymentMethod === 'mbway' && <img src='/mbway.png' alt='MB Way' className='w-6 h-6 object-contain' />}
+                    {paymentMethod === 'multibanco' && <img src='/multibanco.png' alt='Multibanco' className='w-6 h-6 object-contain' />}
+                    {paymentMethod === 'card' && <CreditCard className='w-5 h-5' />}
+                    <span>{getPaymentButtonText()}</span>
                   </>
                 )}
               </button>
 
-              {/* Info text */}
-              {hasAddress() && !user && (
-                <p className='mt-3 text-center text-sm text-gray-500'>
-                  🔐 Será pedido login antes do pagamento
-                </p>
+              {/* Login prompt para guests */}
+              {!user && hasAddress() && (
+                <div className='mt-4 text-center'>
+                  <p className='text-sm text-gray-500 mb-2'>Já tem conta?</p>
+                  <button
+                    onClick={() => setShowUserLogin(true)}
+                    className='text-primary font-medium hover:underline flex items-center justify-center gap-1 mx-auto'
+                  >
+                    <User className='w-4 h-4' />
+                    Iniciar sessão
+                  </button>
+                </div>
               )}
 
               {/* Trust Badges */}

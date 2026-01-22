@@ -6,7 +6,7 @@ import axios from 'axios';
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = import.meta.env.VITE_BACKEND_URL;
 
-// ⭐ DEBUG - Mas apenas em desenvolvimento
+// DEBUG - Apenas em desenvolvimento
 if (import.meta.env.DEV) {
   console.log('🔧 Backend URL:', import.meta.env.VITE_BACKEND_URL);
 }
@@ -23,12 +23,12 @@ export const AppContextProvider = ({ children }) => {
   const [isSeller, setIsSeller] = useState(false);
   const [showUserLogin, setShowUserLogin] = useState(false);
   const [products, setProducts] = useState([]);
-  const [familyCache, setFamilyCache] = useState({}); // 🆕 Cache de famílias de produtos
+  const [familyCache, setFamilyCache] = useState({});
   const [cartItems, setCartItems] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [showCartSidebar, setShowCartSidebar] = useState(false);
   
-  // ✅ OTIMIZADO: isLoading começa false - site carrega imediato
+  // OTIMIZADO: isLoading começa false - site carrega imediato
   const [isLoading, setIsLoading] = useState(false);
   const [isSellerLoading, setIsSellerLoading] = useState(true);
 
@@ -72,6 +72,8 @@ export const AppContextProvider = ({ children }) => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('cart_items');
     localStorage.removeItem('user_data');
+    localStorage.removeItem('guest_checkout_email');
+    localStorage.removeItem('guest_checkout_address');
     delete axios.defaults.headers.common['Authorization'];
   };
 
@@ -99,10 +101,14 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // ✅ OTIMIZADO: fetchUser sem setIsLoading global
+  // 🆕 Detectar se é mobile
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+
+  // OTIMIZADO: fetchUser sem setIsLoading global
   const fetchUser = async () => {
     try {
-      // First, try to get user with existing session/cookie
       let response = await axios.get('/api/user/is-auth');
 
       if (response.data.success) {
@@ -118,7 +124,6 @@ export const AppContextProvider = ({ children }) => {
         return;
       }
 
-      // If cookie auth failed, try with stored token
       const storedToken = getStoredToken();
       if (storedToken) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
@@ -138,7 +143,6 @@ export const AppContextProvider = ({ children }) => {
         }
       }
 
-      // Try to load from localStorage as fallback
       const savedUser = loadUserFromStorage();
       const savedCart = loadCartFromStorage();
 
@@ -182,7 +186,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // ✅ OTIMIZADO: Logout do Seller centralizado
+  // Logout do Seller centralizado
   const logoutSeller = async () => {
     try {
       await axios.get('/api/seller/logout');
@@ -197,7 +201,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // ✅ OTIMIZADO: Fetch Seller só quando necessário
+  // Fetch Seller só quando necessário
   const fetchSeller = async () => {
     try {
       setIsSellerLoading(true);
@@ -245,15 +249,13 @@ export const AppContextProvider = ({ children }) => {
   };
 
   // =============================================================================
-  // 🆕 FUNÇÕES DE STOCK
+  // FUNÇÕES DE STOCK
   // =============================================================================
 
-  // 🎯 Função auxiliar para encontrar produto (em products OU familyCache)
+  // Função auxiliar para encontrar produto
   const findProduct = (productId) => {
-    // Primeiro procura nos produtos principais
     let product = products.find(p => p._id === productId);
     
-    // Se não encontrou, procura no cache de famílias (variantes)
     if (!product) {
       for (const familySlug in familyCache) {
         const familyProduct = familyCache[familySlug].find(p => p._id === productId);
@@ -267,13 +269,13 @@ export const AppContextProvider = ({ children }) => {
     return product;
   };
 
-  // 🎯 Obter stock disponível de um produto
+  // Obter stock disponível de um produto
   const getAvailableStock = (productId) => {
     const product = findProduct(productId);
     return product?.stock || 0;
   };
 
-  // 🎯 Validar se pode adicionar ao carrinho
+  // Validar se pode adicionar ao carrinho
   const canAddToCart = (productId, quantityToAdd = 1) => {
     const product = findProduct(productId);
     
@@ -282,14 +284,12 @@ export const AppContextProvider = ({ children }) => {
     }
     
     const currentInCart = cartItems[productId] || 0;
-    const availableStock = product.stock !== undefined ? product.stock : 999; // Compatibilidade: se não tem stock definido, assume disponível
+    const availableStock = product.stock !== undefined ? product.stock : 999;
     
-    // Se stock é 0, não pode adicionar
     if (availableStock === 0) {
       return { can: false, reason: 'Produto esgotado' };
     }
     
-    // Se vai exceder o stock disponível
     if (currentInCart + quantityToAdd > availableStock) {
       return { 
         can: false, 
@@ -301,14 +301,13 @@ export const AppContextProvider = ({ children }) => {
   };
 
   // =============================================================================
-  // 🆕 FUNÇÃO PARA BUSCAR FAMÍLIA DE PRODUTOS (VARIANTES DE COR)
+  // FUNÇÕES DE FAMÍLIA/VARIANTES
   // =============================================================================
 
-  // 🎯 Buscar todos os produtos de uma família (com cache)
+  // Buscar todos os produtos de uma família (com cache)
   const getProductFamily = async (familySlug) => {
     if (!familySlug) return [];
     
-    // Se já está em cache, retornar
     if (familyCache[familySlug]) {
       return familyCache[familySlug];
     }
@@ -317,7 +316,6 @@ export const AppContextProvider = ({ children }) => {
       const { data } = await axios.post('/api/product/family', { familySlug });
       
       if (data.success && data.products) {
-        // Guardar em cache
         setFamilyCache(prev => ({
           ...prev,
           [familySlug]: data.products
@@ -331,7 +329,7 @@ export const AppContextProvider = ({ children }) => {
     }
   };
 
-  // 🎯 Limpar cache de uma família (quando produto é atualizado)
+  // Limpar cache de uma família
   const clearFamilyCache = (familySlug) => {
     if (familySlug) {
       setFamilyCache(prev => {
@@ -340,17 +338,15 @@ export const AppContextProvider = ({ children }) => {
         return newCache;
       });
     } else {
-      // Limpar todo o cache
       setFamilyCache({});
     }
   };
 
   // =============================================================================
-  // 🆕 CART OPERATIONS COM VALIDAÇÃO DE STOCK
+  // CART OPERATIONS COM VALIDAÇÃO DE STOCK
   // =============================================================================
 
   const addToCart = async itemId => {
-    // 🆕 Validar stock antes de adicionar
     const validation = canAddToCart(itemId, 1);
     
     if (!validation.can) {
@@ -370,7 +366,6 @@ export const AppContextProvider = ({ children }) => {
     saveCartToStorage(newCartItems);
     toast.success('Adicionado ao carrinho');
     
-    // ✅ Abrir sidebar do carrinho
     setShowCartSidebar(true);
 
     if (user) {
@@ -391,10 +386,8 @@ export const AppContextProvider = ({ children }) => {
       delete newCartItems[itemId];
       toast.success('Produto removido do carrinho');
     } else {
-      // 🆕 Validar stock antes de atualizar
       const availableStock = getAvailableStock(itemId);
       
-      // Se o produto tem stock definido e a quantidade excede
       if (availableStock > 0 && quantity > availableStock) {
         toast.error(`Apenas ${availableStock} unidade(s) disponível(eis)`);
         return false;
@@ -456,7 +449,7 @@ export const AppContextProvider = ({ children }) => {
   const getCartAmount = () => {
     let totalAmount = 0;
     for (const items in cartItems) {
-      let itemInfo = findProduct(items); // 🆕 Usar findProduct para encontrar variantes
+      let itemInfo = findProduct(items);
       if (itemInfo && cartItems[items] > 0) {
         totalAmount += itemInfo.offerPrice * cartItems[items];
       }
@@ -495,10 +488,9 @@ export const AppContextProvider = ({ children }) => {
     };
   }, []);
 
-  // ✅ OTIMIZADO: Inicialização rápida
+  // Inicialização rápida
   useEffect(() => {
     const initializeApp = async () => {
-      // 1. Carregar dados locais IMEDIATAMENTE (sem await)
       const token = getStoredToken();
       if (token) {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -512,13 +504,9 @@ export const AppContextProvider = ({ children }) => {
         setUser(savedUser);
       }
 
-      // 2. Buscar produtos (não bloqueia)
       fetchProducts();
-
-      // 3. Verificar usuário em background
       fetchUser();
 
-      // 4. ✅ MELHORADO: Verificar seller com cache de sessionStorage
       if (window.location.pathname.startsWith('/seller')) {
         const sellerCached = sessionStorage.getItem('seller_authenticated');
         
@@ -540,7 +528,7 @@ export const AppContextProvider = ({ children }) => {
     initializeApp();
   }, []);
 
-  // ✅ Verificar seller apenas na primeira vez que entra na área de seller
+  // Verificar seller apenas na primeira vez que entra na área de seller
   useEffect(() => {
     if (location.pathname.startsWith('/seller') && !isSeller && isSellerLoading) {
       fetchSeller();
@@ -592,14 +580,15 @@ export const AppContextProvider = ({ children }) => {
     setAuthToken,
     isLoading,
     isSellerLoading,
+    isMobile,
     saveCartToStorage,
     loadCartFromStorage,
     saveUserToStorage,
-    // 🆕 FUNÇÕES DE STOCK
+    // Funções de stock
     getAvailableStock,
     canAddToCart,
-    findProduct, // 🆕 Encontrar produto em products ou familyCache
-    // 🆕 FUNÇÕES DE FAMÍLIA/VARIANTES
+    findProduct,
+    // Funções de família/variantes
     getProductFamily,
     clearFamilyCache,
     familyCache,

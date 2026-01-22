@@ -1,5 +1,5 @@
 // server/controllers/orderController.js
-// 🎯 VERSÃO COM SUPORTE A STOCK + MB WAY + MULTIBANCO
+// 🎯 VERSÃO COM SUPORTE A STOCK + MB WAY + MULTIBANCO + GUEST CHECKOUT
 
 import { sendOrderConfirmationEmail } from '../services/emailService.js';
 import Order from '../models/Order.js';
@@ -84,23 +84,58 @@ const validateOrderStock = async (items) => {
 };
 
 // =============================================================================
-// FUNÇÃO PARA ENVIAR EMAIL AO CLIENTE
+// 🆕 FUNÇÃO PARA ENVIAR EMAIL - SUPORTA USER E GUEST
 // =============================================================================
-const sendClientEmail = async (order, userId) => {
+const sendClientEmail = async (order, userOrEmail) => {
   try {
     console.log('📧 Preparando email para cliente...');
     
-    const user = await User.findById(userId);
+    let user = null;
+    let email = null;
+    let customerName = null;
+    
+    // Determinar se é user registado ou guest
+    if (typeof userOrEmail === 'string') {
+      // É um email de guest
+      email = userOrEmail;
+      customerName = order.guestName || 'Cliente';
+    } else if (userOrEmail?._id) {
+      // É um objeto user
+      user = userOrEmail;
+      email = user.email;
+      customerName = user.name;
+    } else if (userOrEmail) {
+      // É um userId string
+      user = await User.findById(userOrEmail);
+      if (user) {
+        email = user.email;
+        customerName = user.name;
+      }
+    }
+    
+    // Se é guest order, usar dados do pedido
+    if (order.isGuestOrder && !email) {
+      email = order.guestEmail;
+      customerName = order.guestName || 'Cliente';
+    }
+
     const address = await Address.findById(order.address);
     const productIds = order.items.map(item => item.product);
     const products = await Product.find({ _id: { $in: productIds } });
 
-    if (!user || !address) {
+    if (!email || !address) {
       console.error('❌ Dados insuficientes para enviar email');
       return;
     }
 
-    const emailResult = await sendOrderConfirmationEmail(order, user, products, address);
+    // Criar objeto user fake para o template de email se for guest
+    const emailUser = user || {
+      _id: 'guest',
+      name: customerName,
+      email: email
+    };
+
+    const emailResult = await sendOrderConfirmationEmail(order, emailUser, products, address);
     
     if (emailResult.success) {
       console.log('✅ Email de confirmação enviado para:', emailResult.recipient);
@@ -108,10 +143,11 @@ const sendClientEmail = async (order, userId) => {
       console.error('❌ Falha no email:', emailResult.error);
     }
 
+    // Notificação admin
     if (notifyAdminNewOrder) {
       try {
         console.log('🔔 Enviando notificação para admin...');
-        const adminResult = await notifyAdminNewOrder(order, user, products, address);
+        const adminResult = await notifyAdminNewOrder(order, emailUser, products, address);
         console.log('🔔 Resultado notificação admin:', adminResult);
       } catch (adminError) {
         console.error('❌ Erro na notificação admin (não crítico):', adminError.message);
@@ -124,7 +160,7 @@ const sendClientEmail = async (order, userId) => {
 };
 
 // =============================================================================
-// PLACE ORDER COD
+// 🆕 PLACE ORDER COD - SUPORTA GUEST
 // =============================================================================
 export const placeOrderCOD = async (req, res) => {
   try {
@@ -137,13 +173,27 @@ export const placeOrderCOD = async (req, res) => {
       discountAmount,
       discountPercentage,
       promoCode,
+      // 🆕 Campos de guest
+      isGuestOrder,
+      guestEmail,
+      guestName,
+      guestPhone,
     } = req.body;
 
     if (!address || items.length === 0) {
-      return res.json({ success: false, message: 'Invalid data' });
+      return res.json({ success: false, message: 'Dados inválidos' });
     }
 
-    // 🆕 VALIDAR STOCK ANTES DE CRIAR PEDIDO
+    // 🆕 Validar: precisa de userId OU dados de guest
+    if (!userId && !isGuestOrder) {
+      return res.json({ success: false, message: 'Utilizador ou dados de guest necessários' });
+    }
+
+    if (isGuestOrder && !guestEmail) {
+      return res.json({ success: false, message: 'Email é obrigatório para guest checkout' });
+    }
+
+    // Validar stock
     const stockValidation = await validateOrderStock(items);
     if (!stockValidation.valid) {
       return res.json({ 
@@ -152,8 +202,8 @@ export const placeOrderCOD = async (req, res) => {
       });
     }
 
-    const newOrder = await Order.create({
-      userId,
+    // 🆕 Criar pedido com suporte a guest
+    const orderData = {
       items,
       amount,
       address,
@@ -163,25 +213,42 @@ export const placeOrderCOD = async (req, res) => {
       discountAmount: discountAmount || 0,
       discountPercentage: discountPercentage || 0,
       originalAmount,
-    });
+    };
 
-    console.log('✅ Pedido COD criado:', newOrder._id);
+    if (isGuestOrder) {
+      orderData.isGuestOrder = true;
+      orderData.guestEmail = guestEmail;
+      orderData.guestName = guestName || '';
+      orderData.guestPhone = guestPhone || '';
+      orderData.userId = null;
+    } else {
+      orderData.userId = userId;
+      orderData.isGuestOrder = false;
+    }
 
-    // 🆕 DECREMENTAR STOCK (COD decrementa imediatamente pois é confirmado)
+    const newOrder = await Order.create(orderData);
+
+    console.log(`✅ Pedido COD criado (${isGuestOrder ? 'GUEST' : 'USER'}):`, newOrder._id);
+
+    // Decrementar stock
     await decrementProductStock(items);
 
-    // Clear user cart
-    await User.findByIdAndUpdate(userId, { cartItems: {} });
+    // Limpar carrinho do user (se não for guest)
+    if (userId) {
+      await User.findByIdAndUpdate(userId, { cartItems: {} });
+    }
 
-    // Enviar email em background
-    sendClientEmail(newOrder, userId).catch(err => {
+    // Enviar email
+    const emailRecipient = isGuestOrder ? guestEmail : userId;
+    sendClientEmail(newOrder, emailRecipient).catch(err => {
       console.error('❌ Erro no envio de email (background):', err.message);
     });
 
     return res.json({
       success: true,
-      message: 'Order Placed Successfully',
+      message: 'Encomenda realizada com sucesso',
       orderId: newOrder._id,
+      isGuestOrder: isGuestOrder || false,
     });
   } catch (error) {
     console.error('❌ Erro COD:', error);
@@ -190,7 +257,7 @@ export const placeOrderCOD = async (req, res) => {
 };
 
 // =============================================================================
-// PLACE ORDER STRIPE
+// 🆕 PLACE ORDER STRIPE - SUPORTA GUEST
 // =============================================================================
 export const placeOrderStripe = async (req, res) => {
   console.log('🚀 STRIPE FUNCTION STARTED!!!');
@@ -206,15 +273,29 @@ export const placeOrderStripe = async (req, res) => {
       discountPercentage,
       promoCode,
       paymentMethod,
+      // 🆕 Campos de guest
+      isGuestOrder,
+      guestEmail,
+      guestName,
+      guestPhone,
     } = req.body;
 
     const { origin } = req.headers;
 
     if (!address || items.length === 0) {
-      return res.json({ success: false, message: 'Invalid data' });
+      return res.json({ success: false, message: 'Dados inválidos' });
     }
 
-    // 🆕 VALIDAR STOCK ANTES DE CRIAR PEDIDO
+    // 🆕 Validar: precisa de userId OU dados de guest
+    if (!userId && !isGuestOrder) {
+      return res.json({ success: false, message: 'Utilizador ou dados de guest necessários' });
+    }
+
+    if (isGuestOrder && !guestEmail) {
+      return res.json({ success: false, message: 'Email é obrigatório para guest checkout' });
+    }
+
+    // Validar stock
     const stockValidation = await validateOrderStock(items);
     if (!stockValidation.valid) {
       return res.json({ 
@@ -234,8 +315,8 @@ export const placeOrderStripe = async (req, res) => {
       });
     }
 
-    const order = await Order.create({
-      userId,
+    // 🆕 Criar pedido com suporte a guest
+    const orderData = {
       items,
       amount,
       address,
@@ -245,9 +326,22 @@ export const placeOrderStripe = async (req, res) => {
       discountAmount: discountAmount || 0,
       discountPercentage: discountPercentage || 0,
       originalAmount,
-    });
+    };
 
-    console.log('✅ Pedido Stripe criado:', order._id);
+    if (isGuestOrder) {
+      orderData.isGuestOrder = true;
+      orderData.guestEmail = guestEmail;
+      orderData.guestName = guestName || '';
+      orderData.guestPhone = guestPhone || '';
+      orderData.userId = null;
+    } else {
+      orderData.userId = userId;
+      orderData.isGuestOrder = false;
+    }
+
+    const order = await Order.create(orderData);
+
+    console.log(`✅ Pedido Stripe criado (${isGuestOrder ? 'GUEST' : 'USER'}):`, order._id);
 
     // Stripe Gateway
     const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
@@ -287,18 +381,26 @@ export const placeOrderStripe = async (req, res) => {
         break;
     }
 
+    // 🆕 Incluir dados de guest no metadata
     const sessionOptions = {
       line_items,
       mode: 'payment',
       payment_method_types,
-      success_url: `${origin}/order-success/${order._id}?payment=stripe&method=${paymentMethod || 'card'}`,
+      success_url: `${origin}/order-success/${order._id}?payment=stripe&method=${paymentMethod || 'card'}${isGuestOrder ? '&guest=true' : ''}`,
       cancel_url: `${origin}/cart`,
       metadata: {
         orderId: order._id.toString(),
-        userId,
+        userId: userId || '',
         paymentMethod: paymentMethod || 'card',
+        isGuestOrder: isGuestOrder ? 'true' : 'false',
+        guestEmail: guestEmail || '',
       },
     };
+
+    // 🆕 Pre-fill email para guest
+    if (isGuestOrder && guestEmail) {
+      sessionOptions.customer_email = guestEmail;
+    }
 
     if (paymentMethod === 'mbway') {
       sessionOptions.payment_method_options = { mb_way: {} };
@@ -320,7 +422,7 @@ export const placeOrderStripe = async (req, res) => {
 };
 
 // =============================================================================
-// STRIPE WEBHOOKS - 🆕 COM DECREMENTO DE STOCK
+// STRIPE WEBHOOKS - 🆕 COM SUPORTE A GUEST
 // =============================================================================
 export const stripeWebhooks = async (request, response) => {
   const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
@@ -344,7 +446,7 @@ export const stripeWebhooks = async (request, response) => {
       const session = event.data.object;
       console.log('✅ Checkout Session Completed:', session.id);
       
-      const { orderId, userId, paymentMethod } = session.metadata;
+      const { orderId, userId, paymentMethod, isGuestOrder, guestEmail } = session.metadata;
       
       if (session.payment_status === 'paid') {
         console.log(`💳 Pagamento ${paymentMethod} confirmado para pedido:`, orderId);
@@ -357,17 +459,20 @@ export const stripeWebhooks = async (request, response) => {
         
         console.log('✅ Pedido marcado como pago:', orderId);
         
-        // 🆕 DECREMENTAR STOCK APÓS PAGAMENTO CONFIRMADO
+        // Decrementar stock
         if (updatedOrder) {
           await decrementProductStock(updatedOrder.items);
         }
         
-        // Clear user cart
-        await User.findByIdAndUpdate(userId, { cartItems: {} });
+        // Limpar carrinho (apenas se não for guest)
+        if (userId && isGuestOrder !== 'true') {
+          await User.findByIdAndUpdate(userId, { cartItems: {} });
+        }
 
         // Enviar email
         if (updatedOrder) {
-          sendClientEmail(updatedOrder, userId).catch(err => {
+          const emailRecipient = isGuestOrder === 'true' ? guestEmail : userId;
+          sendClientEmail(updatedOrder, emailRecipient).catch(err => {
             console.error('❌ Erro no email Stripe (background):', err.message);
           });
         }
@@ -393,7 +498,7 @@ export const stripeWebhooks = async (request, response) => {
           break;
         }
 
-        const { orderId, userId, paymentMethod } = session.data[0].metadata;
+        const { orderId, userId, paymentMethod, isGuestOrder, guestEmail } = session.data[0].metadata;
         
         const updatedOrder = await Order.findByIdAndUpdate(
           orderId, 
@@ -403,15 +508,20 @@ export const stripeWebhooks = async (request, response) => {
         
         console.log(`✅ Pedido ${paymentMethod} marcado como pago:`, orderId);
         
-        // 🆕 DECREMENTAR STOCK
+        // Decrementar stock
         if (updatedOrder) {
           await decrementProductStock(updatedOrder.items);
         }
         
-        await User.findByIdAndUpdate(userId, { cartItems: {} });
+        // Limpar carrinho (apenas se não for guest)
+        if (userId && isGuestOrder !== 'true') {
+          await User.findByIdAndUpdate(userId, { cartItems: {} });
+        }
 
+        // Enviar email
         if (updatedOrder) {
-          sendClientEmail(updatedOrder, userId).catch(err => {
+          const emailRecipient = isGuestOrder === 'true' ? guestEmail : userId;
+          sendClientEmail(updatedOrder, emailRecipient).catch(err => {
             console.error('❌ Erro no email Stripe (background):', err.message);
           });
         }
@@ -462,20 +572,34 @@ export const stripeWebhooks = async (request, response) => {
 };
 
 // =============================================================================
-// GET USER ORDERS
+// GET USER ORDERS - 🆕 SUPORTA BUSCA POR EMAIL (GUEST)
 // =============================================================================
 export const getUserOrders = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id || req.query.userId || req.body.userId;
+    const guestEmail = req.query.guestEmail || req.body.guestEmail;
 
-    if (!userId) {
-      return res.json({ success: false, message: 'User ID is required' });
+    // 🆕 Permitir buscar por guestEmail OU userId
+    let query;
+    
+    if (guestEmail) {
+      // Buscar pedidos de guest por email
+      query = {
+        isGuestOrder: true,
+        guestEmail: guestEmail,
+        $or: [{ paymentType: 'COD' }, { isPaid: true }],
+      };
+    } else if (userId) {
+      // Buscar pedidos de user registado
+      query = {
+        userId,
+        $or: [{ paymentType: 'COD' }, { isPaid: true }],
+      };
+    } else {
+      return res.json({ success: false, message: 'User ID ou Guest Email necessário' });
     }
 
-    const orders = await Order.find({
-      userId,
-      $or: [{ paymentType: 'COD' }, { isPaid: true }],
-    })
+    const orders = await Order.find(query)
       .populate({
         path: 'items.product',
         select: 'name image category offerPrice weight color colorCode',
@@ -489,6 +613,49 @@ export const getUserOrders = async (req, res) => {
     res.json({ success: true, orders });
   } catch (error) {
     console.error('❌ Erro ao buscar pedidos:', error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// =============================================================================
+// 🆕 GET SINGLE ORDER (PUBLIC - PARA PÁGINA DE SUCESSO)
+// =============================================================================
+export const getOrderById = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return res.json({ success: false, message: 'Order ID necessário' });
+    }
+
+    const order = await Order.findById(orderId)
+      .populate({
+        path: 'items.product',
+        select: 'name image category offerPrice weight color colorCode',
+      })
+      .populate({
+        path: 'address',
+        select: 'firstName lastName street city state zipcode country email phone',
+      });
+
+    if (!order) {
+      return res.json({ success: false, message: 'Pedido não encontrado' });
+    }
+
+    // Verificar se é um pedido válido para mostrar
+    const isValidOrder = order.paymentType === 'COD' || order.isPaid === true;
+
+    if (!isValidOrder) {
+      return res.json({ 
+        success: false, 
+        message: 'Pedido ainda não confirmado',
+        pending: true 
+      });
+    }
+
+    res.json({ success: true, order });
+  } catch (error) {
+    console.error('❌ Erro ao buscar pedido:', error);
     res.json({ success: false, message: error.message });
   }
 };
