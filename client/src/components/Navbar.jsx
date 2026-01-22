@@ -364,9 +364,11 @@ const Navbar = () => {
               isTransparent ? 'invert brightness-0 opacity-100' : 'opacity-80'
             }`}
           />
-          <button className='absolute -top-2 -right-3 text-xs text-white bg-primary w-[18px] h-[18px] rounded-full'>
-            {getCartCount()}
-          </button>
+          {getCartCount() > 0 && (
+            <span className='absolute -top-2 -right-3 text-xs text-white bg-primary w-[18px] h-[18px] rounded-full flex items-center justify-center'>
+              {getCartCount()}
+            </span>
+          )}
         </div>
 
         {/* ===== USER ACCOUNT - Ícone unificado ===== */}
@@ -454,9 +456,11 @@ const Navbar = () => {
               isTransparent ? 'invert brightness-0 opacity-100' : 'opacity-80'
             }`}
           />
-          <button className='absolute -top-2 -right-3 text-xs text-white bg-primary w-[18px] h-[18px] rounded-full'>
-            {getCartCount()}
-          </button>
+          {getCartCount() > 0 && (
+            <span className='absolute -top-2 -right-3 text-xs text-white bg-primary w-[18px] h-[18px] rounded-full flex items-center justify-center'>
+              {getCartCount()}
+            </span>
+          )}
         </div>
       </div>
 
