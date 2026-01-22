@@ -1,19 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { assets } from '../assets/assets';
 import { SEO } from '../components/seo';
 import seoConfig from '../components/seo/seoConfig';
+import { Loader2 } from 'lucide-react';
 
 const MyOrders = () => {
   const [myOrders, setMyOrders] = useState([]);
+  const [isLoading, setIsLoading] = useState(true); // ✅ NOVO: loading state
+  const [error, setError] = useState(null); // ✅ NOVO: error state
   const { currency, axios, user } = useAppContext();
 
-  // ✅ ATUALIZADO PARA FUNCIONAR COM STRIPE
-  const fetchMyOrders = async () => {
-    try {
-      console.log('🔍 Buscando pedidos para usuário:', user?._id);
+  // ✅ CORRIGIDO: useCallback para evitar re-criação da função
+  const fetchMyOrders = useCallback(async () => {
+    // ✅ Verificar se user existe e tem _id
+    if (!user?._id) {
+      console.log('❌ User não disponível ainda');
+      setIsLoading(false);
+      return;
+    }
 
-      // ✅ USANDO POST com userId para compatibilidade com backend
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('🔍 Buscando pedidos para usuário:', user._id);
+
       const { data } = await axios.post('/api/order/user', {
         userId: user._id,
       });
@@ -26,10 +38,10 @@ const MyOrders = () => {
         // ✅ FILTRAR PEDIDOS: COD (sempre) + Online (só se pagos)
         const validOrders = data.orders.filter(order => {
           if (order.paymentType === 'COD') {
-            return true; // COD sempre aparece
+            return true;
           }
           if (order.paymentType === 'Online') {
-            return order.isPaid === true; // Stripe só se pago
+            return order.isPaid === true;
           }
           return false;
         });
@@ -38,24 +50,39 @@ const MyOrders = () => {
         setMyOrders(validOrders);
       } else {
         console.error('❌ Erro ao buscar pedidos:', data.message);
+        setError(data.message || 'Erro ao carregar pedidos');
       }
     } catch (error) {
       console.error('❌ Erro na requisição de pedidos:', error);
       console.error('❌ Status do erro:', error.response?.status);
       console.error('❌ Dados do erro:', error.response?.data);
+      
+      // ✅ NOVO: Tratamento específico para erro de autenticação
+      if (error.response?.status === 401) {
+        setError('Sessão expirada. Por favor, faça login novamente.');
+      } else {
+        setError(error.response?.data?.message || 'Erro ao carregar pedidos');
+      }
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [user?._id, axios]);
 
-  // ✅ IGUAL AO CÓDIGO QUE FUNCIONA
+  // ✅ CORRIGIDO: Dependência correta e delay para garantir token configurado
   useEffect(() => {
-    if (user) {
+    if (user?._id) {
       console.log('👤 Usuário encontrado, buscando pedidos...');
-      fetchMyOrders();
+      // Pequeno delay para garantir que o token está configurado nos headers
+      const timer = setTimeout(() => {
+        fetchMyOrders();
+      }, 100);
+      return () => clearTimeout(timer);
     } else {
       console.log('❌ Usuário não encontrado');
       setMyOrders([]);
+      setIsLoading(false);
     }
-  }, [user]);
+  }, [user?._id, fetchMyOrders]);
 
   // ✅ FUNÇÃO PARA MOSTRAR STATUS DE PAGAMENTO
   const getPaymentStatusBadge = order => {
@@ -106,12 +133,10 @@ const MyOrders = () => {
 
   // ✅ FUNÇÃO PARA CALCULAR VALOR TOTAL EXIBIDO
   const getDisplayAmount = order => {
-    // Se tem valor final (com desconto), usar esse
     if (order.amount) {
       return order.amount.toFixed(2);
     }
 
-    // Fallback: calcular manualmente
     let total = 0;
     order.items.forEach(item => {
       if (item.product && item.product.offerPrice) {
@@ -119,10 +144,8 @@ const MyOrders = () => {
       }
     });
 
-    // Adicionar taxa de 2%
     total += Math.floor(total * 0.02);
 
-    // Aplicar desconto se houver
     if (order.discountAmount > 0) {
       total -= order.discountAmount;
     }
@@ -142,7 +165,7 @@ const MyOrders = () => {
     return brightness > 200;
   };
 
-  // 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+  // 🆕 Componente para renderizar bolinha de cor
   const ColorBall = ({ code1, code2, size = 22, title }) => {
     if (!code1) return null;
     
@@ -160,7 +183,6 @@ const MyOrders = () => {
         title={title}
       >
         {isDual ? (
-          // Bolinha dividida na diagonal
           <div 
             className='w-full h-full rounded-full overflow-hidden'
             style={{
@@ -168,7 +190,6 @@ const MyOrders = () => {
             }}
           />
         ) : (
-          // Bolinha simples
           <div 
             className='w-full h-full rounded-full'
             style={{ backgroundColor: code1 }}
@@ -180,7 +201,6 @@ const MyOrders = () => {
 
   return (
     <>
-      {/* SEO - Página privada, não indexar */}
       <SEO 
         title={seoConfig.myOrders.title}
         description={seoConfig.myOrders.description}
@@ -194,7 +214,32 @@ const MyOrders = () => {
             As Minhas Encomendas
           </h1>
 
-          {myOrders.length === 0 ? (
+          {/* ✅ NOVO: Loading State */}
+          {isLoading ? (
+            <div className='flex flex-col items-center justify-center min-h-[50vh] text-center'>
+              <Loader2 className='w-12 h-12 text-primary animate-spin mb-4' />
+              <p className='text-gray-600'>A carregar as suas encomendas...</p>
+            </div>
+          ) : error ? (
+            /* ✅ NOVO: Error State */
+            <div className='flex flex-col items-center justify-center min-h-[50vh] text-center'>
+              <div className='w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-4'>
+                <svg className='w-10 h-10 text-red-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' />
+                </svg>
+              </div>
+              <p className='text-xl font-semibold mb-3 text-gray-700'>
+                Ocorreu um erro
+              </p>
+              <p className='text-gray-600 mb-4'>{error}</p>
+              <button
+                onClick={fetchMyOrders}
+                className='px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dull transition-colors'
+              >
+                Tentar novamente
+              </button>
+            </div>
+          ) : myOrders.length === 0 ? (
             <div className='flex flex-col items-center justify-center min-h-[50vh] text-center'>
               <img
                 src={assets.empty_cart}
@@ -216,7 +261,7 @@ const MyOrders = () => {
                   key={order._id || orderIndex}
                   className='bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200'
                 >
-                  {/* Order Header - ATUALIZADO COM STRIPE INFO */}
+                  {/* Order Header */}
                   <div className='bg-primary-light/30 p-4 sm:p-5 border-b border-gray-200'>
                     <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3'>
                       <h3 className='text-lg sm:text-xl font-bold text-gray-800 mb-2 sm:mb-0'>
@@ -247,7 +292,6 @@ const MyOrders = () => {
                       <div className='text-left sm:text-right'>
                         <p className='text-sm text-gray-600'>Total:</p>
                         <div>
-                          {/* Mostrar desconto se aplicável */}
                           {order.originalAmount &&
                             order.originalAmount !== order.amount && (
                               <p className='text-sm text-gray-500 line-through'>
@@ -299,7 +343,7 @@ const MyOrders = () => {
                           key={item?.product?._id || itemIndex}
                           className='flex flex-col sm:flex-row items-center p-4 sm:p-5 gap-4'
                         >
-                          {/* 🆕 Product Image com bolinha de cor */}
+                          {/* Product Image com bolinha de cor */}
                           <div className='relative flex-shrink-0 w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 rounded-lg overflow-hidden border border-gray-200'>
                             <img
                               src={
@@ -309,7 +353,6 @@ const MyOrders = () => {
                               alt={item?.product?.name || 'Imagem do Produto'}
                               className='w-full h-full object-contain'
                             />
-                            {/* 🆕 Bolinha de Cor - Suporta Dual Colors */}
                             <ColorBall
                               code1={item?.product?.colorCode}
                               code2={item?.product?.colorCode2}
@@ -327,7 +370,6 @@ const MyOrders = () => {
                               Categoria: {item?.product?.category || 'N/D'}
                             </p>
                             
-                            {/* 🆕 Nome da Cor */}
                             {item?.product?.color && (
                               <p className='text-sm text-gray-600'>
                                 Cor: {item.product.color}
@@ -390,7 +432,7 @@ const MyOrders = () => {
                       ))}
                   </div>
 
-                  {/* Order Footer with Actions - NOVO */}
+                  {/* Order Footer */}
                   <div className='bg-gray-50 px-4 sm:px-5 py-3 border-t border-gray-200'>
                     <div className='flex flex-col sm:flex-row justify-between items-center gap-3'>
                       <div className='text-sm text-gray-600'>

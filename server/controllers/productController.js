@@ -96,6 +96,33 @@ export const getProductById = async (req, res) => {
   }
 };
 
+// 🆕 Get Products by IDs (múltiplos) : /api/product/by-ids
+export const getProductsByIds = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.json({ success: false, message: 'IDs array is required' });
+    }
+
+    // Limitar a 50 produtos por request para evitar abuse
+    const limitedIds = ids.slice(0, 50);
+
+    const products = await Product.find({ 
+      _id: { $in: limitedIds } 
+    });
+
+    res.json({ 
+      success: true, 
+      products,
+      count: products.length
+    });
+  } catch (error) {
+    console.error('Error fetching products by IDs:', error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
 // 🆕 Get Products by Family : /api/product/family
 export const getProductFamily = async (req, res) => {
   try {

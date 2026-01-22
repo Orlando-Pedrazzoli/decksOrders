@@ -369,44 +369,36 @@ const Navbar = () => {
           </button>
         </div>
 
-        {/* ===== USER ACCOUNT - BEST PRACTICE UX ===== */}
-        {!user ? (
-          // Logged Out: Botão Login simples
+        {/* ===== USER ACCOUNT - Ícone unificado ===== */}
+        <div className='relative group'>
           <button
-            onClick={() => setShowUserLogin(true)}
-            className={`cursor-pointer px-8 py-2 transition rounded-full ${
+            onClick={() => !user && setShowUserLogin(true)}
+            className={`relative p-2 rounded-full transition-all duration-200 cursor-pointer ${
               isTransparent 
-                ? 'bg-white text-gray-900 hover:bg-white/90' 
-                : 'bg-primary hover:bg-primary-dull text-white'
+                ? 'hover:bg-white/10' 
+                : 'hover:bg-gray-100'
             }`}
+            aria-label={user ? 'Minha conta' : 'Entrar'}
           >
-            Login
-          </button>
-        ) : (
-          // Logged In: Apenas ícone com indicador + dropdown
-          <div className='relative group'>
-            <button
-              className={`relative p-2 rounded-full transition-all duration-200 cursor-pointer ${
+            <User 
+              className={`w-6 h-6 transition-colors ${
                 isTransparent 
-                  ? 'hover:bg-white/10' 
-                  : 'hover:bg-gray-100'
+                  ? 'text-white' 
+                  : 'text-gray-700'
               }`}
-              aria-label='Minha conta'
-            >
-              {/* User Icon - Preenchido quando logado */}
-              <User 
-                className={`w-6 h-6 transition-colors ${
-                  isTransparent 
-                    ? 'text-white' 
-                    : 'text-gray-700'
-                }`}
-                fill={isTransparent ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)'}
-              />
-              {/* Indicador de logado - ponto verde discreto */}
+              fill={user 
+                ? (isTransparent ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)') 
+                : 'none'
+              }
+            />
+            {/* Indicador de logado - só aparece quando user está logado */}
+            {user && (
               <span className='absolute bottom-1 right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white'></span>
-            </button>
-            
-            {/* Dropdown - Aparece no hover */}
+            )}
+          </button>
+          
+          {/* Dropdown - Só aparece quando logado */}
+          {user && (
             <div className='hidden group-hover:block absolute top-full right-0 pt-2 z-50'>
               <div className='bg-white shadow-xl border border-gray-200 rounded-xl py-2 w-52 text-sm'>
                 {/* Header com nome */}
@@ -445,8 +437,8 @@ const Navbar = () => {
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ===== MOBILE: Cart (Right) ===== */}

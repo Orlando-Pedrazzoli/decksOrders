@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight, ChevronRight } from 'lucide-react';
+import { X, ShoppingBag, Plus, Minus, Trash2, ArrowRight, ChevronRight, Loader2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import toast from 'react-hot-toast';
 
@@ -15,13 +15,18 @@ const CartSidebar = () => {
     getCartCount,
     getCartAmount,
     navigate,
-    findProduct, // 🆕 Para encontrar variantes
+    findProduct,
+    axios, // ✅ ADICIONADO: para buscar produtos que não estão em cache
   } = useAppContext();
 
   const [isVisible, setIsVisible] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startXRef = useRef(0);
+  
+  // ✅ NOVO: Estado para produtos carregados (inclui os buscados do servidor)
+  const [loadedProducts, setLoadedProducts] = useState({});
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
 
   useEffect(() => {
     if (showCartSidebar) {
@@ -30,6 +35,55 @@ const CartSidebar = () => {
       });
     }
   }, [showCartSidebar]);
+
+  // ✅ NOVO: Carregar produtos que não estão no cache quando o sidebar abre
+  useEffect(() => {
+    const loadMissingProducts = async () => {
+      if (!showCartSidebar || Object.keys(cartItems).length === 0) return;
+      
+      const missingIds = Object.keys(cartItems).filter(id => {
+        const found = findProduct(id);
+        return !found && !loadedProducts[id];
+      });
+      
+      if (missingIds.length === 0) return;
+      
+      setIsLoadingProducts(true);
+      console.log('🔄 Carregando produtos em falta:', missingIds);
+      
+      try {
+        // Buscar produtos em falta do servidor
+        const { data } = await axios.post('/api/product/by-ids', { ids: missingIds });
+        
+        if (data.success && data.products) {
+          const newProducts = {};
+          data.products.forEach(product => {
+            newProducts[product._id] = product;
+          });
+          setLoadedProducts(prev => ({ ...prev, ...newProducts }));
+          console.log('✅ Produtos carregados:', Object.keys(newProducts).length);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao carregar produtos:', error);
+        
+        // ✅ FALLBACK: Buscar um por um se a rota by-ids não existir
+        for (const id of missingIds) {
+          try {
+            const { data } = await axios.get(`/api/product/${id}`);
+            if (data.success && data.product) {
+              setLoadedProducts(prev => ({ ...prev, [id]: data.product }));
+            }
+          } catch (err) {
+            console.error(`Erro ao buscar produto ${id}:`, err);
+          }
+        }
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    };
+    
+    loadMissingProducts();
+  }, [showCartSidebar, cartItems, products]);
 
   const handleClose = () => {
     setIsVisible(false);
@@ -78,12 +132,27 @@ const CartSidebar = () => {
     }
   };
 
+  // ✅ CORRIGIDO: Função para encontrar produto (context + loadedProducts)
+  const getProduct = (productId) => {
+    // Primeiro tenta no context (findProduct)
+    const found = findProduct(productId);
+    if (found) return found;
+    
+    // Depois tenta nos produtos carregados localmente
+    return loadedProducts[productId] || null;
+  };
+
+  // ✅ CORRIGIDO: Construir array do carrinho com fallback
   const cartArray = Object.keys(cartItems)
     .map((key) => {
-      const product = findProduct(key); // 🆕 Usar findProduct para encontrar variantes
+      const product = getProduct(key);
       return product ? { ...product, quantity: cartItems[key] } : null;
     })
     .filter(Boolean);
+
+  // ✅ NOVO: Verificar se há itens no carrinho mas produtos não carregados
+  const hasUnloadedProducts = Object.keys(cartItems).length > 0 && 
+    cartArray.length < Object.keys(cartItems).length;
 
   const handleCheckout = () => {
     setShowCartSidebar(false);
@@ -210,7 +279,13 @@ const CartSidebar = () => {
 
         {/* Cart Items */}
         <div className='flex-1 overflow-y-auto'>
-          {cartArray.length === 0 ? (
+          {/* ✅ NOVO: Loading state enquanto carrega produtos */}
+          {isLoadingProducts && hasUnloadedProducts ? (
+            <div className='flex flex-col items-center justify-center h-full px-6 text-center'>
+              <Loader2 className='w-10 h-10 text-primary animate-spin mb-4' />
+              <p className='text-gray-600'>A carregar produtos...</p>
+            </div>
+          ) : cartArray.length === 0 && !hasUnloadedProducts ? (
             <div className='flex flex-col items-center justify-center h-full px-6 text-center'>
               <div className='w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4'>
                 <ShoppingBag className='w-10 h-10 text-gray-400' />
@@ -333,6 +408,14 @@ const CartSidebar = () => {
                   </div>
                 );
               })}
+              
+              {/* ✅ NOVO: Indicador de itens ainda a carregar */}
+              {hasUnloadedProducts && !isLoadingProducts && (
+                <div className='p-4 text-center text-gray-500 text-sm'>
+                  <Loader2 className='w-4 h-4 animate-spin inline mr-2' />
+                  A carregar mais itens...
+                </div>
+              )}
             </div>
           )}
         </div>

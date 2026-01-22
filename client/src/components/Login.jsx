@@ -24,8 +24,8 @@ const Login = () => {
     setAuthToken,
     setCartItems,
     saveCartToStorage,
-    loadCartFromStorage,
     saveUserToStorage,
+    // ✅ REMOVIDO: loadCartFromStorage - não precisamos mais
   } = useAppContext();
 
   const [state, setState] = useState('login');
@@ -110,21 +110,16 @@ const Login = () => {
         // Save user data to localStorage
         saveUserToStorage(data.user);
 
-        // Merge server cart with local cart
-        const localCart = loadCartFromStorage();
+        // ✅ CORREÇÃO: Usar APENAS os cartItems do servidor
+        // O servidor já tem o carrinho do usuário salvo no banco de dados
+        // Não fazer merge com localStorage (que está vazio após logout)
         const serverCart = data.user.cartItems || {};
-        const mergedCart = { ...serverCart, ...localCart };
-        setCartItems(mergedCart);
-        saveCartToStorage(mergedCart);
-
-        // Sync merged cart with server
-        if (Object.keys(mergedCart).length > 0) {
-          try {
-            await axios.post('/api/cart/update', { cartItems: mergedCart });
-          } catch (error) {
-            console.error('Error syncing cart:', error);
-          }
-        }
+        
+        // Atualizar estado e localStorage com os dados do servidor
+        setCartItems(serverCart);
+        saveCartToStorage(serverCart);
+        
+        console.log('🛒 Carrinho restaurado do servidor:', Object.keys(serverCart).length, 'itens');
 
         // Mensagem de boas-vindas personalizada
         const userName = data.user.name.split(' ')[0];
