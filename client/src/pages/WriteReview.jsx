@@ -13,15 +13,79 @@ const WriteReview = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    console.log('🔍 WriteReview mounted');
-    console.log('👤 User:', user);
-    console.log('🌐 Axios baseURL:', axios.defaults.baseURL);
+  // Opções pré-definidas de títulos (organizados por rating)
+  const titleSuggestions = {
+    positive: [
+      'Excelente produto!',
+      'Superou as expectativas',
+      'Recomendo muito!',
+      'Qualidade top',
+      'Adorei! Voltarei a comprar',
+      'Perfeito para surf',
+      'Melhor custo-benefício',
+      'Produto de qualidade',
+    ],
+    neutral: [
+      'Bom produto',
+      'Cumpre o prometido',
+      'Satisfaz as necessidades',
+      'Produto razoável',
+    ],
+    negative: [
+      'Podia ser melhor',
+      'Expectativas não atendidas',
+      'Qualidade abaixo do esperado',
+    ],
+  };
 
+  // Templates de comentários pré-definidos
+  const commentTemplates = [
+    {
+      label: 'Satisfeito',
+      text: 'Produto chegou bem embalado e dentro do prazo. A qualidade é excelente e correspondeu às minhas expectativas. Recomendo!',
+    },
+    {
+      label: 'Perfeito para surf',
+      text: 'Exatamente o que precisava para as minhas sessões de surf. Material de qualidade, resistente e com ótimo acabamento. Já testei no mar e aprovo!',
+    },
+    {
+      label: 'Superou expectativas',
+      text: 'Fiquei surpreendido positivamente! O produto é ainda melhor do que aparece nas fotos. Entrega rápida e atendimento impecável. Com certeza voltarei a comprar.',
+    },
+    {
+      label: 'Custo-benefício',
+      text: 'Pelo preço que paguei, o produto superou as expectativas. Boa qualidade e funciona perfeitamente. Vale muito a pena!',
+    },
+    {
+      label: 'Presente',
+      text: 'Comprei para oferecer e foi um sucesso! Produto de qualidade, bem embalado e chegou a tempo. Quem recebeu adorou!',
+    },
+    {
+      label: 'Recomendo',
+      text: 'Produto conforme descrito, boa qualidade e entrega dentro do prazo. Loja de confiança, recomendo a outros surfistas!',
+    },
+    {
+      label: 'Razoável',
+      text: 'O produto é razoável, cumpre a sua função básica. Nada de extraordinário, mas também não tenho queixas graves.',
+    },
+    {
+      label: 'Escrever próprio',
+      text: '',
+    },
+  ];
+
+  // Determinar sugestões de título baseadas no rating
+  const getTitleSuggestions = () => {
+    if (rating >= 4) return titleSuggestions.positive;
+    if (rating === 3) return titleSuggestions.neutral;
+    if (rating > 0) return titleSuggestions.negative;
+    return titleSuggestions.positive;
+  };
+
+  useEffect(() => {
     if (user) {
       fetchEligibleProducts();
     } else {
-      console.log('❌ Usuário não encontrado, redirecionando...');
       navigate('/');
     }
   }, [user]);
@@ -29,89 +93,33 @@ const WriteReview = () => {
   const fetchEligibleProducts = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Iniciando fetchEligibleProducts...');
-      console.log(
-        '🔗 URL completa que será chamada:',
-        axios.defaults.baseURL + '/api/reviews/eligible-orders'
-      );
 
-      // ✅ TESTE 1: Verificar se a rota de teste funciona primeiro
-      console.log('🧪 Testando rota de teste primeiro...');
-      try {
-        const testResponse = await axios.get('/api/reviews/test');
-        console.log('✅ Rota de teste OK:', testResponse.data);
-      } catch (testError) {
-        console.error('❌ Rota de teste falhou:', testError);
-        console.error('❌ Status:', testError.response?.status);
-        console.error('❌ Data:', testError.response?.data);
-        toast.error('Erro: Rotas de reviews não estão funcionando');
-        return;
-      }
-
-      // ✅ TESTE 2: Verificar autenticação
-      console.log('🔐 Verificando autenticação...');
-      console.log('🍪 Cookies:', document.cookie);
-      console.log('💾 Token localStorage:', localStorage.getItem('auth_token'));
-
-      // ✅ TESTE 3: Chamar a rota protegida
-      console.log('📦 Chamando /api/reviews/eligible-orders...');
       const response = await axios.post(
         '/api/reviews/eligible-orders',
         {},
         {
-          withCredentials: true, // ✅ Garantir que cookies sejam enviados
+          withCredentials: true,
           headers: {
             'Content-Type': 'application/json',
           },
         }
       );
 
-      console.log('✅ Resposta recebida:', response.data);
-
       if (response.data.success) {
         setEligibleProducts(response.data.eligibleProducts);
-        console.log(
-          '✅ Produtos carregados:',
-          response.data.eligibleProducts.length
-        );
-
-        if (response.data.eligibleProducts.length === 0) {
-          console.log('📝 Nenhum produto elegível encontrado');
-        } else {
-          console.log(
-            '📝 Primeiro produto:',
-            response.data.eligibleProducts[0]
-          );
-        }
       } else {
-        console.log('❌ Resposta não foi sucesso:', response.data.message);
         toast.error(response.data.message || 'Erro ao carregar produtos');
       }
     } catch (error) {
-      console.error('❌ Erro completo:', error);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error code:', error.code);
-      console.error('❌ Response status:', error.response?.status);
-      console.error('❌ Response data:', error.response?.data);
-      console.error('❌ Request config:', error.config);
+      console.error('Erro:', error);
 
-      // ✅ MELHORES MENSAGENS DE ERRO BASEADAS NO TIPO
       if (error.code === 'ERR_NETWORK') {
-        toast.error('Erro de rede. Verifique se o servidor está rodando.');
-      } else if (error.response?.status === 404) {
-        toast.error(
-          'Rota não encontrada. Verifique se as rotas de reviews estão registradas.'
-        );
+        toast.error('Erro de rede. Verifique a conexão.');
       } else if (error.response?.status === 401) {
-        toast.error('Não autorizado. Faça login novamente.');
+        toast.error('Sessão expirada. Faça login novamente.');
         navigate('/');
-      } else if (error.response?.status === 500) {
-        toast.error('Erro interno do servidor.');
       } else {
-        toast.error(
-          'Erro ao carregar produtos: ' +
-            (error.response?.data?.message || error.message)
-        );
+        toast.error('Erro ao carregar produtos');
       }
     } finally {
       setLoading(false);
@@ -124,30 +132,19 @@ const WriteReview = () => {
     if (!selectedProduct) {
       return toast.error('Selecione um produto para avaliar');
     }
-
     if (rating === 0) {
       return toast.error('Selecione uma classificação');
     }
-
     if (!title.trim()) {
-      return toast.error('Digite um título para o review');
+      return toast.error('Selecione ou digite um título');
     }
-
     if (!comment.trim()) {
-      return toast.error('Digite um comentário');
+      return toast.error('Selecione ou escreva um comentário');
     }
 
     setIsSubmitting(true);
 
     try {
-      console.log('📝 Enviando review:', {
-        orderId: selectedProduct.orderId,
-        productId: selectedProduct.product._id,
-        rating,
-        title: title.trim(),
-        comment: comment.trim(),
-      });
-
       const response = await axios.post(
         '/api/reviews/create',
         {
@@ -157,49 +154,33 @@ const WriteReview = () => {
           title: title.trim(),
           comment: comment.trim(),
         },
-        {
-          withCredentials: true,
-        }
+        { withCredentials: true }
       );
-
-      console.log('✅ Resposta do review:', response.data);
 
       if (response.data.success) {
         toast.success('Review enviado com sucesso!');
-
-        // Reset form
         setSelectedProduct(null);
         setRating(0);
         setTitle('');
         setComment('');
-
-        // Refresh eligible products
         fetchEligibleProducts();
-
-        // Navigate to my orders or reviews
-        setTimeout(() => {
-          navigate('/my-orders');
-        }, 2000);
+        setTimeout(() => navigate('/my-orders'), 2000);
       } else {
         toast.error(response.data.message || 'Erro ao enviar review');
       }
     } catch (error) {
-      console.error('❌ Erro ao enviar review:', error);
-
       if (error.response?.status === 401) {
         toast.error('Sessão expirada. Faça login novamente');
         navigate('/');
       } else {
-        toast.error(
-          'Erro ao enviar review: ' +
-            (error.response?.data?.message || error.message)
-        );
+        toast.error('Erro ao enviar review');
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Componente de Star Rating
   const StarRating = ({ rating, setRating, disabled = false }) => (
     <div className='flex gap-1'>
       {[1, 2, 3, 4, 5].map(star => (
@@ -208,25 +189,83 @@ const WriteReview = () => {
           type='button'
           disabled={disabled}
           onClick={() => !disabled && setRating(star)}
-          className={`text-2xl transition-colors ${
+          className={`text-3xl transition-all duration-200 ${
             star <= rating
-              ? 'text-yellow-500'
-              : 'text-gray-300 hover:text-yellow-400'
+              ? 'text-yellow-500 scale-110'
+              : 'text-gray-300 hover:text-yellow-400 hover:scale-105'
           } ${disabled ? 'cursor-default' : 'cursor-pointer'}`}
         >
           ★
         </button>
       ))}
+      {rating > 0 && (
+        <span className='ml-2 text-sm text-gray-600 self-center'>
+          {rating === 5 && 'Excelente!'}
+          {rating === 4 && 'Muito bom'}
+          {rating === 3 && 'Bom'}
+          {rating === 2 && 'Razoável'}
+          {rating === 1 && 'Fraco'}
+        </span>
+      )}
     </div>
   );
 
-  // ✅ VERIFICAÇÃO ADICIONAL: Se não há usuário, redirecionar
+  // Componente de Chips Selecionáveis
+  const SelectableChips = ({ options, selectedValue, onSelect, label }) => (
+    <div>
+      <label className='block text-sm font-medium text-gray-700 mb-2'>
+        {label}
+      </label>
+      <div className='flex flex-wrap gap-2'>
+        {options.map((option, index) => (
+          <button
+            key={index}
+            type='button'
+            onClick={() => onSelect(option)}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+              selectedValue === option
+                ? 'bg-primary text-white shadow-md scale-105'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow'
+            }`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Componente de Templates de Comentário
+  const CommentTemplates = ({ templates, onSelect, currentComment }) => (
+    <div>
+      <label className='block text-sm font-medium text-gray-700 mb-2'>
+        Escolha um template ou escreva o seu:
+      </label>
+      <div className='grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3'>
+        {templates.map((template, index) => (
+          <button
+            key={index}
+            type='button'
+            onClick={() => onSelect(template.text)}
+            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 text-center ${
+              currentComment === template.text && template.text !== ''
+                ? 'bg-primary text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow'
+            }`}
+          >
+            {template.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   if (!user) {
     return (
       <div className='flex justify-center items-center min-h-[50vh]'>
         <div className='text-center'>
           <p className='text-lg text-gray-600 mb-4'>
-            Você precisa estar logado para escrever reviews
+            Precisa estar logado para escrever reviews
           </p>
           <button
             onClick={() => navigate('/')}
@@ -245,9 +284,6 @@ const WriteReview = () => {
         <div className='text-center'>
           <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto'></div>
           <p className='mt-4 text-gray-600'>Carregando produtos...</p>
-          <p className='mt-2 text-sm text-gray-500'>
-            Se demorar muito, verifique o console (F12) para mais detalhes
-          </p>
         </div>
       </div>
     );
@@ -256,9 +292,12 @@ const WriteReview = () => {
   return (
     <div className='container mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-10'>
       <div className='max-w-4xl mx-auto'>
-        <h1 className='text-3xl font-bold text-gray-800 mb-8 text-center'>
+        <h1 className='text-3xl font-bold text-gray-800 mb-2 text-center'>
           Escrever Review
         </h1>
+        <p className='text-gray-500 text-center mb-8'>
+          A sua opinião ajuda outros surfistas a escolher melhor!
+        </p>
 
         {eligibleProducts.length === 0 ? (
           <div className='text-center py-12'>
@@ -273,24 +312,18 @@ const WriteReview = () => {
             <p className='text-gray-600 mb-6'>
               Faça algumas compras primeiro para poder avaliar os produtos!
             </p>
-            <div className='space-y-4'>
+            <div className='space-x-4'>
               <button
                 onClick={() => navigate('/products')}
-                className='bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-dull transition mx-2'
+                className='bg-primary text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-dull transition'
               >
                 Explorar Produtos
               </button>
               <button
                 onClick={() => navigate('/my-orders')}
-                className='bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition mx-2'
+                className='bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition'
               >
                 Ver Meus Pedidos
-              </button>
-              <button
-                onClick={fetchEligibleProducts}
-                className='bg-blue-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-600 transition mx-2'
-              >
-                🔄 Tentar Novamente
               </button>
             </div>
           </div>
@@ -302,16 +335,21 @@ const WriteReview = () => {
                 Produtos Comprados ({eligibleProducts.length})
               </h2>
 
-              <div className='space-y-4 max-h-96 overflow-y-auto'>
+              <div className='space-y-4 max-h-[500px] overflow-y-auto pr-2'>
                 {eligibleProducts.map((item, index) => (
                   <div
                     key={`${item.orderId}-${item.product._id}-${index}`}
-                    onClick={() => setSelectedProduct(item)}
-                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    onClick={() => {
+                      setSelectedProduct(item);
+                      setRating(0);
+                      setTitle('');
+                      setComment('');
+                    }}
+                    className={`border rounded-lg p-4 cursor-pointer transition-all duration-200 ${
                       selectedProduct?.product._id === item.product._id &&
                       selectedProduct?.orderId === item.orderId
-                        ? 'border-primary bg-primary/5'
-                        : 'border-gray-200 hover:border-primary/50'
+                        ? 'border-primary bg-primary/5 shadow-md'
+                        : 'border-gray-200 hover:border-primary/50 hover:shadow'
                     }`}
                   >
                     <div className='flex items-center gap-4'>
@@ -320,8 +358,7 @@ const WriteReview = () => {
                         alt={item.product.name}
                         className='w-16 h-16 object-cover rounded'
                         onError={e => {
-                          e.target.src =
-                            assets.placeholder_image || '/placeholder.jpg';
+                          e.target.src = '/placeholder.jpg';
                         }}
                       />
                       <div className='flex-grow'>
@@ -363,17 +400,16 @@ const WriteReview = () => {
               <h2 className='text-xl font-semibold mb-4'>Escrever Review</h2>
 
               {selectedProduct ? (
-                <form onSubmit={handleSubmitReview} className='space-y-6'>
+                <form onSubmit={handleSubmitReview} className='space-y-5'>
                   {/* Produto Selecionado */}
-                  <div className='bg-gray-50 p-4 rounded-lg'>
+                  <div className='bg-gradient-to-r from-primary/5 to-primary/10 p-4 rounded-lg'>
                     <div className='flex items-center gap-4'>
                       <img
                         src={selectedProduct.product.image[0]}
                         alt={selectedProduct.product.name}
-                        className='w-20 h-20 object-cover rounded'
+                        className='w-20 h-20 object-cover rounded shadow'
                         onError={e => {
-                          e.target.src =
-                            assets.placeholder_image || '/placeholder.jpg';
+                          e.target.src = '/placeholder.jpg';
                         }}
                       />
                       <div>
@@ -393,43 +429,42 @@ const WriteReview = () => {
                       Classificação *
                     </label>
                     <StarRating rating={rating} setRating={setRating} />
-                    <p className='text-xs text-gray-500 mt-1'>
-                      Clique nas estrelas para avaliar
-                    </p>
                   </div>
 
-                  {/* Título */}
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>
-                      Título do Review *
-                    </label>
-                    <input
-                      type='text'
-                      value={title}
-                      onChange={e => setTitle(e.target.value)}
-                      placeholder='Ex: Produto excelente, superou expectativas'
-                      maxLength={100}
-                      className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent'
-                      required
-                    />
-                    <p className='text-xs text-gray-500 mt-1'>
-                      {title.length}/100 caracteres
-                    </p>
-                  </div>
+                  {/* Títulos pré-definidos */}
+                  <SelectableChips
+                    options={getTitleSuggestions()}
+                    selectedValue={title}
+                    onSelect={setTitle}
+                    label='Título do Review * (clique para selecionar)'
+                  />
 
-                  {/* Comentário */}
+                  {/* Input para título personalizado */}
+                  <input
+                    type='text'
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    placeholder='Ou escreva o seu próprio título...'
+                    maxLength={100}
+                    className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-sm'
+                  />
+
+                  {/* Templates de comentário */}
+                  <CommentTemplates
+                    templates={commentTemplates}
+                    onSelect={setComment}
+                    currentComment={comment}
+                  />
+
+                  {/* Textarea para comentário */}
                   <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-2'>
-                      Comentário *
-                    </label>
                     <textarea
                       value={comment}
                       onChange={e => setComment(e.target.value)}
-                      placeholder='Conte sobre sua experiência com o produto...'
+                      placeholder='Ou escreva a sua própria experiência...'
                       maxLength={500}
-                      rows={5}
+                      rows={4}
                       className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent'
-                      required
                     />
                     <p className='text-xs text-gray-500 mt-1'>
                       {comment.length}/500 caracteres
@@ -440,18 +475,45 @@ const WriteReview = () => {
                   <button
                     type='submit'
                     disabled={isSubmitting}
-                    className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${
+                    className={`w-full py-3 px-4 rounded-md font-medium transition-all duration-200 ${
                       isSubmitting
                         ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-primary hover:bg-primary-dull'
+                        : 'bg-primary hover:bg-primary-dull hover:shadow-lg'
                     } text-white`}
                   >
-                    {isSubmitting ? 'Enviando...' : 'Enviar Review'}
+                    {isSubmitting ? (
+                      <span className='flex items-center justify-center gap-2'>
+                        <svg
+                          className='animate-spin h-5 w-5'
+                          viewBox='0 0 24 24'
+                        >
+                          <circle
+                            className='opacity-25'
+                            cx='12'
+                            cy='12'
+                            r='10'
+                            stroke='currentColor'
+                            strokeWidth='4'
+                            fill='none'
+                          />
+                          <path
+                            className='opacity-75'
+                            fill='currentColor'
+                            d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
+                          />
+                        </svg>
+                        Enviando...
+                      </span>
+                    ) : (
+                      'Enviar Review'
+                    )}
                   </button>
                 </form>
               ) : (
-                <div className='text-center py-8 text-gray-500'>
-                  <p>Selecione um produto à esquerda para escrever um review</p>
+                <div className='text-center py-12 bg-gray-50 rounded-lg'>
+                  <p className='text-gray-500'>
+                    Selecione um produto à esquerda para escrever um review
+                  </p>
                 </div>
               )}
             </div>

@@ -17,22 +17,36 @@ const GroupPage = () => {
   const groupCategories = getCategoriesByGroup(groupSlug);
   const groupCategoryPaths = groupCategories.map(cat => cat.path.toLowerCase());
 
-  // Filtrar produtos deste grupo
+  // Filtrar produtos deste grupo e ordenar (disponíveis primeiro, esgotados no final)
   const groupProducts = useMemo(() => {
-    return products.filter(product => {
+    const filtered = products.filter(product => {
       // Filtrar por group do produto (se existir)
       if (product.group && product.group === groupSlug) {
-        // Apenas produtos em stock e variantes principais
-        return product.inStock && product.isMainVariant !== false;
+        // Apenas variantes principais
+        return product.isMainVariant !== false;
       }
       
       // Fallback: filtrar por categoria (para produtos antigos sem group)
       const productCategory = (product.category || '').toLowerCase();
       if (groupCategoryPaths.includes(productCategory)) {
-        return product.inStock && product.isMainVariant !== false;
+        return product.isMainVariant !== false;
       }
       
       return false;
+    });
+
+    // Ordenar: produtos disponíveis primeiro, esgotados no final
+    // Usa a mesma lógica do ProductCard: isInactive = !inStock || stock <= 0
+    return filtered.sort((a, b) => {
+      const aIsInactive = !a.inStock || (a.stock || 0) <= 0;
+      const bIsInactive = !b.inStock || (b.stock || 0) <= 0;
+      
+      // Se a está inativo e b não, a vai para o final (retorna 1)
+      // Se b está inativo e a não, b vai para o final (retorna -1)
+      // Se ambos iguais, mantém ordem (retorna 0)
+      if (aIsInactive && !bIsInactive) return 1;
+      if (!aIsInactive && bIsInactive) return -1;
+      return 0;
     });
   }, [products, groupSlug, groupCategoryPaths]);
 

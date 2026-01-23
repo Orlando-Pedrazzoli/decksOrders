@@ -16,7 +16,7 @@ const CartSidebar = () => {
     getCartAmount,
     navigate,
     findProduct,
-    axios, // ✅ ADICIONADO: para buscar produtos que não estão em cache
+    axios,
   } = useAppContext();
 
   const [isVisible, setIsVisible] = useState(false);
@@ -24,19 +24,24 @@ const CartSidebar = () => {
   const [isDragging, setIsDragging] = useState(false);
   const startXRef = useRef(0);
   
-  // ✅ NOVO: Estado para produtos carregados (inclui os buscados do servidor)
+  // Estado para produtos carregados (inclui os buscados do servidor)
   const [loadedProducts, setLoadedProducts] = useState({});
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+
+  // Estado para countdown de fecho automático
+  const [closeCountdown, setCloseCountdown] = useState(3);
 
   useEffect(() => {
     if (showCartSidebar) {
       requestAnimationFrame(() => {
         setIsVisible(true);
       });
+      // Reset countdown quando sidebar abre
+      setCloseCountdown(3);
     }
   }, [showCartSidebar]);
 
-  // ✅ NOVO: Carregar produtos que não estão no cache quando o sidebar abre
+  // Carregar produtos que não estão no cache quando o sidebar abre
   useEffect(() => {
     const loadMissingProducts = async () => {
       if (!showCartSidebar || Object.keys(cartItems).length === 0) return;
@@ -49,7 +54,6 @@ const CartSidebar = () => {
       if (missingIds.length === 0) return;
       
       setIsLoadingProducts(true);
-      console.log('🔄 Carregando produtos em falta:', missingIds);
       
       try {
         // Buscar produtos em falta do servidor
@@ -61,12 +65,11 @@ const CartSidebar = () => {
             newProducts[product._id] = product;
           });
           setLoadedProducts(prev => ({ ...prev, ...newProducts }));
-          console.log('✅ Produtos carregados:', Object.keys(newProducts).length);
         }
       } catch (error) {
-        console.error('❌ Erro ao carregar produtos:', error);
+        console.error('Erro ao carregar produtos:', error);
         
-        // ✅ FALLBACK: Buscar um por um se a rota by-ids não existir
+        // FALLBACK: Buscar um por um se a rota by-ids não existir
         for (const id of missingIds) {
           try {
             const { data } = await axios.get(`/api/product/${id}`);
@@ -84,6 +87,49 @@ const CartSidebar = () => {
     
     loadMissingProducts();
   }, [showCartSidebar, cartItems, products]);
+
+  // Função para encontrar produto (context + loadedProducts)
+  const getProduct = (productId) => {
+    const found = findProduct(productId);
+    if (found) return found;
+    return loadedProducts[productId] || null;
+  };
+
+  // Construir array do carrinho com fallback
+  const cartArray = Object.keys(cartItems)
+    .map((key) => {
+      const product = getProduct(key);
+      return product ? { ...product, quantity: cartItems[key] } : null;
+    })
+    .filter(Boolean);
+
+  // Verificar se há itens no carrinho mas produtos não carregados
+  const hasUnloadedProducts = Object.keys(cartItems).length > 0 && 
+    cartArray.length < Object.keys(cartItems).length;
+
+  // Verificar se carrinho está vazio
+  const isCartEmpty = cartArray.length === 0 && !hasUnloadedProducts && !isLoadingProducts;
+
+  // Fecho automático quando carrinho está vazio
+  useEffect(() => {
+    if (showCartSidebar && isCartEmpty) {
+      const timer = setInterval(() => {
+        setCloseCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            handleClose();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    } else {
+      // Reset countdown se carrinho deixar de estar vazio
+      setCloseCountdown(3);
+    }
+  }, [showCartSidebar, isCartEmpty]);
 
   const handleClose = () => {
     setIsVisible(false);
@@ -132,28 +178,6 @@ const CartSidebar = () => {
     }
   };
 
-  // ✅ CORRIGIDO: Função para encontrar produto (context + loadedProducts)
-  const getProduct = (productId) => {
-    // Primeiro tenta no context (findProduct)
-    const found = findProduct(productId);
-    if (found) return found;
-    
-    // Depois tenta nos produtos carregados localmente
-    return loadedProducts[productId] || null;
-  };
-
-  // ✅ CORRIGIDO: Construir array do carrinho com fallback
-  const cartArray = Object.keys(cartItems)
-    .map((key) => {
-      const product = getProduct(key);
-      return product ? { ...product, quantity: cartItems[key] } : null;
-    })
-    .filter(Boolean);
-
-  // ✅ NOVO: Verificar se há itens no carrinho mas produtos não carregados
-  const hasUnloadedProducts = Object.keys(cartItems).length > 0 && 
-    cartArray.length < Object.keys(cartItems).length;
-
   const handleCheckout = () => {
     setShowCartSidebar(false);
     navigate('/cart');
@@ -168,7 +192,7 @@ const CartSidebar = () => {
     navigate(`/products/${product.category.toLowerCase()}/${product._id}`);
   };
 
-  // 🆕 VALIDAR STOCK ANTES DE AUMENTAR
+  // Validar stock antes de aumentar
   const handleIncrease = (product) => {
     const availableStock = product.stock || 0;
     const currentQty = product.quantity;
@@ -181,7 +205,7 @@ const CartSidebar = () => {
     updateCartItem(product._id, currentQty + 1);
   };
 
-  // 🆕 Helper: verificar se cor é clara
+  // Helper: verificar se cor é clara
   const isLightColor = (color) => {
     if (!color) return false;
     const hex = color.replace('#', '');
@@ -193,7 +217,7 @@ const CartSidebar = () => {
     return brightness > 200;
   };
 
-  // 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+  // Componente para renderizar bolinha de cor (simples ou dupla)
   const ColorBall = ({ code1, code2, size = 20, title }) => {
     const isDual = code2 && code2 !== code1;
     const isLight1 = isLightColor(code1);
@@ -209,7 +233,6 @@ const CartSidebar = () => {
         title={title}
       >
         {isDual ? (
-          // Bolinha dividida na diagonal
           <div 
             className='w-full h-full rounded-full overflow-hidden'
             style={{
@@ -217,7 +240,6 @@ const CartSidebar = () => {
             }}
           />
         ) : (
-          // Bolinha simples
           <div 
             className='w-full h-full rounded-full'
             style={{ backgroundColor: code1 || '#ccc' }}
@@ -279,13 +301,13 @@ const CartSidebar = () => {
 
         {/* Cart Items */}
         <div className='flex-1 overflow-y-auto'>
-          {/* ✅ NOVO: Loading state enquanto carrega produtos */}
+          {/* Loading state enquanto carrega produtos */}
           {isLoadingProducts && hasUnloadedProducts ? (
             <div className='flex flex-col items-center justify-center h-full px-6 text-center'>
               <Loader2 className='w-10 h-10 text-primary animate-spin mb-4' />
               <p className='text-gray-600'>A carregar produtos...</p>
             </div>
-          ) : cartArray.length === 0 && !hasUnloadedProducts ? (
+          ) : isCartEmpty ? (
             <div className='flex flex-col items-center justify-center h-full px-6 text-center'>
               <div className='w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4'>
                 <ShoppingBag className='w-10 h-10 text-gray-400' />
@@ -293,9 +315,19 @@ const CartSidebar = () => {
               <h3 className='text-lg font-semibold text-gray-800 mb-2'>
                 O seu carrinho está vazio
               </h3>
-              <p className='text-gray-500 text-sm mb-6'>
+              <p className='text-gray-500 text-sm mb-4'>
                 Ainda não adicionou produtos ao carrinho
               </p>
+              
+              {/* Countdown indicator */}
+              <div className='mb-6 flex items-center gap-2 text-gray-500'>
+                <svg className='animate-spin h-4 w-4' viewBox='0 0 24 24'>
+                  <circle className='opacity-25' cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='4' fill='none' />
+                  <path className='opacity-75' fill='currentColor' d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z' />
+                </svg>
+                <span className='text-sm'>A fechar em {closeCountdown}s...</span>
+              </div>
+
               <button
                 onClick={handleContinueShopping}
                 className='px-6 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-dull transition-colors cursor-pointer'
@@ -324,7 +356,7 @@ const CartSidebar = () => {
                           className='w-20 h-20 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0'
                           onClick={() => handleProductClick(product)}
                         />
-                        {/* 🆕 Bolinha de Cor - Suporta Dual Colors */}
+                        {/* Bolinha de Cor - Suporta Dual Colors */}
                         {product.colorCode && (
                           <ColorBall
                             code1={product.colorCode}
@@ -344,7 +376,7 @@ const CartSidebar = () => {
                           {product.name}
                         </h3>
                         
-                        {/* 🆕 Nome da Cor */}
+                        {/* Nome da Cor */}
                         {product.color && (
                           <p className='text-xs text-gray-500 mt-0.5'>
                             Cor: {product.color}
@@ -355,7 +387,7 @@ const CartSidebar = () => {
                           {currency} {product.offerPrice.toFixed(2)}
                         </p>
 
-                        {/* 🆕 Badge Stock Baixo */}
+                        {/* Badge Stock Baixo */}
                         {isLowStock && (
                           <p className='text-xs text-orange-600 font-medium mt-0.5'>
                             Últimas {availableStock}!
@@ -379,7 +411,7 @@ const CartSidebar = () => {
                             <span className='px-3 py-1 text-sm font-medium min-w-[36px] text-center'>
                               {product.quantity}
                             </span>
-                            {/* 🆕 BOTÃO + COM VALIDAÇÃO DE STOCK */}
+                            {/* Botão + com validação de stock */}
                             <button
                               onClick={() => handleIncrease(product)}
                               disabled={!canIncrease}
@@ -409,7 +441,7 @@ const CartSidebar = () => {
                 );
               })}
               
-              {/* ✅ NOVO: Indicador de itens ainda a carregar */}
+              {/* Indicador de itens ainda a carregar */}
               {hasUnloadedProducts && !isLoadingProducts && (
                 <div className='p-4 text-center text-gray-500 text-sm'>
                   <Loader2 className='w-4 h-4 animate-spin inline mr-2' />

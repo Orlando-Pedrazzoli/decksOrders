@@ -17,7 +17,7 @@ const ProductDetails = () => {
     cartItems,
     updateCartItem,
     axios,
-    getProductFamily, // 🆕 Função para buscar família
+    getProductFamily,
   } = useAppContext();
   const { id, category } = useParams();
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -33,11 +33,11 @@ const ProductDetails = () => {
     loading: true,
   });
 
-  // 🆕 ESTADOS PARA FAMÍLIA DE CORES
+  // Estados para família de cores
   const [familyProducts, setFamilyProducts] = useState([]);
   const [displayProduct, setDisplayProduct] = useState(null);
   const [isColorTransitioning, setIsColorTransitioning] = useState(false);
-  const [showVideo, setShowVideo] = useState(false); // 🆕 Mostrar vídeo
+  const [showVideo, setShowVideo] = useState(false);
 
   // Estados para o modal
   const [modalImageIndex, setModalImageIndex] = useState(0);
@@ -55,13 +55,13 @@ const ProductDetails = () => {
   const modalImageRef = useRef(null);
   const pinchStartDistance = useRef(0);
 
-  // 🆕 Estado para produto carregado via API (quando não está no products)
+  // Estado para produto carregado via API (quando não está no products)
   const [apiProduct, setApiProduct] = useState(null);
   
   const productFromContext = products.find(item => item._id === id);
   const product = productFromContext || apiProduct;
 
-  // 🆕 Buscar produto via API se não estiver no contexto (variante não-principal)
+  // Buscar produto via API se não estiver no contexto (variante não-principal)
   useEffect(() => {
     const fetchProduct = async () => {
       if (!productFromContext && id) {
@@ -78,7 +78,7 @@ const ProductDetails = () => {
     fetchProduct();
   }, [id, productFromContext, axios]);
 
-  // 🎯 Atualizar displayProduct quando produto muda
+  // Atualizar displayProduct quando produto muda
   useEffect(() => {
     if (product) {
       setDisplayProduct(product);
@@ -86,7 +86,7 @@ const ProductDetails = () => {
     }
   }, [product?._id]);
 
-  // 🎯 Buscar produtos da mesma família via API (com cache)
+  // Buscar produtos da mesma família via API (com cache)
   useEffect(() => {
     const fetchFamily = async () => {
       if (product?.productFamily) {
@@ -130,13 +130,10 @@ const ProductDetails = () => {
     ];
   };
 
-  // Sincronização com cartItems
+  // Reset quantity quando muda de produto
   useEffect(() => {
-    if (displayProduct) {
-      const cartQuantity = cartItems[displayProduct._id] || 0;
-      setQuantity(Math.max(1, cartQuantity || 1));
-    }
-  }, [displayProduct?._id, cartItems]);
+    setQuantity(1);
+  }, [displayProduct?._id]);
 
   // Produtos relacionados (excluindo a família atual)
   useEffect(() => {
@@ -179,7 +176,7 @@ const ProductDetails = () => {
     }
   };
 
-  // 🎯 HANDLER PARA TROCAR COR
+  // Handler para trocar cor
   const handleColorClick = (familyProductId) => {
     if (familyProductId === displayProduct?._id) return;
     
@@ -378,69 +375,71 @@ const ProductDetails = () => {
     }
   }, [currentImageIndex]);
 
-  // 🎯 HANDLERS DE QUANTIDADE COM VALIDAÇÃO DE STOCK
+  // ✅ HANDLERS DE QUANTIDADE - INDEPENDENTES DO CARRINHO
   const increaseQuantity = () => {
     if (isInactive) return;
     
     const cartQuantity = cartItems[displayProduct._id] || 0;
-    const totalAfterIncrease = cartQuantity + 1;
+    const maxCanAdd = currentStock - cartQuantity;
     
-    if (totalAfterIncrease > currentStock) {
-      toast.error(`Apenas ${currentStock} unidade(s) disponível(eis)`);
+    if (quantity >= maxCanAdd) {
+      if (cartQuantity > 0) {
+        toast.error(`Apenas ${maxCanAdd} unidade(s) disponível(eis) para adicionar. Já tens ${cartQuantity} no carrinho.`);
+      } else {
+        toast.error(`Apenas ${currentStock} unidade(s) disponível(eis)`);
+      }
       return;
     }
     
-    const newQuantity = quantity + 1;
-    setQuantity(newQuantity);
-    if (cartQuantity > 0) {
-      updateCartItem(displayProduct._id, cartQuantity + 1);
-    }
+    setQuantity(prev => prev + 1);
   };
 
   const decreaseQuantity = () => {
     if (isInactive) return;
-    const cartQuantity = cartItems[displayProduct._id] || 0;
-    
     if (quantity > 1) {
-      const newQuantity = quantity - 1;
-      setQuantity(newQuantity);
-      if (cartQuantity > 1) {
-        updateCartItem(displayProduct._id, cartQuantity - 1);
-      }
+      setQuantity(prev => prev - 1);
     }
   };
 
+  // ✅ ADICIONAR AO CARRINHO - Adiciona a quantidade selecionada
   const handleAddToCart = () => {
-    if (isInactive) return;
+    if (isInactive || !displayProduct) return;
     
     const cartQuantity = cartItems[displayProduct._id] || 0;
-    const totalAfterAdd = cartQuantity + quantity;
+    const newTotal = cartQuantity + quantity;
     
-    if (totalAfterAdd > currentStock) {
+    // Validar stock
+    if (newTotal > currentStock) {
       toast.error(`Apenas ${currentStock} unidade(s) disponível(eis). Já tens ${cartQuantity} no carrinho.`);
       return;
     }
     
-    // Adicionar quantidade selecionada
-    for (let i = 0; i < quantity; i++) {
-      addToCart(displayProduct._id);
-    }
+    // Usar updateCartItem para definir a quantidade total
+    updateCartItem(displayProduct._id, newTotal);
+    
+    toast.success(`${quantity} ${quantity === 1 ? 'item adicionado' : 'itens adicionados'} ao carrinho!`);
+    
+    // Reset quantity para 1 após adicionar
+    setQuantity(1);
   };
 
+  // ✅ COMPRAR AGORA - Define a quantidade selecionada e vai para checkout
   const handleBuyNow = () => {
-    if (isInactive) return;
+    if (isInactive || !displayProduct) return;
     
     const cartQuantity = cartItems[displayProduct._id] || 0;
+    const newTotal = cartQuantity + quantity;
     
-    if (cartQuantity === 0) {
-      if (quantity > currentStock) {
-        toast.error(`Apenas ${currentStock} unidade(s) disponível(eis)`);
-        return;
-      }
-      for (let i = 0; i < quantity; i++) {
-        addToCart(displayProduct._id);
-      }
+    // Validar stock
+    if (newTotal > currentStock) {
+      toast.error(`Apenas ${currentStock} unidade(s) disponível(eis). Já tens ${cartQuantity} no carrinho.`);
+      return;
     }
+    
+    // Usar updateCartItem para definir a quantidade total
+    updateCartItem(displayProduct._id, newTotal);
+    
+    // Navegar para o carrinho
     navigate('/cart');
   };
 
@@ -512,7 +511,7 @@ const ProductDetails = () => {
     return brightness > 200;
   };
 
-  // 🆕 Componente para renderizar bolinha de cor (simples ou dupla)
+  // Componente para renderizar bolinha de cor (simples ou dupla)
   const ColorBall = ({ code1, code2, size = 40, isSelected = false, isOutOfStock = false, onClick, title }) => {
     const isDual = code2 && code2 !== code1;
     const isLight1 = isLightColor(code1);
@@ -583,6 +582,7 @@ const ProductDetails = () => {
   }
 
   const cartQuantity = cartItems[displayProduct._id] || 0;
+  const maxCanAdd = currentStock - cartQuantity;
 
   return (
     <>
@@ -738,7 +738,7 @@ const ProductDetails = () => {
                 onScroll={() => handleImageScroll(imageScrollRef)}
                 className='flex w-full h-full overflow-x-auto snap-x snap-mandatory scrollbar-hide sm:hidden border border-gray-200 rounded-xl shadow-sm relative'
               >
-                {/* 🆕 Vídeo como primeiro slide (se existir) */}
+                {/* Vídeo como primeiro slide (se existir) */}
                 {displayProduct.video && (
                   <div className='relative w-full h-full flex-shrink-0 snap-center bg-black'>
                     <video
@@ -773,7 +773,7 @@ const ProductDetails = () => {
 
               {/* Desktop Main Image */}
               <div className='relative border border-gray-200 w-full h-full rounded-xl overflow-hidden hidden sm:block shadow-sm'>
-                {/* 🆕 Vídeo Player */}
+                {/* Vídeo Player */}
                 {showVideo && displayProduct.video ? (
                   <video
                     src={displayProduct.video}
@@ -812,7 +812,7 @@ const ProductDetails = () => {
 
                 {!isInactive && (
                   <div className='absolute top-2 right-2 bg-black/50 text-white p-2 rounded-lg text-xs opacity-0 hover:opacity-100 transition-opacity'>
-                    🔍 Clique para ampliar
+                    Clique para ampliar
                   </div>
                 )}
 
@@ -836,7 +836,7 @@ const ProductDetails = () => {
 
               {/* Mobile Dots */}
               <div className='flex justify-center gap-2 mt-4 sm:hidden'>
-                {/* 🆕 Dot do Vídeo */}
+                {/* Dot do Vídeo */}
                 {displayProduct.video && (
                   <button
                     onClick={() => {
@@ -872,7 +872,7 @@ const ProductDetails = () => {
                   )}
 
                   <div className='flex gap-3 overflow-hidden'>
-                    {/* 🆕 Thumbnail do Vídeo */}
+                    {/* Thumbnail do Vídeo */}
                     {displayProduct.video && (
                       <div
                         onClick={() => { setShowVideo(true); }}
@@ -981,7 +981,7 @@ const ProductDetails = () => {
               </div>
             </div>
 
-            {/* 🆕 SELETOR DE CORES - ATUALIZADO PARA DUAL COLORS */}
+            {/* Seletor de Cores */}
             {familyProducts.length > 1 && (
               <div className='bg-white border border-gray-200 p-4 rounded-lg'>
                 <div className='flex items-center justify-between mb-3'>
@@ -1082,14 +1082,19 @@ const ProductDetails = () => {
                       <button
                         onClick={increaseQuantity}
                         className='w-10 h-10 flex items-center justify-center border border-gray-300 rounded-r-lg hover:bg-gray-50 transition-colors duration-200 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed'
-                        disabled={cartQuantity + quantity >= currentStock}
+                        disabled={quantity >= maxCanAdd}
                       >
                         +
                       </button>
                     </div>
                     {cartQuantity > 0 && (
                       <p className='text-xs text-primary mt-1'>
-                        {cartQuantity} {cartQuantity === 1 ? 'item' : 'itens'} no carrinho
+                        {cartQuantity} {cartQuantity === 1 ? 'item' : 'itens'} já no carrinho
+                      </p>
+                    )}
+                    {maxCanAdd < currentStock && maxCanAdd > 0 && (
+                      <p className='text-xs text-orange-600 mt-1'>
+                        Podes adicionar até {maxCanAdd} {maxCanAdd === 1 ? 'unidade' : 'unidades'}
                       </p>
                     )}
                   </div>
@@ -1127,10 +1132,26 @@ const ProductDetails = () => {
                 </>
               ) : (
                 <>
-                  <button onClick={handleAddToCart} className='w-full py-3 px-4 text-base font-semibold bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-all duration-300 active:scale-[0.98] border border-gray-200'>
-                    Adicionar ao Carrinho
+                  <button 
+                    onClick={handleAddToCart} 
+                    disabled={maxCanAdd <= 0}
+                    className={`w-full py-3 px-4 text-base font-semibold rounded-lg transition-all duration-300 active:scale-[0.98] border ${
+                      maxCanAdd <= 0 
+                        ? 'bg-gray-200 text-gray-500 border-gray-200 cursor-not-allowed' 
+                        : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
+                    }`}
+                  >
+                    {maxCanAdd <= 0 ? 'Stock Máximo no Carrinho' : `Adicionar ${quantity} ao Carrinho`}
                   </button>
-                  <button onClick={handleBuyNow} className='w-full py-3 px-4 text-base font-semibold bg-primary text-white rounded-lg hover:bg-primary-dull transition-all duration-300 active:scale-[0.98] shadow-lg hover:shadow-xl'>
+                  <button 
+                    onClick={handleBuyNow} 
+                    disabled={maxCanAdd <= 0}
+                    className={`w-full py-3 px-4 text-base font-semibold rounded-lg transition-all duration-300 active:scale-[0.98] shadow-lg hover:shadow-xl ${
+                      maxCanAdd <= 0 
+                        ? 'bg-gray-400 text-white cursor-not-allowed' 
+                        : 'bg-primary text-white hover:bg-primary-dull'
+                    }`}
+                  >
                     Comprar Agora
                   </button>
                 </>
@@ -1141,7 +1162,7 @@ const ProductDetails = () => {
             <div className={`p-3 md:p-4 rounded-lg transition-all duration-300 ${isInactive ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'}`}>
               {isInactive ? (
                 <div className='space-y-2 text-center'>
-                  <p className='text-red-700 font-semibold'>🚫 Produto Temporariamente Indisponível</p>
+                  <p className='text-red-700 font-semibold'>Produto Temporariamente Indisponível</p>
                   <p className='text-sm text-red-600'>Entre em contacto para saber quando voltará ao stock</p>
                 </div>
               ) : (

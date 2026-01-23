@@ -40,10 +40,42 @@ const Cart = () => {
   const [guestAddress, setGuestAddress] = useState(null);
   const [isAddressLoading, setIsAddressLoading] = useState(false);
   
-  // 🆕 Estado para morada de guest guardada no servidor
+  // Estado para morada de guest guardada no servidor
   const [guestAddressId, setGuestAddressId] = useState(null);
+
+  // Estado para countdown de redirecionamento
+  const [redirectCountdown, setRedirectCountdown] = useState(3);
   
   const validPromoCode = 'BROTHER';
+
+  // Verificar se carrinho está vazio
+  const isCartEmpty = !products.length || !cartItems || Object.keys(cartItems).length === 0;
+
+  // Redirecionamento automático quando carrinho está vazio
+  useEffect(() => {
+    if (isCartEmpty) {
+      const timer = setInterval(() => {
+        setRedirectCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            // Tentar voltar à página anterior, se não houver histórico vai para produtos
+            if (window.history.length > 2) {
+              navigate(-1);
+            } else {
+              navigate('/products');
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    } else {
+      // Reset countdown se o carrinho deixar de estar vazio
+      setRedirectCountdown(3);
+    }
+  }, [isCartEmpty, navigate]);
 
   // Carregar morada de guest do localStorage
   useEffect(() => {
@@ -188,7 +220,7 @@ const Cart = () => {
   };
 
   // =============================================================================
-  // 🆕 HANDLE PLACE ORDER - SUPORTA GUEST CHECKOUT COMPLETO
+  // HANDLE PLACE ORDER - SUPORTA GUEST CHECKOUT COMPLETO
   // =============================================================================
   const handlePlaceOrder = async () => {
     const currentAddress = getCurrentAddress();
@@ -213,7 +245,7 @@ const Cart = () => {
       const discountAmount = discountApplied ? subtotal * 0.3 : 0;
       const finalAmount = subtotal - discountAmount;
 
-      // 🆕 Preparar dados base do pedido
+      // Preparar dados base do pedido
       const orderData = {
         items: cartArray.map(item => ({
           product: item._id,
@@ -268,7 +300,7 @@ const Cart = () => {
         setCartItems(emptyCart);
         saveCartToStorage(emptyCart);
         
-        // 🆕 Guardar email de guest para página de sucesso
+        // Guardar email de guest para página de sucesso
         if (!user && currentAddress.email) {
           localStorage.setItem('guest_checkout_email', currentAddress.email);
         }
@@ -279,7 +311,7 @@ const Cart = () => {
         toast.error(response.data.message || 'Falha ao inicializar o pagamento.');
       }
     } catch (error) {
-      console.error('❌ Erro na encomenda:', error);
+      console.error('Erro na encomenda:', error);
       
       if (error.response?.status === 401 && user) {
         toast.error('Sessão expirada. Por favor, inicie sessão novamente.');
@@ -411,17 +443,27 @@ const Cart = () => {
     );
   };
 
-  // Empty cart
-  if (!products.length || !cartItems || Object.keys(cartItems).length === 0) {
+  // Empty cart com redirecionamento automático
+  if (isCartEmpty) {
     return (
       <>
         <SEO title={seoConfig.cart.title} description={seoConfig.cart.description} url={seoConfig.cart.url} noindex={true} />
         <div className='flex flex-col items-center justify-center min-h-[70vh] px-4 text-center bg-gray-50'>
           <img src={assets.empty_cart} alt='Carrinho vazio' className='w-56 sm:w-64 md:w-72 mb-6 max-w-full' />
           <h3 className='text-xl sm:text-2xl font-semibold mb-3 text-gray-700'>O seu carrinho está vazio!</h3>
-          <p className='text-gray-600 mb-6 max-w-md'>Parece que ainda não adicionou nada ao seu carrinho.</p>
+          <p className='text-gray-600 mb-4 max-w-md'>Ainda não adicionou produtos ao carrinho.</p>
+          
+          {/* Countdown indicator */}
+          <div className='mb-6 flex items-center gap-2 text-gray-500'>
+            <svg className='animate-spin h-4 w-4' viewBox='0 0 24 24'>
+              <circle className='opacity-25' cx='12' cy='12' r='10' stroke='currentColor' strokeWidth='4' fill='none' />
+              <path className='opacity-75' fill='currentColor' d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z' />
+            </svg>
+            <span className='text-sm'>A redirecionar em {redirectCountdown}s...</span>
+          </div>
+
           <button onClick={() => navigate('/products')} className='bg-primary text-white px-7 py-3 rounded-lg shadow-md hover:bg-primary-dull transition-all duration-300 text-base font-medium active:scale-95'>
-            Explorar produtos
+            Explorar produtos agora
           </button>
         </div>
       </>
@@ -536,7 +578,7 @@ const Cart = () => {
                         
                         {hasStockWarning && (
                           <p className='text-xs text-red-600 font-medium mt-1 bg-red-100 px-2 py-1 rounded'>
-                            ⚠️ {hasStockWarning}
+                            {hasStockWarning}
                           </p>
                         )}
                         
@@ -585,7 +627,7 @@ const Cart = () => {
 
             {Object.keys(stockWarnings).length > 0 && (
               <div className='mt-4 p-4 bg-red-50 border border-red-200 rounded-lg'>
-                <p className='text-red-700 font-medium'>⚠️ Alguns produtos excedem o stock disponível. Por favor, ajuste as quantidades antes de finalizar.</p>
+                <p className='text-red-700 font-medium'>Alguns produtos excedem o stock disponível. Por favor, ajuste as quantidades antes de finalizar.</p>
               </div>
             )}
           </div>
@@ -595,7 +637,7 @@ const Cart = () => {
             <div className='bg-white rounded-xl shadow-lg p-6 sticky lg:top-8'>
               <h2 className='text-2xl font-bold mb-5 text-gray-800'>Finalizar Compra</h2>
 
-              {/* 🆕 Guest Checkout Banner */}
+              {/* Guest Checkout Banner */}
               {!user && (
                 <div className='mb-4 p-3 bg-green-50 border border-green-200 rounded-lg'>
                   <div className='flex items-center gap-2 text-green-800'>
