@@ -1,17 +1,26 @@
 // server/controllers/orderController.js
-// 🎯 VERSÃO COM SUPORTE A STOCK + MB WAY + MULTIBANCO + GUEST CHECKOUT
-// 🆕 ATUALIZADO: Notificação por email/WhatsApp quando status é atualizado
+// CORRIGIDO: Importações seguras que não quebram se algo falhar
 
-import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } from '../services/emailService.js';
-import { sendStatusUpdateToAdmin } from '../services/whatsappService.js';
+import { sendOrderConfirmationEmail } from '../services/emailService.js';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
 import Address from '../models/Address.js';
 import stripe from 'stripe';
 
+// Importação segura do sendOrderStatusUpdateEmail
+let sendOrderStatusUpdateEmail = null;
+try {
+  const emailService = await import('../services/emailService.js');
+  sendOrderStatusUpdateEmail = emailService.sendOrderStatusUpdateEmail;
+  console.log('✅ sendOrderStatusUpdateEmail carregado');
+} catch (error) {
+  console.log('⚠️ sendOrderStatusUpdateEmail não disponível:', error.message);
+}
+
 // Importação segura do WhatsApp
 let notifyAdminNewOrder = null;
+let sendStatusUpdateToAdmin = null;
 try {
   const adminNotification = await import('../services/adminNotificationService.js');
   notifyAdminNewOrder = adminNotification.notifyAdminNewOrder;
@@ -20,8 +29,16 @@ try {
   console.log('⚠️ Serviço de notificação admin não disponível:', error.message);
 }
 
+try {
+  const whatsappService = await import('../services/whatsappService.js');
+  sendStatusUpdateToAdmin = whatsappService.sendStatusUpdateToAdmin;
+  console.log('✅ WhatsApp service carregado');
+} catch (error) {
+  console.log('⚠️ WhatsApp service não disponível:', error.message);
+}
+
 // =============================================================================
-// 🆕 FUNÇÃO PARA DECREMENTAR STOCK
+// FUNÇÃO PARA DECREMENTAR STOCK
 // =============================================================================
 const decrementProductStock = async (items) => {
   try {
@@ -54,7 +71,7 @@ const decrementProductStock = async (items) => {
 };
 
 // =============================================================================
-// 🆕 FUNÇÃO PARA VALIDAR STOCK ANTES DE CRIAR PEDIDO
+// FUNÇÃO PARA VALIDAR STOCK ANTES DE CRIAR PEDIDO
 // =============================================================================
 const validateOrderStock = async (items) => {
   const errors = [];
@@ -86,7 +103,7 @@ const validateOrderStock = async (items) => {
 };
 
 // =============================================================================
-// 🆕 FUNÇÃO PARA ENVIAR EMAIL - SUPORTA USER E GUEST
+// FUNÇÃO PARA ENVIAR EMAIL - SUPORTA USER E GUEST
 // =============================================================================
 const sendClientEmail = async (order, userOrEmail) => {
   try {
@@ -98,21 +115,24 @@ const sendClientEmail = async (order, userOrEmail) => {
     
     // Determinar se é user registado ou guest
     if (typeof userOrEmail === 'string') {
-      // É um email de guest
-      email = userOrEmail;
-      customerName = order.guestName || 'Cliente';
+      // Verificar se é um email ou um userId
+      if (userOrEmail.includes('@')) {
+        // É um email de guest
+        email = userOrEmail;
+        customerName = order.guestName || 'Cliente';
+      } else {
+        // É um userId string
+        user = await User.findById(userOrEmail);
+        if (user) {
+          email = user.email;
+          customerName = user.name;
+        }
+      }
     } else if (userOrEmail?._id) {
       // É um objeto user
       user = userOrEmail;
       email = user.email;
       customerName = user.name;
-    } else if (userOrEmail) {
-      // É um userId string
-      user = await User.findById(userOrEmail);
-      if (user) {
-        email = user.email;
-        customerName = user.name;
-      }
     }
     
     // Se é guest order, usar dados do pedido
@@ -127,6 +147,8 @@ const sendClientEmail = async (order, userOrEmail) => {
 
     if (!email || !address) {
       console.error('❌ Dados insuficientes para enviar email');
+      console.error('❌ Email:', email);
+      console.error('❌ Address:', address?._id);
       return;
     }
 
@@ -137,6 +159,7 @@ const sendClientEmail = async (order, userOrEmail) => {
       email: email
     };
 
+    console.log('📧 Enviando email para:', email);
     const emailResult = await sendOrderConfirmationEmail(order, emailUser, products, address);
     
     if (emailResult.success) {
@@ -162,7 +185,7 @@ const sendClientEmail = async (order, userOrEmail) => {
 };
 
 // =============================================================================
-// 🆕 PLACE ORDER COD - SUPORTA GUEST
+// PLACE ORDER COD - SUPORTA GUEST
 // =============================================================================
 export const placeOrderCOD = async (req, res) => {
   try {
@@ -175,7 +198,7 @@ export const placeOrderCOD = async (req, res) => {
       discountAmount,
       discountPercentage,
       promoCode,
-      // 🆕 Campos de guest
+      // Campos de guest
       isGuestOrder,
       guestEmail,
       guestName,
@@ -186,7 +209,7 @@ export const placeOrderCOD = async (req, res) => {
       return res.json({ success: false, message: 'Dados inválidos' });
     }
 
-    // 🆕 Validar: precisa de userId OU dados de guest
+    // Validar: precisa de userId OU dados de guest
     if (!userId && !isGuestOrder) {
       return res.json({ success: false, message: 'Utilizador ou dados de guest necessários' });
     }
@@ -204,7 +227,7 @@ export const placeOrderCOD = async (req, res) => {
       });
     }
 
-    // 🆕 Criar pedido com suporte a guest
+    // Criar pedido com suporte a guest
     const orderData = {
       items,
       amount,
@@ -240,7 +263,7 @@ export const placeOrderCOD = async (req, res) => {
       await User.findByIdAndUpdate(userId, { cartItems: {} });
     }
 
-    // Enviar email
+    // Enviar email (async, não bloqueia a resposta)
     const emailRecipient = isGuestOrder ? guestEmail : userId;
     sendClientEmail(newOrder, emailRecipient).catch(err => {
       console.error('❌ Erro no envio de email (background):', err.message);
@@ -259,7 +282,7 @@ export const placeOrderCOD = async (req, res) => {
 };
 
 // =============================================================================
-// 🆕 PLACE ORDER STRIPE - SUPORTA GUEST
+// PLACE ORDER STRIPE - SUPORTA GUEST
 // =============================================================================
 export const placeOrderStripe = async (req, res) => {
   console.log('🚀 STRIPE FUNCTION STARTED!!!');
@@ -275,7 +298,7 @@ export const placeOrderStripe = async (req, res) => {
       discountPercentage,
       promoCode,
       paymentMethod,
-      // 🆕 Campos de guest
+      // Campos de guest
       isGuestOrder,
       guestEmail,
       guestName,
@@ -288,7 +311,7 @@ export const placeOrderStripe = async (req, res) => {
       return res.json({ success: false, message: 'Dados inválidos' });
     }
 
-    // 🆕 Validar: precisa de userId OU dados de guest
+    // Validar: precisa de userId OU dados de guest
     if (!userId && !isGuestOrder) {
       return res.json({ success: false, message: 'Utilizador ou dados de guest necessários' });
     }
@@ -317,7 +340,7 @@ export const placeOrderStripe = async (req, res) => {
       });
     }
 
-    // 🆕 Criar pedido com suporte a guest
+    // Criar pedido com suporte a guest
     const orderData = {
       items,
       amount,
@@ -383,7 +406,7 @@ export const placeOrderStripe = async (req, res) => {
         break;
     }
 
-    // 🆕 Incluir dados de guest no metadata
+    // Incluir dados de guest no metadata
     const sessionOptions = {
       line_items,
       mode: 'payment',
@@ -399,7 +422,7 @@ export const placeOrderStripe = async (req, res) => {
       },
     };
 
-    // 🆕 Pre-fill email para guest
+    // Pre-fill email para guest
     if (isGuestOrder && guestEmail) {
       sessionOptions.customer_email = guestEmail;
     }
@@ -424,7 +447,7 @@ export const placeOrderStripe = async (req, res) => {
 };
 
 // =============================================================================
-// STRIPE WEBHOOKS - 🆕 COM SUPORTE A GUEST
+// STRIPE WEBHOOKS - COM SUPORTE A GUEST
 // =============================================================================
 export const stripeWebhooks = async (request, response) => {
   const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
@@ -574,14 +597,14 @@ export const stripeWebhooks = async (request, response) => {
 };
 
 // =============================================================================
-// GET USER ORDERS - 🆕 SUPORTA BUSCA POR EMAIL (GUEST)
+// GET USER ORDERS - SUPORTA BUSCA POR EMAIL (GUEST)
 // =============================================================================
 export const getUserOrders = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id || req.query.userId || req.body.userId;
     const guestEmail = req.query.guestEmail || req.body.guestEmail;
 
-    // 🆕 Permitir buscar por guestEmail OU userId
+    // Permitir buscar por guestEmail OU userId
     let query;
     
     if (guestEmail) {
@@ -620,7 +643,7 @@ export const getUserOrders = async (req, res) => {
 };
 
 // =============================================================================
-// 🆕 GET SINGLE ORDER (PUBLIC - PARA PÁGINA DE SUCESSO)
+// GET SINGLE ORDER (PUBLIC - PARA PÁGINA DE SUCESSO)
 // =============================================================================
 export const getOrderById = async (req, res) => {
   try {
@@ -680,7 +703,7 @@ export const getAllOrders = async (req, res) => {
 };
 
 // =============================================================================
-// 🆕 UPDATE ORDER STATUS (SELLER/ADMIN) - COM NOTIFICAÇÃO AO CLIENTE
+// UPDATE ORDER STATUS (SELLER/ADMIN) - COM NOTIFICAÇÃO AO CLIENTE
 // =============================================================================
 export const updateOrderStatus = async (req, res) => {
   try {
@@ -739,11 +762,12 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     // ==========================================================================
-    // 🆕 ENVIAR NOTIFICAÇÃO AO CLIENTE
+    // ENVIAR NOTIFICAÇÃO AO CLIENTE (se o status mudou)
     // ==========================================================================
     
-    // Só notificar se o status realmente mudou
-    if (previousStatus !== status) {
+    let notificationSent = false;
+    
+    if (previousStatus !== status && sendOrderStatusUpdateEmail) {
       console.log('📧 Enviando notificação de status ao cliente...');
       
       // Buscar produtos para o email
@@ -774,23 +798,27 @@ export const updateOrderStatus = async (req, res) => {
           console.error('❌ Erro ao enviar email de status:', err.message);
         });
 
-      // Notificar admin via WhatsApp (opcional, para tracking)
-      sendStatusUpdateToAdmin(updatedOrder, customerName, status)
-        .then(result => {
-          if (result.success) {
-            console.log('✅ WhatsApp admin notificado');
-          }
-        })
-        .catch(err => {
-          console.log('⚠️ WhatsApp admin não enviado:', err.message);
-        });
+      // Notificar admin via WhatsApp (opcional)
+      if (sendStatusUpdateToAdmin) {
+        sendStatusUpdateToAdmin(updatedOrder, customerName, status)
+          .then(result => {
+            if (result.success) {
+              console.log('✅ WhatsApp admin notificado');
+            }
+          })
+          .catch(err => {
+            console.log('⚠️ WhatsApp admin não enviado:', err.message);
+          });
+      }
+      
+      notificationSent = true;
     }
 
     res.json({
       success: true,
       message: `Status atualizado para "${status}"`,
       order: updatedOrder,
-      notificationSent: previousStatus !== status,
+      notificationSent,
     });
   } catch (error) {
     console.error('❌ Erro ao atualizar status:', error);

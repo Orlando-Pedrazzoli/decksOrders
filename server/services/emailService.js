@@ -1,12 +1,21 @@
 // server/services/emailService.js
-// 🆕 ATUALIZADO: Adicionado sendOrderStatusUpdateEmail
+// CORRIGIDO: Importação segura do OrderStatusUpdateEmail
 
 import nodemailer from 'nodemailer';
 import { createOrderEmailTemplate } from '../emails/OrderConfirmationEmail.js';
-import { 
-  createStatusUpdateEmailTemplate, 
-  createStatusUpdateTextTemplate 
-} from '../emails/OrderStatusUpdateEmail.js';
+
+// Importação segura do template de status (não quebra se não existir)
+let createStatusUpdateEmailTemplate = null;
+let createStatusUpdateTextTemplate = null;
+
+try {
+  const statusModule = await import('../emails/OrderStatusUpdateEmail.js');
+  createStatusUpdateEmailTemplate = statusModule.createStatusUpdateEmailTemplate;
+  createStatusUpdateTextTemplate = statusModule.createStatusUpdateTextTemplate;
+  console.log('✅ Template de status update carregado');
+} catch (error) {
+  console.log('⚠️ Template de status update não disponível:', error.message);
+}
 
 const createGmailTransporter = () => {
   return nodemailer.createTransport({
@@ -32,11 +41,7 @@ export const sendOrderConfirmationEmail = async (
     let emailToSend = user.email;
 
     // Se o email do usuário for inválido, use o do endereço
-    if (
-      !user.email ||
-      user.email === '' ||
-      user.email === 'pedrazzoliorlando@gmail.com'
-    ) {
+    if (!user.email || user.email === '') {
       console.log('⚠️ Email do usuário inválido, usando email do endereço');
       emailToSend = address.email;
     }
@@ -44,6 +49,8 @@ export const sendOrderConfirmationEmail = async (
     // Validação final
     if (!emailToSend || emailToSend === '') {
       console.error('❌ Nenhum email válido encontrado');
+      console.error('❌ user.email:', user.email);
+      console.error('❌ address.email:', address.email);
       return {
         success: false,
         error: 'Nenhum email válido encontrado para envio',
@@ -78,6 +85,7 @@ export const sendOrderConfirmationEmail = async (
 
     const result = await transporter.sendMail(mailOptions);
     console.log('✅ Email de confirmação enviado. ID:', result.messageId);
+    console.log('✅ Enviado para:', emailToSend);
 
     return {
       success: true,
@@ -95,10 +103,16 @@ export const sendOrderConfirmationEmail = async (
 };
 
 // =============================================================================
-// 🆕 ENVIAR EMAIL DE ATUALIZAÇÃO DE STATUS
+// ENVIAR EMAIL DE ATUALIZAÇÃO DE STATUS
 // =============================================================================
 export const sendOrderStatusUpdateEmail = async (order, newStatus, products = []) => {
   try {
+    // Verificar se template está disponível
+    if (!createStatusUpdateEmailTemplate) {
+      console.log('⚠️ Template de status não disponível, pulando envio');
+      return { success: false, error: 'Template não disponível' };
+    }
+
     // Determinar email e nome do cliente
     let customerEmail = null;
     let customerName = 'Cliente';
@@ -107,17 +121,16 @@ export const sendOrderStatusUpdateEmail = async (order, newStatus, products = []
     if (order.isGuestOrder && order.guestEmail) {
       customerEmail = order.guestEmail;
       customerName = order.guestName || 'Cliente';
-      console.log('📧 Enviando para guest:', customerEmail);
+      console.log('📧 Enviando status update para guest:', customerEmail);
     }
     // 2. Se tem userId, buscar do usuário
     else if (order.userId) {
-      // Importar User model dinamicamente para evitar circular dependency
       const { default: User } = await import('../models/User.js');
       const user = await User.findById(order.userId);
       if (user) {
         customerEmail = user.email;
         customerName = user.name;
-        console.log('📧 Enviando para user registado:', customerEmail);
+        console.log('📧 Enviando status update para user:', customerEmail);
       }
     }
 
@@ -154,15 +167,17 @@ export const sendOrderStatusUpdateEmail = async (order, newStatus, products = []
       newStatus, 
       products
     );
-    const emailText = createStatusUpdateTextTemplate(order, customerName, newStatus);
+    const emailText = createStatusUpdateTextTemplate 
+      ? createStatusUpdateTextTemplate(order, customerName, newStatus)
+      : `Olá ${customerName}, o estado do seu pedido foi atualizado para: ${newStatus}`;
 
     // Mapear status para assunto do email
     const statusSubjects = {
       'Order Placed': 'Pedido Recebido',
       'Processing': 'Pedido em Processamento',
-      'Shipped': 'Pedido Enviado! 🚚',
-      'Out for Delivery': 'Pedido Saiu para Entrega! 🏃',
-      'Delivered': 'Pedido Entregue! ✅',
+      'Shipped': 'Pedido Enviado!',
+      'Out for Delivery': 'Pedido Saiu para Entrega!',
+      'Delivered': 'Pedido Entregue!',
       'Cancelled': 'Pedido Cancelado',
     };
 
@@ -181,7 +196,7 @@ export const sendOrderStatusUpdateEmail = async (order, newStatus, products = []
 
     const result = await transporter.sendMail(mailOptions);
     
-    console.log('✅ Email de atualização de status enviado!');
+    console.log('✅ Email de status enviado!');
     console.log('✅ Message ID:', result.messageId);
     console.log('✅ Destinatário:', customerEmail);
 
@@ -192,7 +207,7 @@ export const sendOrderStatusUpdateEmail = async (order, newStatus, products = []
       status: newStatus,
     };
   } catch (error) {
-    console.error('❌ Erro ao enviar email de atualização de status:', error);
+    console.error('❌ Erro ao enviar email de status:', error);
     return {
       success: false,
       error: error.message || 'Erro desconhecido',
