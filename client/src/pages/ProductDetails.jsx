@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 import { assets } from '../assets/assets';
 import ProductCard from '../components/ProductCard';
 import ProductReviews from '../components/ProductReviews';
+import ShareProduct from '../components/ShareProduct';
 import { SEO, ProductSchema, BreadcrumbSchema } from '../components/seo';
 import toast from 'react-hot-toast';
 
@@ -946,11 +947,16 @@ const ProductDetails = () => {
 
           {/* Product Details */}
           <div className='space-y-4'>
-            {/* Título com transição */}
+            {/* Título com transição e botão de partilha */}
             <div className={`transition-all duration-200 ${isColorTransitioning ? 'opacity-0 translate-x-2' : 'opacity-100 translate-x-0'}`}>
-              <h1 className='text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 leading-tight'>
-                {displayProduct.name}
-              </h1>
+              <div className='flex items-start justify-between gap-4'>
+                <h1 className='text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 leading-tight flex-1'>
+                  {displayProduct.name}
+                </h1>
+                
+                {/* Botão de Partilha */}
+                <ShareProduct product={displayProduct} className="flex-shrink-0 mt-1" />
+              </div>
 
               {/* Rating */}
               <div className='flex items-center gap-2 mt-2'>
