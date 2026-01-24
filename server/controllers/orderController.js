@@ -1,7 +1,9 @@
 // server/controllers/orderController.js
 // 🎯 VERSÃO COM SUPORTE A STOCK + MB WAY + MULTIBANCO + GUEST CHECKOUT
+// 🆕 ATUALIZADO: Notificação por email/WhatsApp quando status é atualizado
 
-import { sendOrderConfirmationEmail } from '../services/emailService.js';
+import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } from '../services/emailService.js';
+import { sendStatusUpdateToAdmin } from '../services/whatsappService.js';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
@@ -678,7 +680,7 @@ export const getAllOrders = async (req, res) => {
 };
 
 // =============================================================================
-// UPDATE ORDER STATUS (SELLER/ADMIN)
+// 🆕 UPDATE ORDER STATUS (SELLER/ADMIN) - COM NOTIFICAÇÃO AO CLIENTE
 // =============================================================================
 export const updateOrderStatus = async (req, res) => {
   try {
@@ -704,35 +706,91 @@ export const updateOrderStatus = async (req, res) => {
       return res.json({ success: false, message: 'Status inválido' });
     }
 
+    // Buscar pedido atual
     const order = await Order.findById(orderId);
 
     if (!order) {
       return res.json({ success: false, message: 'Pedido não encontrado' });
     }
 
+    // Guardar status anterior para log
+    const previousStatus = order.status;
+
+    // Atualizar status
     const updatedOrder = await Order.findByIdAndUpdate(
       orderId,
       { status },
       { new: true }
     )
-      .populate('items.product address')
+      .populate('items.product')
+      .populate('address')
       .exec();
 
     console.log('✅ Status atualizado:', {
       orderId: updatedOrder._id,
-      oldStatus: order.status,
+      oldStatus: previousStatus,
       newStatus: status,
     });
 
+    // Se entregue e COD, marcar como pago
     if (status === 'Delivered' && order.paymentType === 'COD') {
       await Order.findByIdAndUpdate(orderId, { isPaid: true });
       console.log('✅ Pedido COD marcado como pago (entregue)');
+    }
+
+    // ==========================================================================
+    // 🆕 ENVIAR NOTIFICAÇÃO AO CLIENTE
+    // ==========================================================================
+    
+    // Só notificar se o status realmente mudou
+    if (previousStatus !== status) {
+      console.log('📧 Enviando notificação de status ao cliente...');
+      
+      // Buscar produtos para o email
+      const productIds = updatedOrder.items.map(item => 
+        item.product?._id || item.product
+      );
+      const products = await Product.find({ _id: { $in: productIds } });
+
+      // Determinar nome do cliente para logs
+      let customerName = 'Cliente';
+      if (updatedOrder.isGuestOrder && updatedOrder.guestName) {
+        customerName = updatedOrder.guestName;
+      } else if (updatedOrder.userId) {
+        const user = await User.findById(updatedOrder.userId);
+        if (user) customerName = user.name;
+      }
+
+      // Enviar email de atualização de status (async, não bloqueia)
+      sendOrderStatusUpdateEmail(updatedOrder, status, products)
+        .then(result => {
+          if (result.success) {
+            console.log('✅ Email de status enviado para:', result.recipient);
+          } else {
+            console.error('❌ Falha no email de status:', result.error);
+          }
+        })
+        .catch(err => {
+          console.error('❌ Erro ao enviar email de status:', err.message);
+        });
+
+      // Notificar admin via WhatsApp (opcional, para tracking)
+      sendStatusUpdateToAdmin(updatedOrder, customerName, status)
+        .then(result => {
+          if (result.success) {
+            console.log('✅ WhatsApp admin notificado');
+          }
+        })
+        .catch(err => {
+          console.log('⚠️ WhatsApp admin não enviado:', err.message);
+        });
     }
 
     res.json({
       success: true,
       message: `Status atualizado para "${status}"`,
       order: updatedOrder,
+      notificationSent: previousStatus !== status,
     });
   } catch (error) {
     console.error('❌ Erro ao atualizar status:', error);

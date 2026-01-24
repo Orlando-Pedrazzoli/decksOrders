@@ -1,3 +1,6 @@
+// server/controllers/userController.js
+// 🆕 ATUALIZADO: Adicionado loginAndLinkOrder
+
 import User from '../models/User.js';
 import Order from '../models/Order.js';
 import bcrypt from 'bcryptjs';
@@ -11,7 +14,9 @@ const getCookieOptions = () => ({
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
 });
 
-// Register User : /api/user/register
+// =============================================================================
+// REGISTER USER : /api/user/register
+// =============================================================================
 export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -49,7 +54,9 @@ export const register = async (req, res) => {
   }
 };
 
-// Login User : /api/user/login
+// =============================================================================
+// LOGIN USER : /api/user/login
+// =============================================================================
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -91,7 +98,9 @@ export const login = async (req, res) => {
   }
 };
 
-// Check Auth : /api/user/is-auth
+// =============================================================================
+// CHECK AUTH : /api/user/is-auth
+// =============================================================================
 export const isAuth = async (req, res) => {
   try {
     const { userId } = req.body;
@@ -116,7 +125,9 @@ export const isAuth = async (req, res) => {
   }
 };
 
-// Logout User : /api/user/logout
+// =============================================================================
+// LOGOUT USER : /api/user/logout
+// =============================================================================
 export const logout = async (req, res) => {
   try {
     res.clearCookie('token', getCookieOptions());
@@ -242,10 +253,110 @@ export const checkEmailExists = async (req, res) => {
     return res.json({
       success: true,
       exists: !!existingUser,
+      // 🆕 Retornar nome se existir (para personalizar a mensagem)
+      userName: existingUser ? existingUser.name.split(' ')[0] : null,
     });
 
   } catch (error) {
     console.error('❌ Erro ao verificar email:', error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+// =============================================================================
+// 🆕 LOGIN AND LINK ORDER - Login + vincular pedidos de guest
+// =============================================================================
+export const loginAndLinkOrder = async (req, res) => {
+  try {
+    const { email, password, orderId } = req.body;
+
+    // Validações básicas
+    if (!email || !password) {
+      return res.json({
+        success: false,
+        message: 'Email e password são obrigatórios',
+      });
+    }
+
+    // Buscar user
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.json({ 
+        success: false, 
+        message: 'Email ou password incorretos' 
+      });
+    }
+
+    // Verificar password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.json({ 
+        success: false, 
+        message: 'Email ou password incorretos' 
+      });
+    }
+
+    console.log('✅ Login bem-sucedido para:', user.email);
+
+    // 🆕 Vincular pedido específico se fornecido
+    let orderLinked = false;
+    if (orderId) {
+      const orderUpdate = await Order.findByIdAndUpdate(
+        orderId,
+        {
+          $set: {
+            userId: user._id.toString(),
+            isGuestOrder: false,
+          },
+        },
+        { new: true }
+      );
+
+      if (orderUpdate) {
+        console.log('✅ Pedido vinculado à conta:', orderId);
+        orderLinked = true;
+      }
+    }
+
+    // 🆕 Vincular TODOS os pedidos de guest com este email
+    const bulkUpdateResult = await Order.updateMany(
+      {
+        guestEmail: email,
+        isGuestOrder: true,
+      },
+      {
+        $set: {
+          userId: user._id.toString(),
+          isGuestOrder: false,
+        },
+      }
+    );
+
+    console.log(`✅ ${bulkUpdateResult.modifiedCount} pedido(s) de guest vinculado(s)`);
+
+    // Gerar token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: '7d',
+    });
+
+    res.cookie('token', token, getCookieOptions());
+
+    return res.json({
+      success: true,
+      message: 'Login realizado com sucesso!',
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        cartItems: user.cartItems || {},
+      },
+      token,
+      orderLinked,
+      totalOrdersLinked: bulkUpdateResult.modifiedCount + (orderLinked ? 1 : 0),
+    });
+
+  } catch (error) {
+    console.error('❌ Erro no loginAndLinkOrder:', error);
     res.json({ success: false, message: error.message });
   }
 };
