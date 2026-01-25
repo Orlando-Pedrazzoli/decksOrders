@@ -82,10 +82,23 @@ const AllProducts = () => {
       );
     }
 
-    // Apply in-stock filter
-    currentResult = currentResult.filter(product => product.inStock);
+    // ✅ Ordenar: produtos disponíveis primeiro, indisponíveis no final
+    currentResult.sort((a, b) => {
+      const aAvailable = a.inStock && a.stock > 0;
+      const bAvailable = b.inStock && b.stock > 0;
+      
+      // Se ambos têm o mesmo status de disponibilidade, manter ordem original
+      if (aAvailable === bAvailable) return 0;
+      
+      // Disponíveis primeiro
+      return aAvailable ? -1 : 1;
+    });
 
-    setFilteredProducts([...currentResult].reverse());
+    // Inverter para mostrar mais recentes primeiro (dentro de cada grupo)
+    const availableProducts = currentResult.filter(p => p.inStock && p.stock > 0).reverse();
+    const unavailableProducts = currentResult.filter(p => !p.inStock || p.stock <= 0).reverse();
+    
+    setFilteredProducts([...availableProducts, ...unavailableProducts]);
   }, [products, searchQuery, selectedCategories, selectedGroups]);
 
   // 🆕 Toggle group expansion
@@ -141,12 +154,12 @@ const AllProducts = () => {
     setShowFilterPanel(false);
   };
 
-  // 🆕 Contar produtos por group
+  // 🆕 Contar produtos por group (incluindo indisponíveis)
   const getGroupProductCount = (groupSlug) => {
     const groupCategoryPaths = getCategoriesByGroup(groupSlug).map(cat => cat.path.toLowerCase());
     
     return products.filter(product => {
-      if (product.isMainVariant === false || !product.inStock) return false;
+      if (product.isMainVariant === false) return false;
       
       if (product.group === groupSlug) return true;
       
@@ -155,10 +168,10 @@ const AllProducts = () => {
     }).length;
   };
 
-  // 🆕 Contar produtos por categoria
+  // 🆕 Contar produtos por categoria (incluindo indisponíveis)
   const getCategoryProductCount = (categoryPath) => {
     return products.filter(product => {
-      if (product.isMainVariant === false || !product.inStock) return false;
+      if (product.isMainVariant === false) return false;
       return (product.category || '').toLowerCase() === categoryPath.toLowerCase();
     }).length;
   };

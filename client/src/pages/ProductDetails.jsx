@@ -220,7 +220,6 @@ const ProductDetails = () => {
   // Modal handlers
   const openModal = useCallback(
     index => {
-      if (isInactive) return;
       setModalImageIndex(index || currentImageIndex);
       setIsModalOpen(true);
       setIsZoomed(false);
@@ -228,7 +227,7 @@ const ProductDetails = () => {
       setImagePosition({ x: 0, y: 0 });
       document.body.style.overflow = 'hidden';
     },
-    [currentImageIndex, isInactive]
+    [currentImageIndex]
   );
 
   const closeModal = useCallback(() => {
@@ -387,20 +386,16 @@ const ProductDetails = () => {
     }
   }, [currentImageIndex]);
 
-  // ✅ HANDLERS DE QUANTIDADE - INDEPENDENTES DO CARRINHO
+  // ✅ HANDLERS DE QUANTIDADE
   const increaseQuantity = () => {
-    if (isInactive) return;
-    
     if (quantity >= availableToAdd) {
       toast.error(`Apenas ${availableToAdd} unidade(s) disponível(eis)`);
       return;
     }
-    
     setQuantity(prev => prev + 1);
   };
 
   const decreaseQuantity = () => {
-    if (isInactive) return;
     if (quantity > 1) {
       setQuantity(prev => prev - 1);
     }
@@ -445,7 +440,6 @@ const ProductDetails = () => {
   };
 
   const changeImage = newIndex => {
-    if (isInactive) return;
     setIsTransitioning(true);
     setCurrentImageIndex(newIndex);
 
@@ -461,31 +455,30 @@ const ProductDetails = () => {
   };
 
   const nextImage = () => {
-    if (isInactive || !displayProduct) return;
+    if (!displayProduct) return;
     const newIndex = (currentImageIndex + 1) % displayProduct.image.length;
     changeImage(newIndex);
   };
 
   const prevImage = () => {
-    if (isInactive || !displayProduct) return;
+    if (!displayProduct) return;
     const newIndex = (currentImageIndex - 1 + displayProduct.image.length) % displayProduct.image.length;
     changeImage(newIndex);
   };
 
   const scrollThumbsLeft = () => {
-    if (isInactive || !displayProduct) return;
+    if (!displayProduct) return;
     const newIndex = thumbStartIndex - 1;
     setThumbStartIndex(newIndex < 0 ? Math.max(0, displayProduct.image.length - 5) : newIndex);
   };
 
   const scrollThumbsRight = () => {
-    if (isInactive || !displayProduct) return;
+    if (!displayProduct) return;
     const newIndex = thumbStartIndex + 1;
     setThumbStartIndex(newIndex > displayProduct.image.length - 5 ? 0 : newIndex);
   };
 
   const selectThumbnail = index => {
-    if (isInactive) return;
     changeImage(index);
   };
 
@@ -781,21 +774,11 @@ const ProductDetails = () => {
                     <img
                       src={image}
                       alt={`Imagem ${index + 1}`}
-                      className={`w-full h-full object-contain transition-all duration-300 ${
-                        isInactive ? 'blur-sm grayscale cursor-default' : 'cursor-pointer'
-                      } ${isColorTransitioning ? 'opacity-0' : 'opacity-100'}`}
-                      onClick={() => !isInactive && openModal(index)}
+                      className={`w-full h-full object-contain transition-all duration-300 cursor-pointer ${isColorTransitioning ? 'opacity-0' : 'opacity-100'}`}
+                      onClick={() => openModal(index)}
                     />
                   </div>
                 ))}
-
-                {isInactive && (
-                  <div className='absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px] pointer-events-none rounded-xl'>
-                    <div className='bg-red-500 text-white px-6 py-3 rounded-xl font-bold text-lg shadow-2xl border-2 border-white/30 transform rotate-[-5deg] animate-pulse'>
-                      INDISPONÍVEL
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Desktop Main Image */}
@@ -813,32 +796,20 @@ const ProductDetails = () => {
                   <img
                     src={displayProduct.image[currentImageIndex]}
                     alt='Produto'
-                    className={`w-full h-full object-contain transition-all duration-300 ${
+                    className={`w-full h-full object-contain transition-all duration-300 cursor-pointer ${
                       isTransitioning ? 'opacity-70' : 'opacity-100'
-                    } ${isInactive ? 'blur-sm grayscale cursor-default' : 'cursor-pointer'} ${
-                      isColorTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
-                    }`}
-                    onClick={() => !isInactive && openModal(currentImageIndex)}
+                    } ${isColorTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+                    onClick={() => openModal(currentImageIndex)}
                   />
                 )}
 
-                {isInactive && (
-                  <div className='absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[2px] rounded-xl pointer-events-none'>
-                    <div className='bg-red-500 text-white px-6 py-3 rounded-xl font-bold text-lg shadow-2xl border-2 border-white/30 transform rotate-[-5deg] animate-pulse'>
-                      INDISPONÍVEL
-                    </div>
-                  </div>
-                )}
 
 
+                <div className='absolute top-2 right-2 bg-black/50 text-white p-2 rounded-lg text-xs opacity-0 hover:opacity-100 transition-opacity'>
+                  Clique para ampliar
+                </div>
 
-                {!isInactive && (
-                  <div className='absolute top-2 right-2 bg-black/50 text-white p-2 rounded-lg text-xs opacity-0 hover:opacity-100 transition-opacity'>
-                    Clique para ampliar
-                  </div>
-                )}
-
-                {!isInactive && displayProduct.image.length > 1 && (
+                {displayProduct.image.length > 1 && (
                   <>
                     <button
                       onClick={e => { e.stopPropagation(); prevImage(); }}
@@ -873,19 +844,17 @@ const ProductDetails = () => {
                 {displayProduct.image.map((_, index) => (
                   <button
                     key={index}
-                    onClick={() => !isInactive && changeImage(index)}
-                    disabled={isInactive}
+                    onClick={() => changeImage(index)}
                     className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
                       currentImageIndex === index ? 'bg-primary scale-110' : 'bg-gray-300 hover:bg-gray-400'
-                    } ${isInactive ? 'cursor-not-allowed opacity-50' : ''}`}
+                    }`}
                   />
                 ))}
               </div>
             </div>
 
             {/* Desktop Thumbnails */}
-            {!isInactive && (
-              <div className='hidden sm:flex justify-center'>
+            <div className='hidden sm:flex justify-center'>
                 <div className='flex items-center gap-2 max-w-[550px]'>
                   {displayProduct.image.length > 5 && (
                     <button onClick={scrollThumbsLeft} className='p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all duration-300 active:scale-90 flex-shrink-0'>
@@ -936,7 +905,6 @@ const ProductDetails = () => {
                   )}
                 </div>
               </div>
-            )}
 
             {/* Especificações - Desktop */}
             <div className='hidden sm:flex justify-center'>
@@ -1079,9 +1047,9 @@ const ProductDetails = () => {
             </div>
 
             {/* Stock e Quantidade */}
-            <div className={`bg-white border p-3 md:p-4 rounded-lg transition-all duration-300 ${isInactive ? 'border-red-200 bg-red-50/30' : availableToAdd <= 0 ? 'border-orange-200 bg-orange-50/30' : 'border-gray-200'}`}>
+            <div className='bg-white border p-3 md:p-4 rounded-lg transition-all duration-300 border-gray-200'>
               <div className='space-y-3'>
-                {/* Status de Stock - Mostra quantidade disponível para adicionar */}
+                {/* Status de Stock */}
                 <div className='flex items-center gap-2'>
                   <div className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${getStockIndicatorColor()}`}></div>
                   <span className={`text-sm font-medium transition-colors duration-300 ${getStockStatusColor()}`}>
@@ -1114,97 +1082,60 @@ const ProductDetails = () => {
                     </div>
                   </div>
                 )}
-
-                {isInactive && (
-                  <div className='bg-red-50 border border-red-200 rounded-lg p-3'>
-                    <p className='text-sm text-red-700 text-center'>
-                      Este produto está temporariamente indisponível
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
 
             {/* Botões de Ação */}
             <div className='space-y-3'>
-              {isInactive ? (
-                <>
-                  <div className='bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-xl p-5 text-center'>
-                    <div className='flex items-center justify-center gap-3 mb-3'>
-                      <svg className='w-8 h-8 text-red-500 animate-pulse' fill='currentColor' viewBox='0 0 20 20'>
-                        <path fillRule='evenodd' d='M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z' clipRule='evenodd' />
-                      </svg>
-                      <span className='text-red-700 font-bold text-xl'>PRODUTO INDISPONÍVEL</span>
-                    </div>
-                    <p className='text-red-600 text-sm'>
-                      Este produto está temporariamente indisponível.<br />
-                      Entre em contacto connosco para saber quando voltará ao stock.
-                    </p>
-                  </div>
-                  <button onClick={() => navigate('/contact')} className='w-full py-3 px-4 text-base font-semibold bg-primary/10 text-primary border-2 border-primary rounded-lg hover:bg-primary hover:text-white transition-all duration-300 active:scale-[0.98]'>
-                    Contacte-nos para Mais Informações
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Botão Adicionar ao Carrinho - Desativado quando não pode adicionar mais */}
-                  <button 
-                    onClick={handleAddToCart} 
-                    disabled={availableToAdd <= 0}
-                    className={`w-full py-3 px-4 text-base font-semibold rounded-lg transition-all duration-300 active:scale-[0.98] border ${
-                      availableToAdd <= 0 
-                        ? 'bg-gray-200 text-gray-500 border-gray-200 cursor-not-allowed' 
-                        : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
-                    }`}
-                  >
-                    {availableToAdd <= 0 ? 'Stock Máximo no Carrinho' : `Adicionar ${quantity} ao Carrinho`}
-                  </button>
-                  
-                  {/* Botão Comprar Agora - SEMPRE ativo se há itens no carrinho OU pode adicionar */}
-                  <button 
-                    onClick={handleBuyNow} 
-                    disabled={!hasItemsInCart && availableToAdd <= 0}
-                    className={`w-full py-3 px-4 text-base font-semibold rounded-lg transition-all duration-300 active:scale-[0.98] shadow-lg hover:shadow-xl ${
-                      !hasItemsInCart && availableToAdd <= 0
-                        ? 'bg-gray-400 text-white cursor-not-allowed' 
-                        : 'bg-primary text-white hover:bg-primary-dull'
-                    }`}
-                  >
-                    {hasItemsInCart && availableToAdd <= 0 ? 'Ir para o Carrinho' : 'Comprar Agora'}
-                  </button>
-                </>
-              )}
+              {/* Botão Adicionar ao Carrinho */}
+              <button 
+                onClick={handleAddToCart} 
+                disabled={isInactive || availableToAdd <= 0}
+                className={`w-full py-3 px-4 text-base font-semibold rounded-lg transition-all duration-300 active:scale-[0.98] border ${
+                  isInactive || availableToAdd <= 0 
+                    ? 'bg-gray-200 text-gray-500 border-gray-200 cursor-not-allowed' 
+                    : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
+                }`}
+              >
+                {isInactive ? 'Produto Indisponível' : availableToAdd <= 0 ? 'Stock Máximo no Carrinho' : `Adicionar ${quantity} ao Carrinho`}
+              </button>
+              
+              {/* Botão Comprar Agora - Ativo se há itens no carrinho OU pode adicionar */}
+              <button 
+                onClick={handleBuyNow} 
+                disabled={isInactive || (!hasItemsInCart && availableToAdd <= 0)}
+                className={`w-full py-3 px-4 text-base font-semibold rounded-lg transition-all duration-300 active:scale-[0.98] shadow-lg hover:shadow-xl ${
+                  isInactive || (!hasItemsInCart && availableToAdd <= 0)
+                    ? 'bg-gray-400 text-white cursor-not-allowed' 
+                    : 'bg-primary text-white hover:bg-primary-dull'
+                }`}
+              >
+                {hasItemsInCart && availableToAdd <= 0 ? 'Ir para o Carrinho' : 'Comprar Agora'}
+              </button>
             </div>
 
             {/* Info Adicional */}
-            <div className={`p-3 md:p-4 rounded-lg transition-all duration-300 ${isInactive ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'}`}>
-              {isInactive ? (
-                <div className='space-y-2 text-center'>
-                  <p className='text-red-700 font-semibold'>Produto Temporariamente Indisponível</p>
-                  <p className='text-sm text-red-600'>Entre em contacto para saber quando voltará ao stock</p>
+            <div className='p-3 md:p-4 rounded-lg bg-blue-50 border border-blue-200'>
+              <div className='space-y-2'>
+                <div className='flex items-center gap-2'>
+                  <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
+                    <span className='text-white text-xs'>✓</span>
+                  </div>
+                  <span className='text-xs md:text-sm text-gray-700'>Envio grátis para Portugal Continental</span>
                 </div>
-              ) : (
-                <div className='space-y-2'>
-                  <div className='flex items-center gap-2'>
-                    <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
-                      <span className='text-white text-xs'>✓</span>
-                    </div>
-                    <span className='text-xs md:text-sm text-gray-700'>Envio grátis para Portugal Continental</span>
+                <div className='flex items-center gap-2'>
+                  <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
+                    <span className='text-white text-xs'>✓</span>
                   </div>
-                  <div className='flex items-center gap-2'>
-                    <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
-                      <span className='text-white text-xs'>✓</span>
-                    </div>
-                    <span className='text-xs md:text-sm text-gray-700'>Garantia de 24 meses</span>
-                  </div>
-                  <div className='flex items-center gap-2'>
-                    <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
-                      <span className='text-white text-xs'>✓</span>
-                    </div>
-                    <span className='text-xs md:text-sm text-gray-700'>Devolução gratuita em 30 dias</span>
-                  </div>
+                  <span className='text-xs md:text-sm text-gray-700'>Garantia de 24 meses</span>
                 </div>
-              )}
+                <div className='flex items-center gap-2'>
+                  <div className='w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center'>
+                    <span className='text-white text-xs'>✓</span>
+                  </div>
+                  <span className='text-xs md:text-sm text-gray-700'>Devolução gratuita em 30 dias</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

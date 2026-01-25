@@ -115,13 +115,11 @@ const ProductCard = memo(({ product }) => {
 
   const nextImage = e => {
     e.stopPropagation();
-    if (isInactive) return;
     setCurrentImageIndex(prev => (prev + 1) % displayProduct.image.length);
   };
 
   const prevImage = e => {
     e.stopPropagation();
-    if (isInactive) return;
     setCurrentImageIndex(
       prev => (prev - 1 + displayProduct.image.length) % displayProduct.image.length
     );
@@ -164,30 +162,26 @@ const ProductCard = memo(({ product }) => {
   return (
     <div
       onClick={handleCardClick}
-      className={`bg-white w-full transition-all duration-300 flex flex-col h-full relative group ${
-        isInactive ? 'opacity-90 cursor-default' : 'cursor-pointer'
-      }`}
+      className='bg-white w-full transition-all duration-300 flex flex-col h-full relative group cursor-pointer'
     >
       {/* Image Container */}
       <div className='relative flex items-center justify-center bg-gray-50/50 rounded-lg overflow-hidden aspect-square'>
         
-        {/* Imagem */}
+        {/* Imagem - sempre visível e com hover */}
         <div className={`
           w-full h-full flex items-center justify-center p-4
           transition-all duration-150 ease-out
           ${isColorTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}
         `}>
           <img
-            className={`max-w-full max-h-full object-contain transition-all duration-300 ${
-              isInactive ? 'opacity-40 grayscale' : 'group-hover:scale-105'
-            }`}
+            className='max-w-full max-h-full object-contain transition-all duration-300 group-hover:scale-105'
             src={displayProduct.image[currentImageIndex]}
             alt={displayProduct.name}
             loading='lazy'
           />
         </div>
 
-        {/* Badge Esgotado - único badge */}
+        {/* Badge Esgotado - discreto */}
         {isInactive && (
           <div className='absolute top-2 left-2 bg-gray-900/80 text-white text-[10px] px-2 py-1 rounded font-medium uppercase tracking-wider'>
             Esgotado
@@ -195,7 +189,7 @@ const ProductCard = memo(({ product }) => {
         )}
 
         {/* Indicadores de imagem (pontos) - só aparece no hover */}
-        {!isInactive && displayProduct.image.length > 1 && (
+        {displayProduct.image.length > 1 && (
           <div className='absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity'>
             {displayProduct.image.map((_, index) => (
               <button
@@ -215,7 +209,7 @@ const ProductCard = memo(({ product }) => {
         )}
 
         {/* Setas de navegação - só aparece no hover */}
-        {!isInactive && displayProduct.image.length > 1 && (
+        {displayProduct.image.length > 1 && (
           <>
             <button
               onClick={prevImage}
@@ -265,9 +259,7 @@ const ProductCard = memo(({ product }) => {
 
         {/* Nome do Produto */}
         <h3
-          className={`text-gray-900 font-medium text-sm leading-snug line-clamp-2 transition-opacity duration-150 ${
-            isInactive ? 'opacity-60' : ''
-          } ${isColorTransitioning ? 'opacity-0' : 'opacity-100'}`}
+          className={`text-gray-900 font-medium text-sm leading-snug line-clamp-2 transition-opacity duration-150 ${isColorTransitioning ? 'opacity-0' : 'opacity-100'}`}
         >
           {displayProduct.name}
         </h3>
@@ -281,15 +273,18 @@ const ProductCard = memo(({ product }) => {
                 {currency}{formatPrice(displayProduct.price)}
               </p>
             )}
-            <p className={`text-gray-900 font-semibold text-base ${isInactive ? 'opacity-60' : ''}`}>
+            <p className='text-gray-900 font-semibold text-base'>
               {currency}{formatPrice(displayProduct.offerPrice)}
             </p>
           </div>
 
-          {/* Botão Carrinho */}
+          {/* Botão Carrinho - desativado quando esgotado */}
           <div onClick={e => e.stopPropagation()}>
             {isInactive ? (
-              <div className='w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center'>
+              <div 
+                className='w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center cursor-not-allowed'
+                title='Produto esgotado'
+              >
                 <ShoppingBag className='w-4 h-4 text-gray-400' />
               </div>
             ) : cartQuantity === 0 ? (
