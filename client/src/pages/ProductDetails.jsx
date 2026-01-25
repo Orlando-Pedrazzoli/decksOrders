@@ -27,7 +27,13 @@ const ProductDetails = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [quantity, setQuantity] = useState(1);
-  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  const [isDescriptionOpen, setIsDescriptionOpen] = useState(() => {
+    // Aberto por padrão em desktop, fechado em mobile
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 640;
+    }
+    return true;
+  });
   const [reviewStats, setReviewStats] = useState({
     averageRating: 0,
     totalReviews: 0,
@@ -110,6 +116,11 @@ const ProductDetails = () => {
   const isInactive = !displayProduct?.inStock || (displayProduct?.stock || 0) <= 0;
   const currentStock = displayProduct?.stock || 0;
   const isLowStock = currentStock > 0 && currentStock <= 3;
+
+  // Calcular quantidade disponível para adicionar
+  const cartQuantity = displayProduct ? (cartItems[displayProduct._id] || 0) : 0;
+  const availableToAdd = currentStock - cartQuantity;
+  const hasItemsInCart = cartQuantity > 0;
 
   // SEO
   const generateProductDescription = (product) => {
@@ -380,15 +391,8 @@ const ProductDetails = () => {
   const increaseQuantity = () => {
     if (isInactive) return;
     
-    const cartQuantity = cartItems[displayProduct._id] || 0;
-    const maxCanAdd = currentStock - cartQuantity;
-    
-    if (quantity >= maxCanAdd) {
-      if (cartQuantity > 0) {
-        toast.error(`Apenas ${maxCanAdd} unidade(s) disponível(eis) para adicionar. Já tens ${cartQuantity} no carrinho.`);
-      } else {
-        toast.error(`Apenas ${currentStock} unidade(s) disponível(eis)`);
-      }
+    if (quantity >= availableToAdd) {
+      toast.error(`Apenas ${availableToAdd} unidade(s) disponível(eis)`);
       return;
     }
     
@@ -404,14 +408,13 @@ const ProductDetails = () => {
 
   // ✅ ADICIONAR AO CARRINHO - Adiciona a quantidade selecionada
   const handleAddToCart = () => {
-    if (isInactive || !displayProduct) return;
+    if (isInactive || !displayProduct || availableToAdd <= 0) return;
     
-    const cartQuantity = cartItems[displayProduct._id] || 0;
     const newTotal = cartQuantity + quantity;
     
     // Validar stock
     if (newTotal > currentStock) {
-      toast.error(`Apenas ${currentStock} unidade(s) disponível(eis). Já tens ${cartQuantity} no carrinho.`);
+      toast.error(`Apenas ${currentStock} unidade(s) disponível(eis)`);
       return;
     }
     
@@ -424,23 +427,20 @@ const ProductDetails = () => {
     setQuantity(1);
   };
 
-  // ✅ COMPRAR AGORA - Define a quantidade selecionada e vai para checkout
+  // ✅ COMPRAR AGORA - Vai para o carrinho (adiciona se ainda não estiver)
   const handleBuyNow = () => {
     if (isInactive || !displayProduct) return;
     
-    const cartQuantity = cartItems[displayProduct._id] || 0;
-    const newTotal = cartQuantity + quantity;
-    
-    // Validar stock
-    if (newTotal > currentStock) {
-      toast.error(`Apenas ${currentStock} unidade(s) disponível(eis). Já tens ${cartQuantity} no carrinho.`);
-      return;
+    // Se ainda pode adicionar, adiciona a quantidade selecionada
+    if (availableToAdd > 0 && quantity > 0) {
+      const newTotal = cartQuantity + quantity;
+      
+      if (newTotal <= currentStock) {
+        updateCartItem(displayProduct._id, newTotal);
+      }
     }
     
-    // Usar updateCartItem para definir a quantidade total
-    updateCartItem(displayProduct._id, newTotal);
-    
-    // Navegar para o carrinho
+    // Navegar para o carrinho (mesmo que não tenha adicionado mais)
     navigate('/cart');
   };
 
@@ -512,6 +512,35 @@ const ProductDetails = () => {
     return brightness > 200;
   };
 
+  // Helper: gerar texto de stock de forma clara
+  const getStockText = () => {
+    if (isInactive) return 'Produto Indisponível';
+    
+    if (availableToAdd <= 0) {
+      return 'Stock máximo no carrinho';
+    }
+    
+    if (isLowStock || availableToAdd <= 3) {
+      return `Últimas ${availableToAdd} unidades!`;
+    }
+    
+    return `Em Stock - ${availableToAdd} disponíveis`;
+  };
+
+  // Helper: cor do status de stock
+  const getStockStatusColor = () => {
+    if (isInactive) return 'text-red-700';
+    if (availableToAdd <= 0) return 'text-orange-600';
+    return 'text-green-700';
+  };
+
+  // Helper: cor do indicador de stock
+  const getStockIndicatorColor = () => {
+    if (isInactive) return 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50';
+    if (availableToAdd <= 0) return 'bg-orange-500 shadow-lg shadow-orange-500/50';
+    return 'bg-green-500 shadow-lg shadow-green-500/50';
+  };
+
   // Componente para renderizar bolinha de cor (simples ou dupla)
   const ColorBall = ({ code1, code2, size = 40, isSelected = false, isOutOfStock = false, onClick, title }) => {
     const isDual = code2 && code2 !== code1;
@@ -581,9 +610,6 @@ const ProductDetails = () => {
       </div>
     );
   }
-
-  const cartQuantity = cartItems[displayProduct._id] || 0;
-  const maxCanAdd = currentStock - cartQuantity;
 
   return (
     <>
@@ -804,12 +830,7 @@ const ProductDetails = () => {
                   </div>
                 )}
 
-                {/* Badge Stock Baixo */}
-                {isLowStock && !isInactive && (
-                  <div className='absolute top-3 left-3 bg-orange-500 text-white text-sm px-3 py-1.5 rounded-lg font-medium animate-pulse shadow-lg'>
-                    Últimas {currentStock} unidades!
-                  </div>
-                )}
+
 
                 {!isInactive && (
                   <div className='absolute top-2 right-2 bg-black/50 text-white p-2 rounded-lg text-xs opacity-0 hover:opacity-100 transition-opacity'>
@@ -1058,20 +1079,18 @@ const ProductDetails = () => {
             </div>
 
             {/* Stock e Quantidade */}
-            <div className={`bg-white border p-3 md:p-4 rounded-lg transition-all duration-300 ${isInactive ? 'border-red-200 bg-red-50/30' : 'border-gray-200'}`}>
+            <div className={`bg-white border p-3 md:p-4 rounded-lg transition-all duration-300 ${isInactive ? 'border-red-200 bg-red-50/30' : availableToAdd <= 0 ? 'border-orange-200 bg-orange-50/30' : 'border-gray-200'}`}>
               <div className='space-y-3'>
-                {/* Status de Stock */}
+                {/* Status de Stock - Mostra quantidade disponível para adicionar */}
                 <div className='flex items-center gap-2'>
-                  <div className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${
-                    isInactive ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/50' : 'bg-green-500 shadow-lg shadow-green-500/50'
-                  }`}></div>
-                  <span className={`text-sm font-medium transition-colors duration-300 ${isInactive ? 'text-red-700' : 'text-green-700'}`}>
-                    {isInactive ? 'Produto Indisponível' : isLowStock ? `Últimas ${currentStock} unidades!` : `Em Stock - ${currentStock} disponíveis`}
+                  <div className={`w-2.5 h-2.5 rounded-full transition-colors duration-300 ${getStockIndicatorColor()}`}></div>
+                  <span className={`text-sm font-medium transition-colors duration-300 ${getStockStatusColor()}`}>
+                    {getStockText()}
                   </span>
                 </div>
 
-                {/* Seletor de Quantidade */}
-                {!isInactive && (
+                {/* Seletor de Quantidade - Só mostra se pode adicionar */}
+                {!isInactive && availableToAdd > 0 && (
                   <div>
                     <label className='block text-sm font-semibold text-gray-900 mb-2'>Quantidade</label>
                     <div className='flex items-center w-fit'>
@@ -1088,21 +1107,11 @@ const ProductDetails = () => {
                       <button
                         onClick={increaseQuantity}
                         className='w-10 h-10 flex items-center justify-center border border-gray-300 rounded-r-lg hover:bg-gray-50 transition-colors duration-200 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed'
-                        disabled={quantity >= maxCanAdd}
+                        disabled={quantity >= availableToAdd}
                       >
                         +
                       </button>
                     </div>
-                    {cartQuantity > 0 && (
-                      <p className='text-xs text-primary mt-1'>
-                        {cartQuantity} {cartQuantity === 1 ? 'item' : 'itens'} já no carrinho
-                      </p>
-                    )}
-                    {maxCanAdd < currentStock && maxCanAdd > 0 && (
-                      <p className='text-xs text-orange-600 mt-1'>
-                        Podes adicionar até {maxCanAdd} {maxCanAdd === 1 ? 'unidade' : 'unidades'}
-                      </p>
-                    )}
                   </div>
                 )}
 
@@ -1138,27 +1147,30 @@ const ProductDetails = () => {
                 </>
               ) : (
                 <>
+                  {/* Botão Adicionar ao Carrinho - Desativado quando não pode adicionar mais */}
                   <button 
                     onClick={handleAddToCart} 
-                    disabled={maxCanAdd <= 0}
+                    disabled={availableToAdd <= 0}
                     className={`w-full py-3 px-4 text-base font-semibold rounded-lg transition-all duration-300 active:scale-[0.98] border ${
-                      maxCanAdd <= 0 
+                      availableToAdd <= 0 
                         ? 'bg-gray-200 text-gray-500 border-gray-200 cursor-not-allowed' 
                         : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
                     }`}
                   >
-                    {maxCanAdd <= 0 ? 'Stock Máximo no Carrinho' : `Adicionar ${quantity} ao Carrinho`}
+                    {availableToAdd <= 0 ? 'Stock Máximo no Carrinho' : `Adicionar ${quantity} ao Carrinho`}
                   </button>
+                  
+                  {/* Botão Comprar Agora - SEMPRE ativo se há itens no carrinho OU pode adicionar */}
                   <button 
                     onClick={handleBuyNow} 
-                    disabled={maxCanAdd <= 0}
+                    disabled={!hasItemsInCart && availableToAdd <= 0}
                     className={`w-full py-3 px-4 text-base font-semibold rounded-lg transition-all duration-300 active:scale-[0.98] shadow-lg hover:shadow-xl ${
-                      maxCanAdd <= 0 
+                      !hasItemsInCart && availableToAdd <= 0
                         ? 'bg-gray-400 text-white cursor-not-allowed' 
                         : 'bg-primary text-white hover:bg-primary-dull'
                     }`}
                   >
-                    Comprar Agora
+                    {hasItemsInCart && availableToAdd <= 0 ? 'Ir para o Carrinho' : 'Comprar Agora'}
                   </button>
                 </>
               )}
