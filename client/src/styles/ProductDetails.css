@@ -254,9 +254,9 @@
   border-width: 0;
 }
 
-/* Focus styles */
+/* Focus styles - ATUALIZADO PARA NOVA COR */
 .focus-visible:focus {
-  outline: 2px solid #358f61;
+  outline: 2px solid #f85032;
   outline-offset: 2px;
 }
 

@@ -1,5 +1,4 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
-
 @import 'tailwindcss';
 
 * {
@@ -7,16 +6,232 @@
 }
 
 @theme {
-  --color-primary: #358f61;
-  --color-primary-dull: #44ae7c;
+  /* Cores base - usadas onde gradiente nao funciona */
+  --color-primary: #f85032;
+  --color-primary-dull: #e73827;
+  --color-primary-light: #ff6b4a;
+  --color-primary-dark: #d62a1a;
 }
+
+/* ============================================================================
+   GRADIENTE PRIMARIO - Classes utilitarias
+   ============================================================================ */
+
+/* Background gradiente */
+.bg-gradient-primary {
+  background: #f85032;
+  background: -webkit-linear-gradient(to right, #e73827, #f85032);
+  background: linear-gradient(to right, #e73827, #f85032);
+}
+
+/* Background gradiente hover (mais intenso) */
+.bg-gradient-primary-hover {
+  background: #e73827;
+  background: -webkit-linear-gradient(to right, #d62a1a, #e73827);
+  background: linear-gradient(to right, #d62a1a, #e73827);
+}
+
+/* Background gradiente invertido */
+.bg-gradient-primary-reverse {
+  background: #e73827;
+  background: -webkit-linear-gradient(to left, #e73827, #f85032);
+  background: linear-gradient(to left, #e73827, #f85032);
+}
+
+/* Background gradiente vertical */
+.bg-gradient-primary-vertical {
+  background: #f85032;
+  background: -webkit-linear-gradient(to bottom, #f85032, #e73827);
+  background: linear-gradient(to bottom, #f85032, #e73827);
+}
+
+/* Background gradiente diagonal */
+.bg-gradient-primary-diagonal {
+  background: #f85032;
+  background: -webkit-linear-gradient(135deg, #e73827, #f85032);
+  background: linear-gradient(135deg, #e73827, #f85032);
+}
+
+/* Texto com gradiente */
+.text-gradient-primary {
+  background: linear-gradient(to right, #e73827, #f85032);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================================================
+   BOTOES COM GRADIENTE
+   ============================================================================ */
+
+/* Botao primario com gradiente */
+.btn-gradient-primary {
+  background: linear-gradient(to right, #e73827, #f85032);
+  color: white;
+  border: none;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gradient-primary:hover {
+  background: linear-gradient(to right, #d62a1a, #e73827);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(248, 80, 50, 0.4);
+}
+
+.btn-gradient-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(248, 80, 50, 0.3);
+}
+
+/* Botao outline com gradiente no hover */
+.btn-outline-gradient {
+  background: transparent;
+  border: 2px solid #f85032;
+  color: #f85032;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-gradient:hover {
+  background: linear-gradient(to right, #e73827, #f85032);
+  color: white;
+  border-color: transparent;
+}
+
+/* ============================================================================
+   EFEITOS ESPECIAIS
+   ============================================================================ */
+
+/* Borda com gradiente */
+.border-gradient-primary {
+  border: 2px solid transparent;
+  background: linear-gradient(white, white) padding-box,
+              linear-gradient(to right, #e73827, #f85032) border-box;
+}
+
+/* Sombra com cor primaria */
+.shadow-primary {
+  box-shadow: 0 4px 14px 0 rgba(248, 80, 50, 0.25);
+}
+
+.shadow-primary-lg {
+  box-shadow: 0 10px 25px -5px rgba(248, 80, 50, 0.3);
+}
+
+/* Glow effect */
+.glow-primary {
+  box-shadow: 0 0 20px rgba(248, 80, 50, 0.5);
+}
+
+/* Ring com gradiente */
+.ring-gradient-primary {
+  --tw-ring-color: #f85032;
+}
+
+/* ============================================================================
+   BACKGROUNDS SUTIS
+   ============================================================================ */
+
+/* Background muito claro */
+.bg-primary-50 {
+  background-color: rgba(248, 80, 50, 0.05);
+}
+
+.bg-primary-100 {
+  background-color: rgba(248, 80, 50, 0.1);
+}
+
+.bg-primary-200 {
+  background-color: rgba(248, 80, 50, 0.2);
+}
+
+/* ============================================================================
+   ANIMACOES
+   ============================================================================ */
+
+/* Gradiente animado */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.bg-gradient-animated {
+  background: linear-gradient(270deg, #e73827, #f85032, #ff6b4a, #f85032, #e73827);
+  background-size: 400% 400%;
+  animation: gradientShift 8s ease infinite;
+}
+
+/* Pulse com cor primaria */
+@keyframes pulsePrimary {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(248, 80, 50, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(248, 80, 50, 0);
+  }
+}
+
+.pulse-primary {
+  animation: pulsePrimary 2s infinite;
+}
+
+/* ============================================================================
+   SCROLLBAR E OUTROS
+   ============================================================================ */
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Hide default Swiper navigation arrows */
 .swiper-button-prev,
 .swiper-button-next {
-  display: none !important; /* Important to override Swiper's default styles */
+  display: none !important;
+}
+
+/* Custom scrollbar com cor primaria */
+.scrollbar-primary::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-primary::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.scrollbar-primary::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #e73827, #f85032);
+  border-radius: 3px;
+}
+
+.scrollbar-primary::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #d62a1a, #e73827);
+}
+
+/* ============================================================================
+   SELECTION
+   ============================================================================ */
+
+::selection {
+  background-color: rgba(248, 80, 50, 0.3);
+  color: inherit;
+}
+
+::-moz-selection {
+  background-color: rgba(248, 80, 50, 0.3);
+  color: inherit;
 }
