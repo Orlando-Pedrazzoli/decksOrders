@@ -10,7 +10,7 @@ const MobileCard = ({ name, slug, image }) => (
       <img
         src={image}
         alt={name}
-        className="w-full h-auto aspect-[3/2] object-cover transition-transform duration-500 group-hover:scale-105"
+        className="w-full h-auto aspect-[4/3] object-cover transition-transform duration-500 group-hover:scale-105"
       />
     </div>
     <p className="mt-3 text-center text-sm font-medium tracking-wide text-gray-700 uppercase">
@@ -21,7 +21,7 @@ const MobileCard = ({ name, slug, image }) => (
 
 // Desktop Card - overlay com título e botão VIEW
 const DesktopCard = ({ name, slug, image }) => (
-  <Link to={`/collections/${slug}`} className="group relative block overflow-hidden aspect-[2/1]">
+  <Link to={`/collections/${slug}`} className="group relative block overflow-hidden aspect-[3/2]">
     {/* Background Image */}
     <div className="absolute inset-0 w-full h-full">
       <img
