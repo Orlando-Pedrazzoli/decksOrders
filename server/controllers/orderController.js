@@ -750,12 +750,8 @@ export const stripeWebhooks = async (request, response) => {
           await User.findByIdAndUpdate(userId, { cartItems: {} });
         }
 
-        // ✅ AWAIT - Enviar emails com await
-        const emailRecipient = isGuestOrder === 'true' ? guestEmail : userId;
-        if (emailRecipient) {
-          const emailResult = await sendAllOrderEmails(updatedOrder, emailRecipient);
-          console.log('📧 Resultado dos emails (payment_intent):', JSON.stringify(emailResult, null, 2));
-        }
+        // ⚠️ NÃO enviar emails aqui - já foram enviados no checkout.session.completed
+        console.log('⚠️ Emails já enviados no checkout.session.completed, ignorando aqui');
       } catch (error) {
         console.error('❌ Erro no webhook payment_intent:', error.message);
       }
