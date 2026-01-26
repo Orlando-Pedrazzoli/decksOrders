@@ -1,6 +1,6 @@
 // server/controllers/orderController.js
-// VERSÃO CORRIGIDA - 26/01/2026
-// Com logging detalhado e notificações funcionais
+// VERSÃO FINAL CORRIGIDA - 26/01/2026
+// Com logging detalhado e emails enviados em PARALELO (fix timeout Vercel)
 
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
@@ -10,56 +10,17 @@ import stripe from 'stripe';
 import nodemailer from 'nodemailer';
 
 // =============================================================================
-// CONFIGURAÇÃO DO TRANSPORTER DE EMAIL (DIRETO)
-// =============================================================================
-const createEmailTransporter = () => {
-  console.log('📧 Criando transporter de email...');
-  console.log('📧 GMAIL_USER:', process.env.GMAIL_USER ? '✅ Configurado' : '❌ NÃO CONFIGURADO');
-  console.log('📧 GMAIL_APP_PASSWORD:', process.env.GMAIL_APP_PASSWORD ? '✅ Configurado' : '❌ NÃO CONFIGURADO');
-  
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-  });
-};
-
-// =============================================================================
 // IMPORTAÇÕES SEGURAS DOS SERVIÇOS
 // =============================================================================
-let sendOrderConfirmationEmail = null;
 let sendOrderStatusUpdateEmail = null;
-let notifyAdminNewOrder = null;
-let sendStatusUpdateToAdmin = null;
 
-// Importar emailService
+// Importar emailService (apenas para status updates)
 try {
   const emailService = await import('../services/emailService.js');
-  sendOrderConfirmationEmail = emailService.sendOrderConfirmationEmail;
   sendOrderStatusUpdateEmail = emailService.sendOrderStatusUpdateEmail;
   console.log('✅ emailService carregado com sucesso');
 } catch (error) {
   console.error('❌ ERRO ao carregar emailService:', error.message);
-}
-
-// Importar adminNotificationService
-try {
-  const adminNotification = await import('../services/adminNotificationService.js');
-  notifyAdminNewOrder = adminNotification.notifyAdminNewOrder;
-  console.log('✅ adminNotificationService carregado com sucesso');
-} catch (error) {
-  console.error('❌ ERRO ao carregar adminNotificationService:', error.message);
-}
-
-// Importar whatsappService
-try {
-  const whatsappService = await import('../services/whatsappService.js');
-  sendStatusUpdateToAdmin = whatsappService.sendStatusUpdateToAdmin;
-  console.log('✅ whatsappService carregado com sucesso');
-} catch (error) {
-  console.log('⚠️ whatsappService não disponível:', error.message);
 }
 
 // =============================================================================
@@ -128,30 +89,7 @@ const validateOrderStock = async (items) => {
 };
 
 // =============================================================================
-// FUNÇÃO PARA ENVIAR EMAIL DIRETO (FALLBACK)
-// =============================================================================
-const sendEmailDirect = async (to, subject, html) => {
-  try {
-    const transporter = createEmailTransporter();
-    
-    const mailOptions = {
-      from: `Elite Surfing <${process.env.GMAIL_USER}>`,
-      to: to,
-      subject: subject,
-      html: html,
-    };
-    
-    const result = await transporter.sendMail(mailOptions);
-    console.log('✅ Email enviado diretamente:', result.messageId);
-    return { success: true, messageId: result.messageId };
-  } catch (error) {
-    console.error('❌ Erro ao enviar email direto:', error.message);
-    return { success: false, error: error.message };
-  }
-};
-
-// =============================================================================
-// GERAR HTML DO EMAIL DE CONFIRMAÇÃO
+// GERAR HTML DO EMAIL DE CONFIRMAÇÃO PARA CLIENTE
 // =============================================================================
 const generateOrderConfirmationHTML = (order, customerName, products, address) => {
   const orderDate = new Date(order.createdAt).toLocaleDateString('pt-PT', {
@@ -355,12 +293,12 @@ const generateAdminNotificationHTML = (order, customerName, customerEmail, custo
 };
 
 // =============================================================================
-// FUNÇÃO PRINCIPAL PARA ENVIAR TODOS OS EMAILS
+// FUNÇÃO PRINCIPAL PARA ENVIAR TODOS OS EMAILS - VERSÃO PARALELA (FIX TIMEOUT)
 // =============================================================================
 const sendAllOrderEmails = async (order, userOrEmail) => {
   console.log('');
   console.log('╔═══════════════════════════════════════════════════════════════╗');
-  console.log('║           📧 INICIANDO ENVIO DE EMAILS                        ║');
+  console.log('║           📧 INICIANDO ENVIO DE EMAILS (PARALELO)             ║');
   console.log('╚═══════════════════════════════════════════════════════════════╝');
   console.log('');
   
@@ -437,94 +375,76 @@ const sendAllOrderEmails = async (order, userOrEmail) => {
     const products = await Product.find({ _id: { $in: productIds } });
     console.log('📦 Produtos encontrados:', products.length);
     
-    // 4. ENVIAR EMAIL PARA O CLIENTE
+    // 4. CRIAR TRANSPORTER COM POOL (mantém conexão aberta para ambos emails)
     console.log('');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📧 [1/2] ENVIANDO EMAIL PARA CLIENTE:', customerEmail);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📧 Criando transporter com pool...');
+    console.log('📧 GMAIL_USER:', process.env.GMAIL_USER ? '✅' : '❌');
+    console.log('📧 GMAIL_APP_PASSWORD:', process.env.GMAIL_APP_PASSWORD ? '✅' : '❌');
     
-    let clientEmailResult = { success: false };
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 10,
+    });
     
-    // Tentar usar o serviço de email importado primeiro
-    if (sendOrderConfirmationEmail) {
-      try {
-        const emailUser = {
-          _id: order.userId || 'guest',
-          name: customerName,
-          email: customerEmail
-        };
-        clientEmailResult = await sendOrderConfirmationEmail(order, emailUser, products, address);
-        console.log('📧 Resultado emailService:', clientEmailResult);
-      } catch (serviceError) {
-        console.error('❌ emailService falhou:', serviceError.message);
-      }
-    }
-    
-    // Se o serviço falhar, enviar diretamente
-    if (!clientEmailResult.success) {
-      console.log('📧 Tentando envio direto...');
-      const html = generateOrderConfirmationHTML(order, customerName, products, address);
-      const subject = `✅ Confirmação do Pedido #${order._id.toString().slice(-8).toUpperCase()} - Elite Surfing`;
-      clientEmailResult = await sendEmailDirect(customerEmail, subject, html);
-    }
-    
-    if (clientEmailResult.success) {
-      console.log('✅ EMAIL CLIENTE ENVIADO COM SUCESSO!');
-    } else {
-      console.error('❌ FALHA no email do cliente:', clientEmailResult.error);
-    }
-    
-    // 5. ENVIAR EMAIL PARA O ADMIN
-    console.log('');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🔔 [2/2] ENVIANDO EMAIL PARA ADMIN');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
+    // 5. PREPARAR EMAILS
     const adminEmail = process.env.ADMIN_EMAIL || process.env.GMAIL_USER;
-    console.log('📧 Admin email:', adminEmail);
     
-    let adminEmailResult = { success: false };
+    const clientHTML = generateOrderConfirmationHTML(order, customerName, products, address);
+    const clientSubject = `✅ Confirmação do Pedido #${order._id.toString().slice(-8).toUpperCase()} - Elite Surfing`;
     
-    // Tentar usar adminNotificationService primeiro
-    if (notifyAdminNewOrder) {
-      try {
-        const emailUser = {
-          _id: order.userId || 'guest',
-          name: customerName,
-          email: customerEmail,
-          phone: customerPhone
-        };
-        adminEmailResult = await notifyAdminNewOrder(order, emailUser, products, address);
-        console.log('🔔 Resultado adminNotificationService:', adminEmailResult);
-      } catch (adminServiceError) {
-        console.error('❌ adminNotificationService falhou:', adminServiceError.message);
-      }
-    }
+    const adminHTML = generateAdminNotificationHTML(order, customerName, customerEmail, customerPhone, products, address);
+    const adminSubject = `🔔 NOVO PEDIDO #${order._id.toString().slice(-8).toUpperCase()} - €${order.amount.toFixed(2)}`;
     
-    // Se o serviço falhar, enviar diretamente
-    if (!adminEmailResult.success && !adminEmailResult.email?.success) {
-      console.log('🔔 Tentando envio direto para admin...');
-      const adminHtml = generateAdminNotificationHTML(order, customerName, customerEmail, customerPhone, products, address);
-      const adminSubject = `🔔 NOVO PEDIDO #${order._id.toString().slice(-8).toUpperCase()} - €${order.amount.toFixed(2)}`;
-      adminEmailResult = await sendEmailDirect(adminEmail, adminSubject, adminHtml);
-    }
-    
-    if (adminEmailResult.success || adminEmailResult.email?.success) {
-      console.log('✅ EMAIL ADMIN ENVIADO COM SUCESSO!');
-    } else {
-      console.error('❌ FALHA no email do admin:', adminEmailResult.error || adminEmailResult.email?.error);
-    }
-    
+    // 6. ENVIAR EMAILS EM PARALELO (CRÍTICO - evita timeout da Vercel)
     console.log('');
-    console.log('╔═══════════════════════════════════════════════════════════════╗');
-    console.log('║           📧 ENVIO DE EMAILS CONCLUÍDO                        ║');
-    console.log('╚═══════════════════════════════════════════════════════════════╝');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📧 ENVIANDO EMAILS EM PARALELO...');
+    console.log('   → Cliente:', customerEmail);
+    console.log('   → Admin:', adminEmail);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    const [clientResult, adminResult] = await Promise.all([
+      // Email para cliente
+      transporter.sendMail({
+        from: { name: 'Elite Surfing', address: process.env.GMAIL_USER },
+        to: customerEmail,
+        subject: clientSubject,
+        html: clientHTML,
+      }).then(r => ({ success: true, messageId: r.messageId }))
+        .catch(e => ({ success: false, error: e.message })),
+      
+      // Email para admin
+      transporter.sendMail({
+        from: { name: 'Elite Surfing', address: process.env.GMAIL_USER },
+        to: adminEmail,
+        subject: adminSubject,
+        html: adminHTML,
+      }).then(r => ({ success: true, messageId: r.messageId }))
+        .catch(e => ({ success: false, error: e.message })),
+    ]);
+    
+    // Fechar transporter
+    transporter.close();
+    
+    // 7. LOG DOS RESULTADOS
+    console.log('');
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log('📧 RESULTADO DOS EMAILS:');
+    console.log('   Cliente:', clientResult.success ? `✅ ENVIADO (${clientResult.messageId})` : `❌ FALHOU (${clientResult.error})`);
+    console.log('   Admin:', adminResult.success ? `✅ ENVIADO (${adminResult.messageId})` : `❌ FALHOU (${adminResult.error})`);
+    console.log('═══════════════════════════════════════════════════════════════');
     console.log('');
     
     return {
-      success: true,
-      clientEmail: clientEmailResult,
-      adminEmail: adminEmailResult
+      success: clientResult.success || adminResult.success,
+      clientEmail: clientResult,
+      adminEmail: adminResult
     };
     
   } catch (error) {
@@ -864,16 +784,10 @@ export const stripeWebhooks = async (request, response) => {
           await User.findByIdAndUpdate(userId, { cartItems: {} });
         }
 
-        // ════════════════════════════════════════════════════════════
         // ENVIAR EMAILS
-        // ════════════════════════════════════════════════════════════
         console.log('');
         console.log('📧 Preparando envio de emails...');
-        console.log('📧 isGuestOrder:', isGuestOrder);
-        console.log('📧 guestEmail:', guestEmail);
-        console.log('📧 userId:', userId);
         
-        // Determinar destinatário
         let emailRecipient;
         if (isGuestOrder === 'true') {
           emailRecipient = guestEmail || updatedOrder.guestEmail;
@@ -884,10 +798,9 @@ export const stripeWebhooks = async (request, response) => {
         }
         
         if (emailRecipient) {
-          // Chamar função de emails (async)
           sendAllOrderEmails(updatedOrder, emailRecipient)
             .then(result => {
-              console.log('📧 Resultado final dos emails:', JSON.stringify(result, null, 2));
+              console.log('📧 Resultado dos emails:', JSON.stringify(result, null, 2));
             })
             .catch(err => {
               console.error('❌ Erro no envio de emails:', err.message);
