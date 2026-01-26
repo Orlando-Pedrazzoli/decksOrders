@@ -107,7 +107,12 @@ const validateOrderStock = async (items) => {
 // =============================================================================
 const sendClientEmail = async (order, userOrEmail) => {
   try {
-    console.log('📧 Preparando email para cliente...');
+    console.log('═══════════════════════════════════════════════════');
+    console.log('📧 INICIANDO ENVIO DE EMAILS');
+    console.log('═══════════════════════════════════════════════════');
+    console.log('📋 Order ID:', order?._id);
+    console.log('📧 userOrEmail recebido:', userOrEmail);
+    console.log('🛒 isGuestOrder:', order?.isGuestOrder);
     
     let user = null;
     let email = null;
@@ -115,17 +120,18 @@ const sendClientEmail = async (order, userOrEmail) => {
     
     // Determinar se é user registado ou guest
     if (typeof userOrEmail === 'string') {
-      // Verificar se é um email ou um userId
       if (userOrEmail.includes('@')) {
         // É um email de guest
         email = userOrEmail;
         customerName = order.guestName || 'Cliente';
+        console.log('📧 Modo: Guest com email direto');
       } else {
         // É um userId string
         user = await User.findById(userOrEmail);
         if (user) {
           email = user.email;
           customerName = user.name;
+          console.log('📧 Modo: User registado encontrado');
         }
       }
     } else if (userOrEmail?._id) {
@@ -133,54 +139,93 @@ const sendClientEmail = async (order, userOrEmail) => {
       user = userOrEmail;
       email = user.email;
       customerName = user.name;
+      console.log('📧 Modo: Objeto user');
     }
     
     // Se é guest order, usar dados do pedido
     if (order.isGuestOrder && !email) {
       email = order.guestEmail;
       customerName = order.guestName || 'Cliente';
+      console.log('📧 Modo: Guest order fallback');
     }
 
-    const address = await Address.findById(order.address);
-    const productIds = order.items.map(item => item.product);
-    const products = await Product.find({ _id: { $in: productIds } });
+    console.log('📧 Email final:', email);
+    console.log('👤 Nome final:', customerName);
 
-    if (!email || !address) {
-      console.error('❌ Dados insuficientes para enviar email');
-      console.error('❌ Email:', email);
-      console.error('❌ Address:', address?._id);
+    // Buscar address
+    const address = await Address.findById(order.address);
+    console.log('📍 Address encontrado:', address ? 'SIM' : 'NÃO');
+    
+    if (!address) {
+      console.error('❌ Address não encontrado para order.address:', order.address);
       return;
     }
 
-    // Criar objeto user fake para o template de email se for guest
+    // Buscar produtos
+    const productIds = order.items.map(item => item.product._id || item.product);
+    const products = await Product.find({ _id: { $in: productIds } });
+    console.log('📦 Produtos encontrados:', products.length);
+
+    if (!email) {
+      console.error('❌ Nenhum email válido encontrado');
+      return;
+    }
+
+    // Criar objeto user para o template de email se for guest
     const emailUser = user || {
       _id: 'guest',
       name: customerName,
       email: email
     };
 
-    console.log('📧 Enviando email para:', email);
+    // ═══════════════════════════════════════════════════
+    // 1. ENVIAR EMAIL PARA O CLIENTE
+    // ═══════════════════════════════════════════════════
+    console.log('📧 [1/2] Enviando email de confirmação para CLIENTE:', email);
     const emailResult = await sendOrderConfirmationEmail(order, emailUser, products, address);
     
     if (emailResult.success) {
-      console.log('✅ Email de confirmação enviado para:', emailResult.recipient);
+      console.log('✅ Email de confirmação enviado para cliente:', emailResult.recipient);
     } else {
-      console.error('❌ Falha no email:', emailResult.error);
+      console.error('❌ Falha no email do cliente:', emailResult.error);
     }
 
-    // Notificação admin
+    // ═══════════════════════════════════════════════════
+    // 2. ENVIAR NOTIFICAÇÃO PARA O ADMIN
+    // ═══════════════════════════════════════════════════
     if (notifyAdminNewOrder) {
+      console.log('🔔 [2/2] Enviando notificação para ADMIN...');
       try {
-        console.log('🔔 Enviando notificação para admin...');
         const adminResult = await notifyAdminNewOrder(order, emailUser, products, address);
-        console.log('🔔 Resultado notificação admin:', adminResult);
+        console.log('🔔 Resultado notificação admin:', JSON.stringify(adminResult, null, 2));
+        
+        if (adminResult.email?.success) {
+          console.log('✅ Email admin enviado com sucesso!');
+        } else {
+          console.error('❌ Email admin falhou:', adminResult.email?.error);
+        }
+        
+        if (adminResult.whatsapp?.success) {
+          console.log('✅ WhatsApp admin enviado com sucesso!');
+        } else {
+          console.log('⚠️ WhatsApp admin não enviado:', adminResult.whatsapp?.error);
+        }
       } catch (adminError) {
-        console.error('❌ Erro na notificação admin (não crítico):', adminError.message);
+        console.error('❌ EXCEÇÃO na notificação admin:', adminError.message);
+        console.error('❌ Stack:', adminError.stack);
       }
+    } else {
+      console.error('❌ notifyAdminNewOrder não está disponível!');
+      console.error('❌ Verifique se o import está correto no topo do ficheiro');
     }
+
+    console.log('═══════════════════════════════════════════════════');
+    console.log('📧 ENVIO DE EMAILS CONCLUÍDO');
+    console.log('═══════════════════════════════════════════════════');
 
   } catch (error) {
-    console.error('❌ Erro ao enviar email:', error.message);
+    console.error('❌ ERRO GERAL em sendClientEmail:', error.message);
+    console.error('❌ Stack:', error.stack);
   }
 };
 
