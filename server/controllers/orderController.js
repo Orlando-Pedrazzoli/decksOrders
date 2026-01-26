@@ -1,40 +1,65 @@
 // server/controllers/orderController.js
-// CORRIGIDO: Importações seguras que não quebram se algo falhar
+// VERSÃO CORRIGIDA - 26/01/2026
+// Com logging detalhado e notificações funcionais
 
-import { sendOrderConfirmationEmail } from '../services/emailService.js';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import User from '../models/User.js';
 import Address from '../models/Address.js';
 import stripe from 'stripe';
+import nodemailer from 'nodemailer';
 
-// Importação segura do sendOrderStatusUpdateEmail
+// =============================================================================
+// CONFIGURAÇÃO DO TRANSPORTER DE EMAIL (DIRETO)
+// =============================================================================
+const createEmailTransporter = () => {
+  console.log('📧 Criando transporter de email...');
+  console.log('📧 GMAIL_USER:', process.env.GMAIL_USER ? '✅ Configurado' : '❌ NÃO CONFIGURADO');
+  console.log('📧 GMAIL_APP_PASSWORD:', process.env.GMAIL_APP_PASSWORD ? '✅ Configurado' : '❌ NÃO CONFIGURADO');
+  
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+};
+
+// =============================================================================
+// IMPORTAÇÕES SEGURAS DOS SERVIÇOS
+// =============================================================================
+let sendOrderConfirmationEmail = null;
 let sendOrderStatusUpdateEmail = null;
-try {
-  const emailService = await import('../services/emailService.js');
-  sendOrderStatusUpdateEmail = emailService.sendOrderStatusUpdateEmail;
-  console.log('✅ sendOrderStatusUpdateEmail carregado');
-} catch (error) {
-  console.log('⚠️ sendOrderStatusUpdateEmail não disponível:', error.message);
-}
-
-// Importação segura do WhatsApp
 let notifyAdminNewOrder = null;
 let sendStatusUpdateToAdmin = null;
+
+// Importar emailService
+try {
+  const emailService = await import('../services/emailService.js');
+  sendOrderConfirmationEmail = emailService.sendOrderConfirmationEmail;
+  sendOrderStatusUpdateEmail = emailService.sendOrderStatusUpdateEmail;
+  console.log('✅ emailService carregado com sucesso');
+} catch (error) {
+  console.error('❌ ERRO ao carregar emailService:', error.message);
+}
+
+// Importar adminNotificationService
 try {
   const adminNotification = await import('../services/adminNotificationService.js');
   notifyAdminNewOrder = adminNotification.notifyAdminNewOrder;
-  console.log('✅ Serviço de notificação admin carregado');
+  console.log('✅ adminNotificationService carregado com sucesso');
 } catch (error) {
-  console.log('⚠️ Serviço de notificação admin não disponível:', error.message);
+  console.error('❌ ERRO ao carregar adminNotificationService:', error.message);
 }
 
+// Importar whatsappService
 try {
   const whatsappService = await import('../services/whatsappService.js');
   sendStatusUpdateToAdmin = whatsappService.sendStatusUpdateToAdmin;
-  console.log('✅ WhatsApp service carregado');
+  console.log('✅ whatsappService carregado com sucesso');
 } catch (error) {
-  console.log('⚠️ WhatsApp service não disponível:', error.message);
+  console.log('⚠️ whatsappService não disponível:', error.message);
 }
 
 // =============================================================================
@@ -103,131 +128,418 @@ const validateOrderStock = async (items) => {
 };
 
 // =============================================================================
-// FUNÇÃO PARA ENVIAR EMAIL - SUPORTA USER E GUEST
+// FUNÇÃO PARA ENVIAR EMAIL DIRETO (FALLBACK)
 // =============================================================================
-const sendClientEmail = async (order, userOrEmail) => {
+const sendEmailDirect = async (to, subject, html) => {
   try {
-    console.log('═══════════════════════════════════════════════════');
-    console.log('📧 INICIANDO ENVIO DE EMAILS');
-    console.log('═══════════════════════════════════════════════════');
+    const transporter = createEmailTransporter();
+    
+    const mailOptions = {
+      from: `Elite Surfing <${process.env.GMAIL_USER}>`,
+      to: to,
+      subject: subject,
+      html: html,
+    };
+    
+    const result = await transporter.sendMail(mailOptions);
+    console.log('✅ Email enviado diretamente:', result.messageId);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error('❌ Erro ao enviar email direto:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// =============================================================================
+// GERAR HTML DO EMAIL DE CONFIRMAÇÃO
+// =============================================================================
+const generateOrderConfirmationHTML = (order, customerName, products, address) => {
+  const orderDate = new Date(order.createdAt).toLocaleDateString('pt-PT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const itemsHTML = order.items.map(item => {
+    const product = products.find(p => p._id.toString() === (item.product._id || item.product).toString());
+    const productName = product?.name || 'Produto';
+    const productPrice = item.price || product?.offerPrice || 0;
+    return `
+      <tr>
+        <td style="padding: 12px; border-bottom: 1px solid #eee;">${productName}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right;">€${(productPrice * item.quantity).toFixed(2)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+      <div style="max-width: 600px; margin: 0 auto; background: white;">
+        
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 30px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 28px;">🏄 Elite Surfing</h1>
+          <p style="color: #a0a0a0; margin: 10px 0 0 0;">Obrigado pela sua encomenda!</p>
+        </div>
+        
+        <!-- Order Info -->
+        <div style="padding: 30px;">
+          <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h2 style="margin: 0 0 15px 0; color: #333;">📋 Detalhes do Pedido</h2>
+            <p style="margin: 5px 0;"><strong>Nº Pedido:</strong> #${order._id.toString().slice(-8).toUpperCase()}</p>
+            <p style="margin: 5px 0;"><strong>Data:</strong> ${orderDate}</p>
+            <p style="margin: 5px 0;"><strong>Pagamento:</strong> ${order.paymentType === 'COD' ? '💵 Pagamento na Entrega' : order.isPaid ? '✅ Pago Online' : '⏳ Aguardando Pagamento'}</p>
+          </div>
+          
+          <!-- Customer Info -->
+          <div style="background: #e8f4f8; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="margin: 0 0 10px 0; color: #333;">👤 Dados do Cliente</h3>
+            <p style="margin: 5px 0;"><strong>Nome:</strong> ${customerName}</p>
+            <p style="margin: 5px 0;"><strong>Morada:</strong> ${address.street}, ${address.zipcode} ${address.city}, ${address.country}</p>
+            ${address.phone ? `<p style="margin: 5px 0;"><strong>Telefone:</strong> ${address.phone}</p>` : ''}
+          </div>
+          
+          <!-- Products Table -->
+          <h3 style="color: #333;">📦 Produtos</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="background: #f8f9fa;">
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Produto</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">Qtd</th>
+                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+            </tbody>
+          </table>
+          
+          <!-- Total -->
+          <div style="background: #1a1a2e; color: white; padding: 15px 20px; border-radius: 8px; text-align: right;">
+            <span style="font-size: 18px;">Total: </span>
+            <span style="font-size: 24px; font-weight: bold;">€${order.amount.toFixed(2)}</span>
+          </div>
+          
+          ${order.promoCode ? `
+          <p style="margin-top: 10px; color: #28a745; font-size: 14px;">
+            🎉 Código promocional aplicado: <strong>${order.promoCode}</strong> (-${order.discountPercentage}%)
+          </p>
+          ` : ''}
+          
+          <!-- Footer -->
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666;">
+            <p>Dúvidas? Contacte-nos:</p>
+            <p>📧 pedrazzoliorlando@gmail.com | 📱 +351 912 164 220</p>
+            <p style="margin-top: 20px;">
+              <a href="https://www.elitesurfing.pt" style="color: #1a1a2e;">www.elitesurfing.pt</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+// =============================================================================
+// GERAR HTML DO EMAIL PARA ADMIN
+// =============================================================================
+const generateAdminNotificationHTML = (order, customerName, customerEmail, customerPhone, products, address) => {
+  const orderDate = new Date(order.createdAt).toLocaleDateString('pt-PT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const itemsHTML = order.items.map(item => {
+    const product = products.find(p => p._id.toString() === (item.product._id || item.product).toString());
+    const productName = product?.name || 'Produto';
+    const productPrice = item.price || product?.offerPrice || 0;
+    return `
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">${productName}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">€${(productPrice * item.quantity).toFixed(2)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
+      <div style="max-width: 600px; margin: 0 auto; background: white;">
+        
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); padding: 25px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">🔔 NOVO PEDIDO!</h1>
+          <p style="color: #ffcccc; margin: 10px 0 0 0;">${order.isGuestOrder ? '👤 GUEST CHECKOUT' : '👤 Cliente Registado'}</p>
+        </div>
+        
+        <div style="padding: 25px;">
+          
+          <!-- Order Info -->
+          <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <p style="margin: 5px 0;"><strong>📋 Pedido:</strong> #${order._id.toString().slice(-8).toUpperCase()}</p>
+            <p style="margin: 5px 0;"><strong>📅 Data:</strong> ${orderDate}</p>
+            <p style="margin: 5px 0;"><strong>💳 Pagamento:</strong> ${order.paymentType === 'COD' ? '💵 Contra-Entrega' : order.isPaid ? '✅ PAGO Online' : '⏳ Pendente'}</p>
+          </div>
+          
+          <!-- Customer Info -->
+          <div style="background: #d4edda; border: 1px solid #28a745; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <h3 style="margin: 0 0 10px 0; color: #155724;">👤 Cliente</h3>
+            <p style="margin: 5px 0;"><strong>Nome:</strong> ${customerName}</p>
+            <p style="margin: 5px 0;"><strong>Email:</strong> ${customerEmail}</p>
+            ${customerPhone ? `<p style="margin: 5px 0;"><strong>Telefone:</strong> ${customerPhone}</p>` : ''}
+          </div>
+          
+          <!-- Address -->
+          <div style="background: #cce5ff; border: 1px solid #007bff; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+            <h3 style="margin: 0 0 10px 0; color: #004085;">📍 Morada de Entrega</h3>
+            <p style="margin: 5px 0;">${address.firstName} ${address.lastName}</p>
+            <p style="margin: 5px 0;">${address.street}</p>
+            <p style="margin: 5px 0;">${address.zipcode} ${address.city}</p>
+            <p style="margin: 5px 0;">${address.country}</p>
+            ${address.phone ? `<p style="margin: 5px 0;">📱 ${address.phone}</p>` : ''}
+          </div>
+          
+          <!-- Products -->
+          <h3 style="color: #333;">📦 Produtos</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr style="background: #f8f9fa;">
+                <th style="padding: 10px; text-align: left;">Produto</th>
+                <th style="padding: 10px; text-align: center;">Qtd</th>
+                <th style="padding: 10px; text-align: right;">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+            </tbody>
+          </table>
+          
+          ${order.promoCode ? `
+          <p style="color: #28a745;"><strong>🎉 Código Promo:</strong> ${order.promoCode} (-${order.discountPercentage}%)</p>
+          ` : ''}
+          
+          <!-- Total -->
+          <div style="background: #007bff; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+            <span style="font-size: 24px; font-weight: bold;">💰 TOTAL: €${order.amount.toFixed(2)}</span>
+          </div>
+          
+          <!-- Action Button -->
+          <div style="text-align: center; margin-top: 25px;">
+            <a href="https://www.elitesurfing.pt/seller/orders" 
+               style="display: inline-block; background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+              📋 Ver Pedido no Painel
+            </a>
+          </div>
+          
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+// =============================================================================
+// FUNÇÃO PRINCIPAL PARA ENVIAR TODOS OS EMAILS
+// =============================================================================
+const sendAllOrderEmails = async (order, userOrEmail) => {
+  console.log('');
+  console.log('╔═══════════════════════════════════════════════════════════════╗');
+  console.log('║           📧 INICIANDO ENVIO DE EMAILS                        ║');
+  console.log('╚═══════════════════════════════════════════════════════════════╝');
+  console.log('');
+  
+  try {
+    // 1. IDENTIFICAR O DESTINATÁRIO
     console.log('📋 Order ID:', order?._id);
     console.log('📧 userOrEmail recebido:', userOrEmail);
     console.log('🛒 isGuestOrder:', order?.isGuestOrder);
     
-    let user = null;
-    let email = null;
+    let customerEmail = null;
     let customerName = null;
+    let customerPhone = null;
     
-    // Determinar se é user registado ou guest
-    if (typeof userOrEmail === 'string') {
+    // Determinar email e nome do cliente
+    if (order.isGuestOrder) {
+      customerEmail = order.guestEmail;
+      customerName = order.guestName || 'Cliente';
+      customerPhone = order.guestPhone || '';
+      console.log('👤 Modo: GUEST');
+    } else if (typeof userOrEmail === 'string') {
       if (userOrEmail.includes('@')) {
-        // É um email de guest
-        email = userOrEmail;
-        customerName = order.guestName || 'Cliente';
-        console.log('📧 Modo: Guest com email direto');
+        customerEmail = userOrEmail;
+        customerName = 'Cliente';
+        console.log('👤 Modo: Email direto');
       } else {
-        // É um userId string
-        user = await User.findById(userOrEmail);
+        // É um userId - buscar user
+        const user = await User.findById(userOrEmail);
         if (user) {
-          email = user.email;
+          customerEmail = user.email;
           customerName = user.name;
-          console.log('📧 Modo: User registado encontrado');
+          customerPhone = user.phone || '';
+          console.log('👤 Modo: User registado encontrado');
+        } else {
+          console.error('❌ User não encontrado com ID:', userOrEmail);
         }
       }
     } else if (userOrEmail?._id) {
-      // É um objeto user
-      user = userOrEmail;
-      email = user.email;
-      customerName = user.name;
-      console.log('📧 Modo: Objeto user');
+      customerEmail = userOrEmail.email;
+      customerName = userOrEmail.name;
+      customerPhone = userOrEmail.phone || '';
+      console.log('👤 Modo: Objeto user');
     }
     
-    // Se é guest order, usar dados do pedido
-    if (order.isGuestOrder && !email) {
-      email = order.guestEmail;
+    // Fallback para guest
+    if (!customerEmail && order.guestEmail) {
+      customerEmail = order.guestEmail;
       customerName = order.guestName || 'Cliente';
-      console.log('📧 Modo: Guest order fallback');
+      console.log('👤 Modo: Fallback guest');
     }
-
-    console.log('📧 Email final:', email);
+    
+    console.log('');
+    console.log('📧 Email final do cliente:', customerEmail);
     console.log('👤 Nome final:', customerName);
-
-    // Buscar address
+    console.log('📱 Telefone:', customerPhone || 'N/A');
+    
+    if (!customerEmail) {
+      console.error('❌ ERRO: Nenhum email de cliente encontrado!');
+      return { success: false, error: 'Email não encontrado' };
+    }
+    
+    // 2. BUSCAR ADDRESS
+    console.log('');
+    console.log('📍 Buscando address:', order.address);
     const address = await Address.findById(order.address);
-    console.log('📍 Address encontrado:', address ? 'SIM' : 'NÃO');
     
     if (!address) {
-      console.error('❌ Address não encontrado para order.address:', order.address);
-      return;
+      console.error('❌ ERRO: Address não encontrado!');
+      return { success: false, error: 'Address não encontrado' };
     }
-
-    // Buscar produtos
+    console.log('✅ Address encontrado:', address.city, address.country);
+    
+    // 3. BUSCAR PRODUTOS
     const productIds = order.items.map(item => item.product._id || item.product);
     const products = await Product.find({ _id: { $in: productIds } });
     console.log('📦 Produtos encontrados:', products.length);
-
-    if (!email) {
-      console.error('❌ Nenhum email válido encontrado');
-      return;
-    }
-
-    // Criar objeto user para o template de email se for guest
-    const emailUser = user || {
-      _id: 'guest',
-      name: customerName,
-      email: email
-    };
-
-    // ═══════════════════════════════════════════════════
-    // 1. ENVIAR EMAIL PARA O CLIENTE
-    // ═══════════════════════════════════════════════════
-    console.log('📧 [1/2] Enviando email de confirmação para CLIENTE:', email);
-    const emailResult = await sendOrderConfirmationEmail(order, emailUser, products, address);
     
-    if (emailResult.success) {
-      console.log('✅ Email de confirmação enviado para cliente:', emailResult.recipient);
-    } else {
-      console.error('❌ Falha no email do cliente:', emailResult.error);
-    }
-
-    // ═══════════════════════════════════════════════════
-    // 2. ENVIAR NOTIFICAÇÃO PARA O ADMIN
-    // ═══════════════════════════════════════════════════
-    if (notifyAdminNewOrder) {
-      console.log('🔔 [2/2] Enviando notificação para ADMIN...');
+    // 4. ENVIAR EMAIL PARA O CLIENTE
+    console.log('');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📧 [1/2] ENVIANDO EMAIL PARA CLIENTE:', customerEmail);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    let clientEmailResult = { success: false };
+    
+    // Tentar usar o serviço de email importado primeiro
+    if (sendOrderConfirmationEmail) {
       try {
-        const adminResult = await notifyAdminNewOrder(order, emailUser, products, address);
-        console.log('🔔 Resultado notificação admin:', JSON.stringify(adminResult, null, 2));
-        
-        if (adminResult.email?.success) {
-          console.log('✅ Email admin enviado com sucesso!');
-        } else {
-          console.error('❌ Email admin falhou:', adminResult.email?.error);
-        }
-        
-        if (adminResult.whatsapp?.success) {
-          console.log('✅ WhatsApp admin enviado com sucesso!');
-        } else {
-          console.log('⚠️ WhatsApp admin não enviado:', adminResult.whatsapp?.error);
-        }
-      } catch (adminError) {
-        console.error('❌ EXCEÇÃO na notificação admin:', adminError.message);
-        console.error('❌ Stack:', adminError.stack);
+        const emailUser = {
+          _id: order.userId || 'guest',
+          name: customerName,
+          email: customerEmail
+        };
+        clientEmailResult = await sendOrderConfirmationEmail(order, emailUser, products, address);
+        console.log('📧 Resultado emailService:', clientEmailResult);
+      } catch (serviceError) {
+        console.error('❌ emailService falhou:', serviceError.message);
       }
-    } else {
-      console.error('❌ notifyAdminNewOrder não está disponível!');
-      console.error('❌ Verifique se o import está correto no topo do ficheiro');
     }
-
-    console.log('═══════════════════════════════════════════════════');
-    console.log('📧 ENVIO DE EMAILS CONCLUÍDO');
-    console.log('═══════════════════════════════════════════════════');
-
+    
+    // Se o serviço falhar, enviar diretamente
+    if (!clientEmailResult.success) {
+      console.log('📧 Tentando envio direto...');
+      const html = generateOrderConfirmationHTML(order, customerName, products, address);
+      const subject = `✅ Confirmação do Pedido #${order._id.toString().slice(-8).toUpperCase()} - Elite Surfing`;
+      clientEmailResult = await sendEmailDirect(customerEmail, subject, html);
+    }
+    
+    if (clientEmailResult.success) {
+      console.log('✅ EMAIL CLIENTE ENVIADO COM SUCESSO!');
+    } else {
+      console.error('❌ FALHA no email do cliente:', clientEmailResult.error);
+    }
+    
+    // 5. ENVIAR EMAIL PARA O ADMIN
+    console.log('');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔔 [2/2] ENVIANDO EMAIL PARA ADMIN');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.GMAIL_USER;
+    console.log('📧 Admin email:', adminEmail);
+    
+    let adminEmailResult = { success: false };
+    
+    // Tentar usar adminNotificationService primeiro
+    if (notifyAdminNewOrder) {
+      try {
+        const emailUser = {
+          _id: order.userId || 'guest',
+          name: customerName,
+          email: customerEmail,
+          phone: customerPhone
+        };
+        adminEmailResult = await notifyAdminNewOrder(order, emailUser, products, address);
+        console.log('🔔 Resultado adminNotificationService:', adminEmailResult);
+      } catch (adminServiceError) {
+        console.error('❌ adminNotificationService falhou:', adminServiceError.message);
+      }
+    }
+    
+    // Se o serviço falhar, enviar diretamente
+    if (!adminEmailResult.success && !adminEmailResult.email?.success) {
+      console.log('🔔 Tentando envio direto para admin...');
+      const adminHtml = generateAdminNotificationHTML(order, customerName, customerEmail, customerPhone, products, address);
+      const adminSubject = `🔔 NOVO PEDIDO #${order._id.toString().slice(-8).toUpperCase()} - €${order.amount.toFixed(2)}`;
+      adminEmailResult = await sendEmailDirect(adminEmail, adminSubject, adminHtml);
+    }
+    
+    if (adminEmailResult.success || adminEmailResult.email?.success) {
+      console.log('✅ EMAIL ADMIN ENVIADO COM SUCESSO!');
+    } else {
+      console.error('❌ FALHA no email do admin:', adminEmailResult.error || adminEmailResult.email?.error);
+    }
+    
+    console.log('');
+    console.log('╔═══════════════════════════════════════════════════════════════╗');
+    console.log('║           📧 ENVIO DE EMAILS CONCLUÍDO                        ║');
+    console.log('╚═══════════════════════════════════════════════════════════════╝');
+    console.log('');
+    
+    return {
+      success: true,
+      clientEmail: clientEmailResult,
+      adminEmail: adminEmailResult
+    };
+    
   } catch (error) {
-    console.error('❌ ERRO GERAL em sendClientEmail:', error.message);
+    console.error('');
+    console.error('❌ ═══════════════════════════════════════════════════════');
+    console.error('❌ ERRO GERAL EM sendAllOrderEmails:', error.message);
     console.error('❌ Stack:', error.stack);
+    console.error('❌ ═══════════════════════════════════════════════════════');
+    console.error('');
+    return { success: false, error: error.message };
   }
 };
+
+// Alias para compatibilidade
+const sendClientEmail = sendAllOrderEmails;
 
 // =============================================================================
 // PLACE ORDER COD - SUPORTA GUEST
@@ -243,18 +555,24 @@ export const placeOrderCOD = async (req, res) => {
       discountAmount,
       discountPercentage,
       promoCode,
-      // Campos de guest
       isGuestOrder,
       guestEmail,
       guestName,
       guestPhone,
     } = req.body;
 
+    console.log('');
+    console.log('🛒 ═══════════════════════════════════════════════════');
+    console.log('🛒 NOVO PEDIDO COD');
+    console.log('🛒 ═══════════════════════════════════════════════════');
+    console.log('🛒 isGuestOrder:', isGuestOrder);
+    console.log('🛒 guestEmail:', guestEmail);
+    console.log('🛒 userId:', userId);
+
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Dados inválidos' });
     }
 
-    // Validar: precisa de userId OU dados de guest
     if (!userId && !isGuestOrder) {
       return res.json({ success: false, message: 'Utilizador ou dados de guest necessários' });
     }
@@ -272,7 +590,7 @@ export const placeOrderCOD = async (req, res) => {
       });
     }
 
-    // Criar pedido com suporte a guest
+    // Criar pedido
     const orderData = {
       items,
       amount,
@@ -297,21 +615,20 @@ export const placeOrderCOD = async (req, res) => {
     }
 
     const newOrder = await Order.create(orderData);
-
-    console.log(`✅ Pedido COD criado (${isGuestOrder ? 'GUEST' : 'USER'}):`, newOrder._id);
+    console.log('✅ Pedido COD criado:', newOrder._id);
 
     // Decrementar stock
     await decrementProductStock(items);
 
-    // Limpar carrinho do user (se não for guest)
+    // Limpar carrinho (se não for guest)
     if (userId) {
       await User.findByIdAndUpdate(userId, { cartItems: {} });
     }
 
-    // Enviar email (async, não bloqueia a resposta)
+    // ENVIAR EMAILS (não bloqueia a resposta)
     const emailRecipient = isGuestOrder ? guestEmail : userId;
-    sendClientEmail(newOrder, emailRecipient).catch(err => {
-      console.error('❌ Erro no envio de email (background):', err.message);
+    sendAllOrderEmails(newOrder, emailRecipient).catch(err => {
+      console.error('❌ Erro no envio de emails (background):', err.message);
     });
 
     return res.json({
@@ -330,7 +647,10 @@ export const placeOrderCOD = async (req, res) => {
 // PLACE ORDER STRIPE - SUPORTA GUEST
 // =============================================================================
 export const placeOrderStripe = async (req, res) => {
-  console.log('🚀 STRIPE FUNCTION STARTED!!!');
+  console.log('');
+  console.log('💳 ═══════════════════════════════════════════════════');
+  console.log('💳 NOVO PEDIDO STRIPE');
+  console.log('💳 ═══════════════════════════════════════════════════');
 
   try {
     const {
@@ -343,7 +663,6 @@ export const placeOrderStripe = async (req, res) => {
       discountPercentage,
       promoCode,
       paymentMethod,
-      // Campos de guest
       isGuestOrder,
       guestEmail,
       guestName,
@@ -352,11 +671,15 @@ export const placeOrderStripe = async (req, res) => {
 
     const { origin } = req.headers;
 
+    console.log('💳 isGuestOrder:', isGuestOrder);
+    console.log('💳 guestEmail:', guestEmail);
+    console.log('💳 userId:', userId);
+    console.log('💳 paymentMethod:', paymentMethod);
+
     if (!address || items.length === 0) {
       return res.json({ success: false, message: 'Dados inválidos' });
     }
 
-    // Validar: precisa de userId OU dados de guest
     if (!userId && !isGuestOrder) {
       return res.json({ success: false, message: 'Utilizador ou dados de guest necessários' });
     }
@@ -375,7 +698,6 @@ export const placeOrderStripe = async (req, res) => {
     }
 
     let productData = [];
-
     for (const item of items) {
       const product = await Product.findById(item.product);
       productData.push({
@@ -385,7 +707,7 @@ export const placeOrderStripe = async (req, res) => {
       });
     }
 
-    // Criar pedido com suporte a guest
+    // Criar pedido
     const orderData = {
       items,
       amount,
@@ -410,10 +732,9 @@ export const placeOrderStripe = async (req, res) => {
     }
 
     const order = await Order.create(orderData);
+    console.log('✅ Pedido Stripe criado:', order._id);
 
-    console.log(`✅ Pedido Stripe criado (${isGuestOrder ? 'GUEST' : 'USER'}):`, order._id);
-
-    // Stripe Gateway
+    // Stripe Session
     const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
 
     const line_items = productData.map(item => {
@@ -421,14 +742,11 @@ export const placeOrderStripe = async (req, res) => {
       if (discountPercentage > 0) {
         itemPrice = item.price * (1 - discountPercentage / 100);
       }
-
       return {
         price_data: {
           currency: 'eur',
           product_data: {
-            name: discountPercentage > 0
-              ? `${item.name} (${discountPercentage}% OFF)`
-              : item.name,
+            name: discountPercentage > 0 ? `${item.name} (${discountPercentage}% OFF)` : item.name,
           },
           unit_amount: Math.floor(itemPrice * 100),
         },
@@ -437,7 +755,6 @@ export const placeOrderStripe = async (req, res) => {
     });
 
     let payment_method_types;
-    
     switch (paymentMethod) {
       case 'mbway':
         payment_method_types = ['mb_way'];
@@ -445,13 +762,10 @@ export const placeOrderStripe = async (req, res) => {
       case 'multibanco':
         payment_method_types = ['multibanco'];
         break;
-      case 'card':
       default:
         payment_method_types = ['card'];
-        break;
     }
 
-    // Incluir dados de guest no metadata
     const sessionOptions = {
       line_items,
       mode: 'payment',
@@ -464,10 +778,11 @@ export const placeOrderStripe = async (req, res) => {
         paymentMethod: paymentMethod || 'card',
         isGuestOrder: isGuestOrder ? 'true' : 'false',
         guestEmail: guestEmail || '',
+        guestName: guestName || '',
+        guestPhone: guestPhone || '',
       },
     };
 
-    // Pre-fill email para guest
     if (isGuestOrder && guestEmail) {
       sessionOptions.customer_email = guestEmail;
     }
@@ -475,28 +790,30 @@ export const placeOrderStripe = async (req, res) => {
     if (paymentMethod === 'mbway') {
       sessionOptions.payment_method_options = { mb_way: {} };
     }
-
     if (paymentMethod === 'multibanco') {
       sessionOptions.payment_method_options = { multibanco: {} };
     }
 
     const session = await stripeInstance.checkout.sessions.create(sessionOptions);
-
     console.log('✅ Sessão Stripe criada:', session.id);
 
     return res.json({ success: true, url: session.url });
   } catch (error) {
-    console.error('❌ Erro Stripe completo:', error);
+    console.error('❌ Erro Stripe:', error);
     return res.json({ success: false, message: error.message });
   }
 };
 
 // =============================================================================
-// STRIPE WEBHOOKS - COM SUPORTE A GUEST
+// STRIPE WEBHOOKS - COM SUPORTE A GUEST E EMAILS
 // =============================================================================
 export const stripeWebhooks = async (request, response) => {
+  console.log('');
+  console.log('🔔 ═══════════════════════════════════════════════════');
+  console.log('🔔 STRIPE WEBHOOK RECEBIDO');
+  console.log('🔔 ═══════════════════════════════════════════════════');
+  
   const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY);
-
   const sig = request.headers['stripe-signature'];
   let event;
 
@@ -506,8 +823,9 @@ export const stripeWebhooks = async (request, response) => {
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
+    console.log('🔔 Evento:', event.type);
   } catch (error) {
-    console.error('❌ Webhook Error:', error.message);
+    console.error('❌ Webhook Signature Error:', error.message);
     return response.status(400).send(`Webhook Error: ${error.message}`);
   }
 
@@ -515,60 +833,97 @@ export const stripeWebhooks = async (request, response) => {
     case 'checkout.session.completed': {
       const session = event.data.object;
       console.log('✅ Checkout Session Completed:', session.id);
+      console.log('💳 Payment Status:', session.payment_status);
       
-      const { orderId, userId, paymentMethod, isGuestOrder, guestEmail } = session.metadata;
+      const { orderId, userId, paymentMethod, isGuestOrder, guestEmail, guestName, guestPhone } = session.metadata;
+      
+      console.log('📋 Metadata:', { orderId, userId, isGuestOrder, guestEmail });
       
       if (session.payment_status === 'paid') {
-        console.log(`💳 Pagamento ${paymentMethod} confirmado para pedido:`, orderId);
+        console.log('💰 Pagamento confirmado!');
         
+        // Atualizar pedido como pago
         const updatedOrder = await Order.findByIdAndUpdate(
           orderId, 
           { isPaid: true },
           { new: true }
         ).populate('items.product');
         
+        if (!updatedOrder) {
+          console.error('❌ Pedido não encontrado:', orderId);
+          break;
+        }
+        
         console.log('✅ Pedido marcado como pago:', orderId);
         
         // Decrementar stock
-        if (updatedOrder) {
-          await decrementProductStock(updatedOrder.items);
-        }
+        await decrementProductStock(updatedOrder.items);
         
-        // Limpar carrinho (apenas se não for guest)
+        // Limpar carrinho (se não for guest)
         if (userId && isGuestOrder !== 'true') {
           await User.findByIdAndUpdate(userId, { cartItems: {} });
         }
 
-        // Enviar email
-        if (updatedOrder) {
-          const emailRecipient = isGuestOrder === 'true' ? guestEmail : userId;
-          sendClientEmail(updatedOrder, emailRecipient).catch(err => {
-            console.error('❌ Erro no email Stripe (background):', err.message);
-          });
+        // ════════════════════════════════════════════════════════════
+        // ENVIAR EMAILS
+        // ════════════════════════════════════════════════════════════
+        console.log('');
+        console.log('📧 Preparando envio de emails...');
+        console.log('📧 isGuestOrder:', isGuestOrder);
+        console.log('📧 guestEmail:', guestEmail);
+        console.log('📧 userId:', userId);
+        
+        // Determinar destinatário
+        let emailRecipient;
+        if (isGuestOrder === 'true') {
+          emailRecipient = guestEmail || updatedOrder.guestEmail;
+          console.log('📧 Modo: Guest - Email:', emailRecipient);
+        } else {
+          emailRecipient = userId;
+          console.log('📧 Modo: User registado - ID:', emailRecipient);
         }
+        
+        if (emailRecipient) {
+          // Chamar função de emails (async)
+          sendAllOrderEmails(updatedOrder, emailRecipient)
+            .then(result => {
+              console.log('📧 Resultado final dos emails:', JSON.stringify(result, null, 2));
+            })
+            .catch(err => {
+              console.error('❌ Erro no envio de emails:', err.message);
+            });
+        } else {
+          console.error('❌ Nenhum destinatário de email encontrado!');
+        }
+        
       } else if (session.payment_status === 'unpaid' && paymentMethod === 'multibanco') {
-        console.log('⏳ Multibanco: Aguardando pagamento da referência para pedido:', orderId);
+        console.log('⏳ Multibanco: Aguardando pagamento');
       }
       break;
     }
 
     case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object;
-      const paymentIntentId = paymentIntent.id;
-
-      console.log('💳 Pagamento confirmado (payment_intent.succeeded):', paymentIntentId);
+      console.log('💳 Payment Intent Succeeded:', paymentIntent.id);
 
       try {
-        const session = await stripeInstance.checkout.sessions.list({
-          payment_intent: paymentIntentId,
+        const sessions = await stripeInstance.checkout.sessions.list({
+          payment_intent: paymentIntent.id,
         });
 
-        if (!session.data || session.data.length === 0) {
-          console.error('❌ Sessão não encontrada');
+        if (!sessions.data || sessions.data.length === 0) {
+          console.log('⚠️ Sessão não encontrada para payment_intent');
           break;
         }
 
-        const { orderId, userId, paymentMethod, isGuestOrder, guestEmail } = session.data[0].metadata;
+        const { orderId, userId, isGuestOrder, guestEmail } = sessions.data[0].metadata;
+        
+        // Verificar se já foi processado
+        const existingOrder = await Order.findById(orderId);
+        if (existingOrder?.isPaid) {
+          console.log('⚠️ Pedido já processado, ignorando duplicado');
+          break;
+        }
         
         const updatedOrder = await Order.findByIdAndUpdate(
           orderId, 
@@ -576,44 +931,45 @@ export const stripeWebhooks = async (request, response) => {
           { new: true }
         ).populate('items.product');
         
-        console.log(`✅ Pedido ${paymentMethod} marcado como pago:`, orderId);
-        
-        // Decrementar stock
-        if (updatedOrder) {
-          await decrementProductStock(updatedOrder.items);
+        if (!updatedOrder) {
+          console.error('❌ Pedido não encontrado:', orderId);
+          break;
         }
         
-        // Limpar carrinho (apenas se não for guest)
+        console.log('✅ Pedido marcado como pago (payment_intent):', orderId);
+        
+        // Decrementar stock
+        await decrementProductStock(updatedOrder.items);
+        
+        // Limpar carrinho
         if (userId && isGuestOrder !== 'true') {
           await User.findByIdAndUpdate(userId, { cartItems: {} });
         }
 
-        // Enviar email
-        if (updatedOrder) {
-          const emailRecipient = isGuestOrder === 'true' ? guestEmail : userId;
-          sendClientEmail(updatedOrder, emailRecipient).catch(err => {
-            console.error('❌ Erro no email Stripe (background):', err.message);
+        // Enviar emails
+        const emailRecipient = isGuestOrder === 'true' ? guestEmail : userId;
+        if (emailRecipient) {
+          sendAllOrderEmails(updatedOrder, emailRecipient).catch(err => {
+            console.error('❌ Erro no email (payment_intent):', err.message);
           });
         }
       } catch (error) {
-        console.error('❌ Erro no webhook:', error.message);
+        console.error('❌ Erro no webhook payment_intent:', error.message);
       }
       break;
     }
 
     case 'payment_intent.payment_failed': {
       const paymentIntent = event.data.object;
-      const paymentIntentId = paymentIntent.id;
-
-      console.log('❌ Pagamento falhou:', paymentIntentId);
+      console.log('❌ Pagamento falhou:', paymentIntent.id);
 
       try {
-        const session = await stripeInstance.checkout.sessions.list({
-          payment_intent: paymentIntentId,
+        const sessions = await stripeInstance.checkout.sessions.list({
+          payment_intent: paymentIntent.id,
         });
 
-        if (session.data && session.data.length > 0) {
-          const { orderId } = session.data[0].metadata;
+        if (sessions.data && sessions.data.length > 0) {
+          const { orderId } = sessions.data[0].metadata;
           await Order.findByIdAndDelete(orderId);
           console.log('🗑️ Pedido deletado:', orderId);
         }
@@ -623,44 +979,29 @@ export const stripeWebhooks = async (request, response) => {
       break;
     }
 
-    case 'source.chargeable': {
-      const source = event.data.object;
-      if (source.type === 'multibanco') {
-        console.log('🏦 Multibanco referência gerada:', {
-          reference: source.multibanco?.reference,
-          entity: source.multibanco?.entity,
-        });
-      }
-      break;
-    }
-
     default:
-      console.log(`ℹ️ Evento não tratado: ${event.type}`);
-      break;
+      console.log('ℹ️ Evento não tratado:', event.type);
   }
+  
   response.json({ received: true });
 };
 
 // =============================================================================
-// GET USER ORDERS - SUPORTA BUSCA POR EMAIL (GUEST)
+// GET USER ORDERS
 // =============================================================================
 export const getUserOrders = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id || req.query.userId || req.body.userId;
     const guestEmail = req.query.guestEmail || req.body.guestEmail;
 
-    // Permitir buscar por guestEmail OU userId
     let query;
-    
     if (guestEmail) {
-      // Buscar pedidos de guest por email
       query = {
         isGuestOrder: true,
         guestEmail: guestEmail,
         $or: [{ paymentType: 'COD' }, { isPaid: true }],
       };
     } else if (userId) {
-      // Buscar pedidos de user registado
       query = {
         userId,
         $or: [{ paymentType: 'COD' }, { isPaid: true }],
@@ -688,7 +1029,7 @@ export const getUserOrders = async (req, res) => {
 };
 
 // =============================================================================
-// GET SINGLE ORDER (PUBLIC - PARA PÁGINA DE SUCESSO)
+// GET SINGLE ORDER (PUBLIC)
 // =============================================================================
 export const getOrderById = async (req, res) => {
   try {
@@ -712,15 +1053,10 @@ export const getOrderById = async (req, res) => {
       return res.json({ success: false, message: 'Pedido não encontrado' });
     }
 
-    // Verificar se é um pedido válido para mostrar
     const isValidOrder = order.paymentType === 'COD' || order.isPaid === true;
 
     if (!isValidOrder) {
-      return res.json({ 
-        success: false, 
-        message: 'Pedido ainda não confirmado',
-        pending: true 
-      });
+      return res.json({ success: false, message: 'Pedido ainda não confirmado', pending: true });
     }
 
     res.json({ success: true, order });
@@ -748,114 +1084,58 @@ export const getAllOrders = async (req, res) => {
 };
 
 // =============================================================================
-// UPDATE ORDER STATUS (SELLER/ADMIN) - COM NOTIFICAÇÃO AO CLIENTE
+// UPDATE ORDER STATUS (SELLER/ADMIN)
 // =============================================================================
 export const updateOrderStatus = async (req, res) => {
   try {
     const { orderId, status } = req.body;
 
     if (!orderId || !status) {
-      return res.json({
-        success: false,
-        message: 'Order ID e Status são obrigatórios',
-      });
+      return res.json({ success: false, message: 'Order ID e Status são obrigatórios' });
     }
 
-    const validStatuses = [
-      'Order Placed',
-      'Processing',
-      'Shipped',
-      'Out for Delivery',
-      'Delivered',
-      'Cancelled',
-    ];
+    const validStatuses = ['Order Placed', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'];
 
     if (!validStatuses.includes(status)) {
       return res.json({ success: false, message: 'Status inválido' });
     }
 
-    // Buscar pedido atual
     const order = await Order.findById(orderId);
 
     if (!order) {
       return res.json({ success: false, message: 'Pedido não encontrado' });
     }
 
-    // Guardar status anterior para log
     const previousStatus = order.status;
 
-    // Atualizar status
     const updatedOrder = await Order.findByIdAndUpdate(
       orderId,
       { status },
       { new: true }
-    )
-      .populate('items.product')
-      .populate('address')
-      .exec();
+    ).populate('items.product').populate('address');
 
-    console.log('✅ Status atualizado:', {
-      orderId: updatedOrder._id,
-      oldStatus: previousStatus,
-      newStatus: status,
-    });
+    console.log('✅ Status atualizado:', { orderId, oldStatus: previousStatus, newStatus: status });
 
-    // Se entregue e COD, marcar como pago
     if (status === 'Delivered' && order.paymentType === 'COD') {
       await Order.findByIdAndUpdate(orderId, { isPaid: true });
-      console.log('✅ Pedido COD marcado como pago (entregue)');
     }
 
-    // ==========================================================================
-    // ENVIAR NOTIFICAÇÃO AO CLIENTE (se o status mudou)
-    // ==========================================================================
-    
+    // Enviar notificação de status
     let notificationSent = false;
-    
     if (previousStatus !== status && sendOrderStatusUpdateEmail) {
-      console.log('📧 Enviando notificação de status ao cliente...');
-      
-      // Buscar produtos para o email
-      const productIds = updatedOrder.items.map(item => 
-        item.product?._id || item.product
-      );
+      const productIds = updatedOrder.items.map(item => item.product?._id || item.product);
       const products = await Product.find({ _id: { $in: productIds } });
 
-      // Determinar nome do cliente para logs
-      let customerName = 'Cliente';
-      if (updatedOrder.isGuestOrder && updatedOrder.guestName) {
-        customerName = updatedOrder.guestName;
-      } else if (updatedOrder.userId) {
-        const user = await User.findById(updatedOrder.userId);
-        if (user) customerName = user.name;
-      }
-
-      // Enviar email de atualização de status (async, não bloqueia)
       sendOrderStatusUpdateEmail(updatedOrder, status, products)
         .then(result => {
           if (result.success) {
-            console.log('✅ Email de status enviado para:', result.recipient);
-          } else {
-            console.error('❌ Falha no email de status:', result.error);
+            console.log('✅ Email de status enviado');
           }
         })
         .catch(err => {
           console.error('❌ Erro ao enviar email de status:', err.message);
         });
 
-      // Notificar admin via WhatsApp (opcional)
-      if (sendStatusUpdateToAdmin) {
-        sendStatusUpdateToAdmin(updatedOrder, customerName, status)
-          .then(result => {
-            if (result.success) {
-              console.log('✅ WhatsApp admin notificado');
-            }
-          })
-          .catch(err => {
-            console.log('⚠️ WhatsApp admin não enviado:', err.message);
-          });
-      }
-      
       notificationSent = true;
     }
 
