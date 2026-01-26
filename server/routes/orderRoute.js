@@ -4,7 +4,6 @@ import authSeller from '../middlewares/authSeller.js';
 import {
   getAllOrders,
   getUserOrders,
-  placeOrderCOD,
   placeOrderStripe,
   updateOrderStatus,
   getOrderById,
@@ -15,17 +14,15 @@ const orderRouter = express.Router();
 // =============================================================================
 // 🆕 ROTAS PÚBLICAS (GUEST CHECKOUT)
 // =============================================================================
-// Estas rotas permitem checkout sem autenticação
-orderRouter.post('/guest/cod', placeOrderCOD);
+// Rota pública para checkout guest via Stripe
 orderRouter.post('/guest/stripe', placeOrderStripe);
 
-// 🆕 Rota pública para ver detalhes de um pedido (página de sucesso)
+// Rota pública para ver detalhes de um pedido (página de sucesso)
 orderRouter.get('/details/:orderId', getOrderById);
 
 // =============================================================================
 // ROTAS DE USER AUTENTICADO
 // =============================================================================
-orderRouter.post('/cod', authUser, placeOrderCOD);
 orderRouter.post('/stripe', authUser, placeOrderStripe);
 orderRouter.post('/user', authUser, getUserOrders);
 

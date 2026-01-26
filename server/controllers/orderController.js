@@ -1,6 +1,7 @@
 // server/controllers/orderController.js
-// VERSÃO FINAL CORRIGIDA - 26/01/2026
-// Com logging detalhado e emails enviados em PARALELO (fix timeout Vercel)
+// VERSÃO CORRIGIDA - 26/01/2026
+// ✅ COD removido
+// ✅ Emails com AWAIT no webhook (fix para Vercel serverless)
 
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
@@ -10,11 +11,10 @@ import stripe from 'stripe';
 import nodemailer from 'nodemailer';
 
 // =============================================================================
-// IMPORTAÇÕES SEGURAS DOS SERVIÇOS
+// IMPORTAÇÃO DO SERVIÇO DE EMAIL PARA STATUS UPDATES
 // =============================================================================
 let sendOrderStatusUpdateEmail = null;
 
-// Importar emailService (apenas para status updates)
 try {
   const emailService = await import('../services/emailService.js');
   sendOrderStatusUpdateEmail = emailService.sendOrderStatusUpdateEmail;
@@ -135,7 +135,7 @@ const generateOrderConfirmationHTML = (order, customerName, products, address) =
             <h2 style="margin: 0 0 15px 0; color: #333;">📋 Detalhes do Pedido</h2>
             <p style="margin: 5px 0;"><strong>Nº Pedido:</strong> #${order._id.toString().slice(-8).toUpperCase()}</p>
             <p style="margin: 5px 0;"><strong>Data:</strong> ${orderDate}</p>
-            <p style="margin: 5px 0;"><strong>Pagamento:</strong> ${order.paymentType === 'COD' ? '💵 Pagamento na Entrega' : order.isPaid ? '✅ Pago Online' : '⏳ Aguardando Pagamento'}</p>
+            <p style="margin: 5px 0;"><strong>Pagamento:</strong> ✅ Pago Online</p>
           </div>
           
           <!-- Customer Info -->
@@ -232,7 +232,7 @@ const generateAdminNotificationHTML = (order, customerName, customerEmail, custo
           <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
             <p style="margin: 5px 0;"><strong>📋 Pedido:</strong> #${order._id.toString().slice(-8).toUpperCase()}</p>
             <p style="margin: 5px 0;"><strong>📅 Data:</strong> ${orderDate}</p>
-            <p style="margin: 5px 0;"><strong>💳 Pagamento:</strong> ${order.paymentType === 'COD' ? '💵 Contra-Entrega' : order.isPaid ? '✅ PAGO Online' : '⏳ Pendente'}</p>
+            <p style="margin: 5px 0;"><strong>💳 Pagamento:</strong> ✅ PAGO Online</p>
           </div>
           
           <!-- Customer Info -->
@@ -293,7 +293,7 @@ const generateAdminNotificationHTML = (order, customerName, customerEmail, custo
 };
 
 // =============================================================================
-// FUNÇÃO PRINCIPAL PARA ENVIAR TODOS OS EMAILS - VERSÃO PARALELA (FIX TIMEOUT)
+// FUNÇÃO PRINCIPAL PARA ENVIAR TODOS OS EMAILS
 // =============================================================================
 const sendAllOrderEmails = async (order, userOrEmail) => {
   console.log('');
@@ -325,12 +325,13 @@ const sendAllOrderEmails = async (order, userOrEmail) => {
         console.log('👤 Modo: Email direto');
       } else {
         // É um userId - buscar user
+        console.log('👤 Modo: Buscando user por ID...');
         const user = await User.findById(userOrEmail);
         if (user) {
           customerEmail = user.email;
           customerName = user.name;
           customerPhone = user.phone || '';
-          console.log('👤 Modo: User registado encontrado');
+          console.log('👤 User encontrado:', user.name, '-', user.email);
         } else {
           console.error('❌ User não encontrado com ID:', userOrEmail);
         }
@@ -375,11 +376,16 @@ const sendAllOrderEmails = async (order, userOrEmail) => {
     const products = await Product.find({ _id: { $in: productIds } });
     console.log('📦 Produtos encontrados:', products.length);
     
-    // 4. CRIAR TRANSPORTER COM POOL (mantém conexão aberta para ambos emails)
+    // 4. CRIAR TRANSPORTER
     console.log('');
-    console.log('📧 Criando transporter com pool...');
-    console.log('📧 GMAIL_USER:', process.env.GMAIL_USER ? '✅' : '❌');
-    console.log('📧 GMAIL_APP_PASSWORD:', process.env.GMAIL_APP_PASSWORD ? '✅' : '❌');
+    console.log('📧 Criando transporter...');
+    console.log('📧 GMAIL_USER:', process.env.GMAIL_USER ? '✅ Configurado' : '❌ NÃO CONFIGURADO');
+    console.log('📧 GMAIL_APP_PASSWORD:', process.env.GMAIL_APP_PASSWORD ? '✅ Configurado' : '❌ NÃO CONFIGURADO');
+    
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+      console.error('❌ ERRO: Variáveis de email não configuradas!');
+      return { success: false, error: 'Configuração de email incompleta' };
+    }
     
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -387,9 +393,6 @@ const sendAllOrderEmails = async (order, userOrEmail) => {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_APP_PASSWORD,
       },
-      pool: true,
-      maxConnections: 3,
-      maxMessages: 10,
     });
     
     // 5. PREPARAR EMAILS
@@ -401,7 +404,7 @@ const sendAllOrderEmails = async (order, userOrEmail) => {
     const adminHTML = generateAdminNotificationHTML(order, customerName, customerEmail, customerPhone, products, address);
     const adminSubject = `🔔 NOVO PEDIDO #${order._id.toString().slice(-8).toUpperCase()} - €${order.amount.toFixed(2)}`;
     
-    // 6. ENVIAR EMAILS EM PARALELO (CRÍTICO - evita timeout da Vercel)
+    // 6. ENVIAR EMAILS EM PARALELO
     console.log('');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📧 ENVIANDO EMAILS EM PARALELO...');
@@ -429,9 +432,6 @@ const sendAllOrderEmails = async (order, userOrEmail) => {
         .catch(e => ({ success: false, error: e.message })),
     ]);
     
-    // Fechar transporter
-    transporter.close();
-    
     // 7. LOG DOS RESULTADOS
     console.log('');
     console.log('═══════════════════════════════════════════════════════════════');
@@ -455,111 +455,6 @@ const sendAllOrderEmails = async (order, userOrEmail) => {
     console.error('❌ ═══════════════════════════════════════════════════════');
     console.error('');
     return { success: false, error: error.message };
-  }
-};
-
-// Alias para compatibilidade
-const sendClientEmail = sendAllOrderEmails;
-
-// =============================================================================
-// PLACE ORDER COD - SUPORTA GUEST
-// =============================================================================
-export const placeOrderCOD = async (req, res) => {
-  try {
-    const {
-      userId,
-      items,
-      address,
-      originalAmount,
-      amount,
-      discountAmount,
-      discountPercentage,
-      promoCode,
-      isGuestOrder,
-      guestEmail,
-      guestName,
-      guestPhone,
-    } = req.body;
-
-    console.log('');
-    console.log('🛒 ═══════════════════════════════════════════════════');
-    console.log('🛒 NOVO PEDIDO COD');
-    console.log('🛒 ═══════════════════════════════════════════════════');
-    console.log('🛒 isGuestOrder:', isGuestOrder);
-    console.log('🛒 guestEmail:', guestEmail);
-    console.log('🛒 userId:', userId);
-
-    if (!address || items.length === 0) {
-      return res.json({ success: false, message: 'Dados inválidos' });
-    }
-
-    if (!userId && !isGuestOrder) {
-      return res.json({ success: false, message: 'Utilizador ou dados de guest necessários' });
-    }
-
-    if (isGuestOrder && !guestEmail) {
-      return res.json({ success: false, message: 'Email é obrigatório para guest checkout' });
-    }
-
-    // Validar stock
-    const stockValidation = await validateOrderStock(items);
-    if (!stockValidation.valid) {
-      return res.json({ 
-        success: false, 
-        message: 'Stock insuficiente: ' + stockValidation.errors.join(', ')
-      });
-    }
-
-    // Criar pedido
-    const orderData = {
-      items,
-      amount,
-      address,
-      paymentType: 'COD',
-      isPaid: false,
-      promoCode: promoCode || '',
-      discountAmount: discountAmount || 0,
-      discountPercentage: discountPercentage || 0,
-      originalAmount,
-    };
-
-    if (isGuestOrder) {
-      orderData.isGuestOrder = true;
-      orderData.guestEmail = guestEmail;
-      orderData.guestName = guestName || '';
-      orderData.guestPhone = guestPhone || '';
-      orderData.userId = null;
-    } else {
-      orderData.userId = userId;
-      orderData.isGuestOrder = false;
-    }
-
-    const newOrder = await Order.create(orderData);
-    console.log('✅ Pedido COD criado:', newOrder._id);
-
-    // Decrementar stock
-    await decrementProductStock(items);
-
-    // Limpar carrinho (se não for guest)
-    if (userId) {
-      await User.findByIdAndUpdate(userId, { cartItems: {} });
-    }
-
-    // ENVIAR EMAILS (não bloqueia a resposta)
-    const emailRecipient = isGuestOrder ? guestEmail : userId;
-    sendAllOrderEmails(newOrder, emailRecipient).catch(err => {
-      console.error('❌ Erro no envio de emails (background):', err.message);
-    });
-
-    return res.json({
-      success: true,
-      message: 'Encomenda realizada com sucesso',
-      orderId: newOrder._id,
-      isGuestOrder: isGuestOrder || false,
-    });
-  } catch (error) {
-    console.error('❌ Erro COD:', error);
-    return res.json({ success: false, message: error.message });
   }
 };
 
@@ -725,7 +620,7 @@ export const placeOrderStripe = async (req, res) => {
 };
 
 // =============================================================================
-// STRIPE WEBHOOKS - COM SUPORTE A GUEST E EMAILS
+// STRIPE WEBHOOKS - COM AWAIT NOS EMAILS (FIX VERCEL)
 // =============================================================================
 export const stripeWebhooks = async (request, response) => {
   console.log('');
@@ -784,7 +679,7 @@ export const stripeWebhooks = async (request, response) => {
           await User.findByIdAndUpdate(userId, { cartItems: {} });
         }
 
-        // ENVIAR EMAILS
+        // ✅ CORREÇÃO: ENVIAR EMAILS COM AWAIT (antes de responder)
         console.log('');
         console.log('📧 Preparando envio de emails...');
         
@@ -798,13 +693,9 @@ export const stripeWebhooks = async (request, response) => {
         }
         
         if (emailRecipient) {
-          sendAllOrderEmails(updatedOrder, emailRecipient)
-            .then(result => {
-              console.log('📧 Resultado dos emails:', JSON.stringify(result, null, 2));
-            })
-            .catch(err => {
-              console.error('❌ Erro no envio de emails:', err.message);
-            });
+          // ✅ AWAIT - Espera os emails serem enviados ANTES de responder
+          const emailResult = await sendAllOrderEmails(updatedOrder, emailRecipient);
+          console.log('📧 Resultado dos emails:', JSON.stringify(emailResult, null, 2));
         } else {
           console.error('❌ Nenhum destinatário de email encontrado!');
         }
@@ -859,12 +750,11 @@ export const stripeWebhooks = async (request, response) => {
           await User.findByIdAndUpdate(userId, { cartItems: {} });
         }
 
-        // Enviar emails
+        // ✅ AWAIT - Enviar emails com await
         const emailRecipient = isGuestOrder === 'true' ? guestEmail : userId;
         if (emailRecipient) {
-          sendAllOrderEmails(updatedOrder, emailRecipient).catch(err => {
-            console.error('❌ Erro no email (payment_intent):', err.message);
-          });
+          const emailResult = await sendAllOrderEmails(updatedOrder, emailRecipient);
+          console.log('📧 Resultado dos emails (payment_intent):', JSON.stringify(emailResult, null, 2));
         }
       } catch (error) {
         console.error('❌ Erro no webhook payment_intent:', error.message);
@@ -896,6 +786,7 @@ export const stripeWebhooks = async (request, response) => {
       console.log('ℹ️ Evento não tratado:', event.type);
   }
   
+  // ✅ Responder ao Stripe DEPOIS dos emails serem enviados
   response.json({ received: true });
 };
 
@@ -912,12 +803,12 @@ export const getUserOrders = async (req, res) => {
       query = {
         isGuestOrder: true,
         guestEmail: guestEmail,
-        $or: [{ paymentType: 'COD' }, { isPaid: true }],
+        isPaid: true,
       };
     } else if (userId) {
       query = {
         userId,
-        $or: [{ paymentType: 'COD' }, { isPaid: true }],
+        isPaid: true,
       };
     } else {
       return res.json({ success: false, message: 'User ID ou Guest Email necessário' });
@@ -966,9 +857,8 @@ export const getOrderById = async (req, res) => {
       return res.json({ success: false, message: 'Pedido não encontrado' });
     }
 
-    const isValidOrder = order.paymentType === 'COD' || order.isPaid === true;
-
-    if (!isValidOrder) {
+    // Só mostra pedidos pagos
+    if (!order.isPaid) {
       return res.json({ success: false, message: 'Pedido ainda não confirmado', pending: true });
     }
 
@@ -985,7 +875,7 @@ export const getOrderById = async (req, res) => {
 export const getAllOrders = async (req, res) => {
   try {
     const orders = await Order.find({
-      $or: [{ paymentType: 'COD' }, { isPaid: true }],
+      isPaid: true,
     })
       .populate('items.product address')
       .sort({ createdAt: -1 });
@@ -1029,27 +919,22 @@ export const updateOrderStatus = async (req, res) => {
 
     console.log('✅ Status atualizado:', { orderId, oldStatus: previousStatus, newStatus: status });
 
-    if (status === 'Delivered' && order.paymentType === 'COD') {
-      await Order.findByIdAndUpdate(orderId, { isPaid: true });
-    }
-
     // Enviar notificação de status
     let notificationSent = false;
     if (previousStatus !== status && sendOrderStatusUpdateEmail) {
       const productIds = updatedOrder.items.map(item => item.product?._id || item.product);
       const products = await Product.find({ _id: { $in: productIds } });
 
-      sendOrderStatusUpdateEmail(updatedOrder, status, products)
-        .then(result => {
-          if (result.success) {
-            console.log('✅ Email de status enviado');
-          }
-        })
-        .catch(err => {
-          console.error('❌ Erro ao enviar email de status:', err.message);
-        });
-
-      notificationSent = true;
+      // ✅ Com await
+      try {
+        const result = await sendOrderStatusUpdateEmail(updatedOrder, status, products);
+        if (result.success) {
+          console.log('✅ Email de status enviado');
+          notificationSent = true;
+        }
+      } catch (err) {
+        console.error('❌ Erro ao enviar email de status:', err.message);
+      }
     }
 
     res.json({
@@ -1062,4 +947,14 @@ export const updateOrderStatus = async (req, res) => {
     console.error('❌ Erro ao atualizar status:', error);
     res.json({ success: false, message: error.message });
   }
+};
+
+// =============================================================================
+// EXPORTAR FUNÇÃO COD VAZIA PARA NÃO QUEBRAR IMPORTS EXISTENTES
+// =============================================================================
+export const placeOrderCOD = async (req, res) => {
+  return res.json({ 
+    success: false, 
+    message: 'Pagamento na entrega não está mais disponível. Por favor, use pagamento online.' 
+  });
 };
