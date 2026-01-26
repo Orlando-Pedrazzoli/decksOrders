@@ -9,4 +9,10 @@ export {
   FAQSchema,
   LocalBusinessSchema 
 } from './JsonLd';
-export { default as seoConfig, categoryDescriptions, getCategorySEO } from './seoConfig';
+export { 
+  default as seoConfig, 
+  categoryDescriptions, 
+  collectionDescriptions,  // NOVO
+  getCategorySEO,
+  getCollectionSEO         // NOVO
+} from './seoConfig';

@@ -5,6 +5,8 @@
  * 1. URLs SEM trailing slash (exceto homepage que usa '')
  * 2. URLs devem ser idênticas às do sitemap.xml
  * 3. Descrições entre 120-160 caracteres para melhor exibição no Google
+ * 
+ * Última atualização: 2026-01-26
  */
 
 const seoConfig = {
@@ -76,7 +78,38 @@ const seoConfig = {
 };
 
 /**
- * Descrições SEO para páginas de categoria
+ * Descrições SEO para páginas de COLLECTIONS (grupos principais)
+ * Estas são as páginas de categoria de alto nível: /collections/decks, etc.
+ */
+export const collectionDescriptions = {
+  'decks': {
+    title: 'Decks de Surf - Traction Pads',
+    description: 'Decks de tracção de alta qualidade para surf. Traction pads em E.V.A premium com diversas texturas e cores. Modelos Tahiti, Hawaii, Saquarema, Noronha, Fiji e J-Bay.',
+    url: '/collections/decks',
+    keywords: ['decks surf', 'traction pad', 'grip surf', 'pad prancha']
+  },
+  'leashes': {
+    title: 'Leashes de Surf',
+    description: 'Leashes de surf premium para máxima segurança e durabilidade. Vários tamanhos disponíveis: 6ft, 7ft e 8ft. Construídos para suportar as condições mais exigentes.',
+    url: '/collections/leashes',
+    keywords: ['leash surf', 'amarração prancha', 'leash 6ft', 'leash 7ft']
+  },
+  'capas': {
+    title: 'Capas para Prancha de Surf',
+    description: 'Capas de protecção para pranchas de surf. Modelos para shortboard, fish e híbridas. Materiais resistentes e designs funcionais para proteger a tua prancha.',
+    url: '/collections/capas',
+    keywords: ['capa prancha surf', 'boardbag', 'proteção prancha']
+  },
+  'wax': {
+    title: 'Wax para Surf - Parafina',
+    description: 'Wax e parafina premium para surf. Fu Wax Cool Water para águas entre 11°C e 17°C. Utilizada por surfistas profissionais. Alto desempenho garantido.',
+    url: '/collections/wax',
+    keywords: ['wax surf', 'parafina surf', 'fu wax', 'cera prancha']
+  }
+};
+
+/**
+ * Descrições SEO para páginas de SUBCATEGORIAS (modelos específicos)
  * Slug DEVE corresponder ao usado nas rotas e no sitemap
  */
 export const categoryDescriptions = {
@@ -118,7 +151,19 @@ export const categoryDescriptions = {
 };
 
 /**
- * Helper: Obter configuração SEO para uma categoria
+ * Helper: Obter configuração SEO para uma collection (grupo)
+ */
+export const getCollectionSEO = (collectionSlug) => {
+  const slug = (collectionSlug || '').toLowerCase();
+  return collectionDescriptions[slug] || {
+    title: `${collectionSlug} - Elite Surfing Portugal`,
+    description: `Coleção ${collectionSlug} na Elite Surfing Portugal. Equipamento de surf de alta qualidade com envio para todo Portugal.`,
+    url: `/collections/${slug}`
+  };
+};
+
+/**
+ * Helper: Obter configuração SEO para uma categoria (subcategoria)
  */
 export const getCategorySEO = (categorySlug) => {
   const slug = (categorySlug || '').toLowerCase();

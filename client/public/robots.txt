@@ -1,12 +1,19 @@
 # =====================================================
 # Elite Surfing Portugal - robots.txt
 # https://www.elitesurfing.pt
+# Última atualização: 2026-01-26
 # =====================================================
 
+# Regras para todos os crawlers
 User-agent: *
 Allow: /
+Allow: /products
+Allow: /products/
+Allow: /collections/
+Allow: /contact
+Allow: /faq
 
-# Páginas privadas (noindex no seoConfig.js)
+# Páginas privadas (não indexar)
 Disallow: /seller
 Disallow: /seller/
 Disallow: /my-orders
@@ -14,25 +21,20 @@ Disallow: /add-address
 Disallow: /write-review
 Disallow: /order-success
 Disallow: /cart
+Disallow: /loader
 
-# URLs removidas
+# URLs removidas (redireccionadas via vercel.json)
 Disallow: /products/Deck-Bells
 Disallow: /products/deck-bells
 
-# Sitemap
-Sitemap: https://www.elitesurfing.pt/sitemap.xml
-
 # =====================================================
-# Googlebot
+# Googlebot específico
 # =====================================================
 User-agent: Googlebot
 Allow: /
-Disallow: /seller
-Disallow: /my-orders
-Disallow: /add-address
-Disallow: /write-review
-Disallow: /order-success
-Disallow: /cart
+Allow: /products
+Allow: /collections/
+Crawl-delay: 1
 
 # =====================================================
 # Google Images
@@ -41,7 +43,28 @@ User-agent: Googlebot-Image
 Allow: /
 
 # =====================================================
-# AdsBot
+# Bing
+# =====================================================
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# =====================================================
+# AdsBot (para campanhas Google Ads)
 # =====================================================
 User-agent: AdsBot-Google
 Allow: /
+
+# =====================================================
+# Sitemaps
+# =====================================================
+Sitemap: https://www.elitesurfing.pt/sitemap.xml
+Sitemap: https://www.elitesurfing.pt/sitemap-static.xml
+Sitemap: https://www.elitesurfing.pt/sitemap-collections.xml
+Sitemap: https://www.elitesurfing.pt/sitemap-categories.xml
+Sitemap: https://www.elitesurfing.pt/sitemap-products.xml
+
+# =====================================================
+# Host preferencial
+# =====================================================
+Host: https://www.elitesurfing.pt

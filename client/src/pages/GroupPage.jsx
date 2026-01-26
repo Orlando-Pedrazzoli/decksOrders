@@ -5,6 +5,8 @@ import { ChevronLeft } from 'lucide-react';
 import { getGroupBySlug, getCategoriesByGroup } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
+// ✅ SEO Imports
+import { SEO, getCollectionSEO, BreadcrumbSchema, OrganizationSchema } from '../components/seo';
 
 const GroupPage = () => {
   const { group: groupSlug } = useParams();
@@ -12,6 +14,15 @@ const GroupPage = () => {
 
   // Obter dados do grupo
   const group = getGroupBySlug(groupSlug);
+
+  // ✅ Obter configuração SEO para esta collection
+  const seoData = getCollectionSEO(groupSlug);
+
+  // ✅ Breadcrumbs para structured data
+  const breadcrumbItems = [
+    { name: 'Home', url: '/' },
+    { name: group?.name || groupSlug, url: `/collections/${groupSlug}` }
+  ];
 
   // Obter categorias deste grupo (para filtrar produtos)
   const groupCategories = getCategoriesByGroup(groupSlug);
@@ -53,113 +64,165 @@ const GroupPage = () => {
   // Se grupo não existe, mostrar erro
   if (!group) {
     return (
-      <div className='min-h-[60vh] flex flex-col items-center justify-center px-6'>
-        <h1 className='text-2xl font-bold text-gray-800 mb-4'>Coleção não encontrada</h1>
-        <p className='text-gray-600 mb-6'>A coleção que procuras não existe.</p>
-        <Link 
-          to='/'
-          className='px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dull transition-colors'
-        >
-          Voltar à Home
-        </Link>
-      </div>
+      <>
+        {/* ✅ SEO para página 404 de collection */}
+        <SEO
+          title="Coleção não encontrada"
+          description="A coleção que procura não existe na Elite Surfing Portugal."
+          url={`/collections/${groupSlug}`}
+          noindex={true}
+        />
+        <div className='min-h-[60vh] flex flex-col items-center justify-center px-6'>
+          <h1 className='text-2xl font-bold text-gray-800 mb-4'>Coleção não encontrada</h1>
+          <p className='text-gray-600 mb-6'>A coleção que procuras não existe.</p>
+          <Link 
+            to='/'
+            className='px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dull transition-colors'
+          >
+            Voltar à Home
+          </Link>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className='min-h-screen'>
-      {/* Banner Hero */}
-      <div className='relative h-[40vh] md:h-[50vh] overflow-hidden'>
-        <img
-          src={group.bannerImage}
-          alt={group.name}
-          className='w-full h-full object-cover'
-        />
-        {/* Overlay */}
-        <div className='absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/20' />
+    <>
+      {/* ✅ SEO Completo para Collection */}
+      <SEO
+        title={seoData.title}
+        description={seoData.description}
+        url={seoData.url}
+        image={group.bannerImage || '/og-image.jpg'}
+        type="website"
+      >
+        {/* Structured Data */}
+        <OrganizationSchema />
+        <BreadcrumbSchema items={breadcrumbItems} />
         
-        {/* Conteúdo do Banner */}
-        <div className='absolute inset-0 flex flex-col justify-end pb-10 md:pb-16 px-6 md:px-16 lg:px-24 xl:px-32'>
-          {/* Breadcrumb */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className='flex items-center gap-2 text-white/80 text-sm mb-4'
-          >
-            <Link to='/' className='hover:text-white transition-colors'>Home</Link>
-            <span>/</span>
-            <span className='text-white'>{group.name}</span>
-          </motion.div>
+        {/* ✅ CollectionPage Schema para e-commerce */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            "name": seoData.title,
+            "description": seoData.description,
+            "url": `https://www.elitesurfing.pt${seoData.url}`,
+            "image": group.bannerImage || 'https://www.elitesurfing.pt/og-image.jpg',
+            "isPartOf": {
+              "@type": "WebSite",
+              "name": "Elite Surfing Portugal",
+              "url": "https://www.elitesurfing.pt"
+            },
+            "numberOfItems": groupProducts.length,
+            "mainEntity": {
+              "@type": "ItemList",
+              "numberOfItems": groupProducts.length,
+              "itemListElement": groupProducts.slice(0, 10).map((product, index) => ({
+                "@type": "ListItem",
+                "position": index + 1,
+                "url": `https://www.elitesurfing.pt/products/${(product.category || '').toLowerCase()}/${product._id}`
+              }))
+            }
+          })}
+        </script>
+      </SEO>
 
-          {/* Título */}
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className='text-4xl md:text-5xl lg:text-6xl font-bold text-white tracking-wide'
-          >
-            {group.name}
-          </motion.h1>
-
-          {/* Descrição */}
-          <motion.p
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className='text-white/90 text-base md:text-lg max-w-2xl mt-4'
-          >
-            {group.description}
-          </motion.p>
-        </div>
-      </div>
-
-      {/* Conteúdo */}
-      <div className='px-6 md:px-16 lg:px-24 xl:px-32 py-8'>
-        {/* Voltar Button + Contagem */}
-        <div className='flex items-center justify-between mb-8'>
-          <button
-            onClick={() => navigate(-1)}
-            className='flex items-center gap-2 text-gray-600 hover:text-primary transition-colors group'
-          >
-            <ChevronLeft className='w-5 h-5 transition-transform group-hover:-translate-x-1' />
-            <span>Voltar</span>
-          </button>
+      <div className='min-h-screen'>
+        {/* Banner Hero */}
+        <div className='relative h-[40vh] md:h-[50vh] overflow-hidden'>
+          <img
+            src={group.bannerImage}
+            alt={group.name}
+            className='w-full h-full object-cover'
+          />
+          {/* Overlay */}
+          <div className='absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/20' />
           
-          <p className='text-gray-500 text-sm'>
-            {groupProducts.length} {groupProducts.length === 1 ? 'produto' : 'produtos'}
-          </p>
+          {/* Conteúdo do Banner */}
+          <div className='absolute inset-0 flex flex-col justify-end pb-10 md:pb-16 px-6 md:px-16 lg:px-24 xl:px-32'>
+            {/* Breadcrumb */}
+            <motion.nav
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className='flex items-center gap-2 text-white/80 text-sm mb-4'
+              aria-label="Breadcrumb"
+            >
+              <Link to='/' className='hover:text-white transition-colors'>Home</Link>
+              <span>/</span>
+              <span className='text-white' aria-current="page">{group.name}</span>
+            </motion.nav>
+
+            {/* Título - H1 importante para SEO */}
+            <motion.h1
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className='text-4xl md:text-5xl lg:text-6xl font-bold text-white tracking-wide'
+            >
+              {group.name}
+            </motion.h1>
+
+            {/* Descrição */}
+            <motion.p
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className='text-white/90 text-base md:text-lg max-w-2xl mt-4'
+            >
+              {group.description}
+            </motion.p>
+          </div>
         </div>
 
-        {/* Grid de Produtos */}
-        {groupProducts.length === 0 ? (
-          <div className='text-center py-16 bg-gray-50 rounded-lg'>
-            <p className='text-gray-500 text-lg mb-4'>
-              Ainda não há produtos nesta coleção.
-            </p>
-            <Link 
-              to='/products'
-              className='inline-block px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dull transition-colors'
+        {/* Conteúdo */}
+        <div className='px-6 md:px-16 lg:px-24 xl:px-32 py-8'>
+          {/* Voltar Button + Contagem */}
+          <div className='flex items-center justify-between mb-8'>
+            <button
+              onClick={() => navigate(-1)}
+              className='flex items-center gap-2 text-gray-600 hover:text-primary transition-colors group'
             >
-              Ver Todos os Produtos
-            </Link>
+              <ChevronLeft className='w-5 h-5 transition-transform group-hover:-translate-x-1' />
+              <span>Voltar</span>
+            </button>
+            
+            <p className='text-gray-500 text-sm'>
+              {groupProducts.length} {groupProducts.length === 1 ? 'produto' : 'produtos'}
+            </p>
           </div>
-        ) : (
-          <div className='grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4 md:gap-6'>
-            {groupProducts.map((product, index) => (
-              <motion.div
-                key={product._id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
+
+          {/* Grid de Produtos */}
+          {groupProducts.length === 0 ? (
+            <div className='text-center py-16 bg-gray-50 rounded-lg'>
+              <p className='text-gray-500 text-lg mb-4'>
+                Ainda não há produtos nesta coleção.
+              </p>
+              <Link 
+                to='/products'
+                className='inline-block px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dull transition-colors'
               >
-                <ProductCard product={product} />
-              </motion.div>
-            ))}
-          </div>
-        )}
+                Ver Todos os Produtos
+              </Link>
+            </div>
+          ) : (
+            <div className='grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4 md:gap-6'>
+              {groupProducts.map((product, index) => (
+                <motion.div
+                  key={product._id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.05 }}
+                >
+                  <ProductCard product={product} />
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

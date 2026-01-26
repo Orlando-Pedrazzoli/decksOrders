@@ -4,13 +4,16 @@ import path from 'path';
 /**
  * Gerador de Sitemaps - Elite Surfing Portugal
  * 
- * Gera 4 ficheiros em /public:
+ * Gera 5 ficheiros em /public:
  * - sitemap.xml (índice)
  * - sitemap-static.xml
- * - sitemap-categories.xml
+ * - sitemap-collections.xml (NOVO - grupos principais)
+ * - sitemap-categories.xml (subcategorias de produtos)
  * - sitemap-products.xml
  * 
  * IMPORTANTE: As URLs aqui DEVEM ser idênticas às do seoConfig.js
+ * 
+ * Última atualização: 2026-01-26
  */
 
 const SITE_URL = 'https://www.elitesurfing.pt';
@@ -31,7 +34,15 @@ const staticRoutes = [
   { url: '/refund-policy', changefreq: 'yearly', priority: 0.3 },
 ];
 
-// Categorias (do categoryDescriptions no seoConfig.js)
+// Collections/Grupos principais (NOVO)
+const collections = [
+  { slug: 'decks', changefreq: 'weekly', priority: 0.9 },
+  { slug: 'leashes', changefreq: 'weekly', priority: 0.9 },
+  { slug: 'capas', changefreq: 'weekly', priority: 0.9 },
+  { slug: 'wax', changefreq: 'weekly', priority: 0.9 },
+];
+
+// Categorias/Subcategorias de produtos
 const categories = [
   'deck-tahiti',
   'deck-hawaii-grom',
@@ -104,6 +115,10 @@ function generateSitemapIndex() {
     <lastmod>${today}</lastmod>
   </sitemap>
   <sitemap>
+    <loc>${SITE_URL}/sitemap-collections.xml</loc>
+    <lastmod>${today}</lastmod>
+  </sitemap>
+  <sitemap>
     <loc>${SITE_URL}/sitemap-categories.xml</loc>
     <lastmod>${today}</lastmod>
   </sitemap>
@@ -127,6 +142,28 @@ function generateStaticSitemap() {
     <lastmod>${today}</lastmod>
     <changefreq>${route.changefreq}</changefreq>
     <priority>${route.priority}</priority>
+  </url>
+`;
+  }
+
+  xml += `</urlset>`;
+  return xml;
+}
+
+// NOVO: Sitemap para Collections/Grupos
+function generateCollectionsSitemap() {
+  const today = getToday();
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`;
+
+  for (const collection of collections) {
+    const fullUrl = `${SITE_URL}/collections/${collection.slug}`;
+    xml += `  <url>
+    <loc>${fullUrl}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${collection.changefreq}</changefreq>
+    <priority>${collection.priority}</priority>
   </url>
 `;
   }
@@ -175,9 +212,10 @@ function generateProductsSitemap(products) {
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>`;
 
-    // Adicionar todas as imagens do produto
+    // Adicionar todas as imagens do produto (máximo 8 por URL)
     if (product.image && product.image.length > 0) {
-      for (const img of product.image) {
+      const images = product.image.slice(0, 8); // Google recomenda máximo 1000 imagens por sitemap
+      for (const img of images) {
         xml += `
     <image:image>
       <image:loc>${escapeXml(img)}</image:loc>
@@ -201,7 +239,8 @@ function generateProductsSitemap(products) {
 
 async function generateSitemaps() {
   console.log('🚀 Iniciando geração de sitemaps...\n');
-  console.log(`📍 URL Base: ${SITE_URL}\n`);
+  console.log(`📍 URL Base: ${SITE_URL}`);
+  console.log(`📅 Data: ${getToday()}\n`);
 
   const outputDir = path.join(process.cwd(), 'public');
 
@@ -226,29 +265,40 @@ async function generateSitemaps() {
   fs.writeFileSync(path.join(outputDir, 'sitemap-static.xml'), staticSitemap, 'utf8');
   console.log(`   ✓ sitemap-static.xml (${staticRoutes.length} páginas)`);
 
-  // 3. Categories Sitemap
+  // 3. Collections Sitemap (NOVO)
+  const collectionsSitemap = generateCollectionsSitemap();
+  fs.writeFileSync(path.join(outputDir, 'sitemap-collections.xml'), collectionsSitemap, 'utf8');
+  console.log(`   ✓ sitemap-collections.xml (${collections.length} collections)`);
+
+  // 4. Categories Sitemap
   const categoriesSitemap = generateCategoriesSitemap();
   fs.writeFileSync(path.join(outputDir, 'sitemap-categories.xml'), categoriesSitemap, 'utf8');
   console.log(`   ✓ sitemap-categories.xml (${categories.length} categorias)`);
 
-  // 4. Products Sitemap
+  // 5. Products Sitemap
   const productsSitemap = generateProductsSitemap(products);
   fs.writeFileSync(path.join(outputDir, 'sitemap-products.xml'), productsSitemap, 'utf8');
   console.log(`   ✓ sitemap-products.xml (${products.length} produtos)`);
 
   // Resumo
+  const totalUrls = staticRoutes.length + collections.length + categories.length + products.length;
   console.log('\n' + '='.repeat(50));
   console.log('✅ SITEMAPS GERADOS COM SUCESSO!');
   console.log('='.repeat(50));
-  console.log(`📊 Total de URLs: ${staticRoutes.length + categories.length + products.length}`);
+  console.log(`📊 Total de URLs: ${totalUrls}`);
   console.log(`   • Estáticas: ${staticRoutes.length}`);
+  console.log(`   • Collections: ${collections.length}`);
   console.log(`   • Categorias: ${categories.length}`);
   console.log(`   • Produtos: ${products.length}`);
   console.log('\n📁 Ficheiros em /public:');
   console.log('   • sitemap.xml');
   console.log('   • sitemap-static.xml');
+  console.log('   • sitemap-collections.xml');
   console.log('   • sitemap-categories.xml');
   console.log('   • sitemap-products.xml');
+  console.log('\n🔗 URLs importantes:');
+  console.log(`   • ${SITE_URL}/sitemap.xml`);
+  console.log(`   • ${SITE_URL}/robots.txt`);
   console.log('');
 }
 
