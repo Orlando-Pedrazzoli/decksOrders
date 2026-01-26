@@ -55,7 +55,7 @@ const App = () => {
   }
 
   return (
-    <div className='text-default min-h-screen text-gray-700 bg-white'>
+    <div className='text-default min-h-screen text-gray-700 bg-white overflow-x-hidden'>
       {/* ✅ AnnouncementBar + Navbar - apenas fora do seller */}
       {!isSellerPath && (
         <>
