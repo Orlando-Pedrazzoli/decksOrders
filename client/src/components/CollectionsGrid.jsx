@@ -32,7 +32,6 @@ const DesktopCard = ({ name, slug, image }) => (
       {/* Overlay escuro */}
       <div className="absolute inset-0 bg-black/30 transition-opacity duration-300 group-hover:bg-black/50" />
     </div>
-
     {/* Content */}
     <div className="relative z-10 flex flex-col items-center justify-center h-full p-6">
       <h3 className="text-white text-2xl lg:text-3xl font-bold tracking-wider mb-4 text-center uppercase">
@@ -47,7 +46,7 @@ const DesktopCard = ({ name, slug, image }) => (
 
 const CollectionsGrid = () => {
   return (
-    <section className="pt-4 pb-8 md:py-16 px-6 md:px-16 lg:px-24 xl:px-32 bg-white">
+    <section className="pt-4 pb-8 md:py-16 px-6 md:px-16 lg:px-24 xl:px-32 bg-white overflow-hidden w-full max-w-full">
       {/* Mobile: Grid 2x2 - texto abaixo */}
       <div className="md:hidden">
         <div className="grid grid-cols-2 gap-x-4 gap-y-6">
@@ -68,7 +67,7 @@ const CollectionsGrid = () => {
           ))}
         </div>
       </div>
-
+      
       {/* Desktop: Grid 2x2 - overlay style */}
       <div className="hidden md:block">
         <div className="grid grid-cols-2 gap-6">

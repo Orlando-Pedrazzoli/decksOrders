@@ -251,3 +251,54 @@ html, body {
   background-color: rgba(248, 80, 50, 0.3);
   color: inherit;
 }
+
+/* Swiper container fix */
+.swiper {
+  overflow: hidden !important;
+  max-width: 100% !important;
+}
+
+.swiper-wrapper {
+  max-width: 100vw;
+}
+
+/* Fix para elementos com centeredSlides que vazam */
+.swiper-slide {
+  flex-shrink: 0;
+}
+
+/* Fix para elementos que usam 100vw (inclui scrollbar no Windows) */
+.w-screen {
+  width: 100% !important;
+  max-width: 100vw !important;
+}
+
+/* Garantir que nenhum filho vaza do container */
+main,
+section,
+article {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fix específico para carousels com slides parciais */
+.mySwiper {
+  overflow: hidden !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Prevenir overflow em imagens grandes */
+img {
+  max-width: 100%;
+}
+
+/* ============================================================================
+   NOTA: Se ainda tiveres problemas, podes adicionar isto como último recurso:
+   
+   * {
+     max-width: 100vw;
+   }
+   
+   Mas isto pode afetar outros elementos, usa apenas se necessário.
+   ============================================================================ */

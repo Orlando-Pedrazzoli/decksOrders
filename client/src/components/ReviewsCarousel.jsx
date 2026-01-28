@@ -136,7 +136,7 @@ export default function ReviewsCarousel() {
 
   if (loading) {
     return (
-     <div className='relative py-16 bg-gray-50 mt-10 px-6 md:px-16 lg:px-24 xl:px-32 overflow-hidden'>
+      <div className='relative py-16 bg-gray-50 mt-10 px-6 md:px-16 lg:px-24 xl:px-32 overflow-hidden w-full max-w-full'>
         <div className='flex justify-center items-center h-40'>
           <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary'></div>
         </div>
@@ -145,7 +145,7 @@ export default function ReviewsCarousel() {
   }
 
   return (
-   <div className='relative py-16 bg-gray-50 mt-10 px-6 md:px-16 lg:px-24 xl:px-32 overflow-hidden'>
+    <div className='relative py-16 bg-gray-50 mt-10 px-6 md:px-16 lg:px-24 xl:px-32 overflow-hidden w-full max-w-full'>
       <h2 className='text-3xl sm:text-4xl font-bold text-gray-800 text-center mb-12'>
         O que os nossos clientes dizem sobre a Elite Surfing
       </h2>
@@ -158,14 +158,14 @@ export default function ReviewsCarousel() {
         breakpoints={{
           640: { slidesPerView: 1.2, centeredSlides: true, spaceBetween: 15 },
           768: { slidesPerView: 2.2, centeredSlides: true, spaceBetween: 25 },
-          1024: { slidesPerView: 3, spaceBetween: 30 },
-          1280: { slidesPerView: 4, spaceBetween: 30 },
+          1024: { slidesPerView: 3, centeredSlides: false, spaceBetween: 30 },
+          1280: { slidesPerView: 4, centeredSlides: false, spaceBetween: 30 },
         }}
         navigation={{
           nextEl: '.swiper-button-next-custom',
           prevEl: '.swiper-button-prev-custom',
         }}
-        className='mySwiper'
+        className='mySwiper !overflow-hidden'
       >
         {reviews.map((review, index) => (
           <SwiperSlide key={index}>
