@@ -2,51 +2,174 @@
 <html lang="pt-PT">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     
-    <!-- Favicon - Atualizado com RealFaviconGenerator -->
+    <!-- =====================================================
+         Elite Surfing Portugal - SEO Optimized
+         Última atualização: 2026-01-28
+         ===================================================== -->
+    
+    <!-- Favicon - Completo para todos os dispositivos -->
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     
-    <!-- 
-      ⚠️ IMPORTANTE: NÃO adicionar canonical tag aqui!
-      O React-Helmet-Async gerencia as canonical tags dinamicamente por página.
-      Ter canonical estática aqui causa conflito com as dinâmicas.
-    -->
+    <!-- =====================================================
+         ⚠️ IMPORTANTE: Canonical tags são geridas pelo React-Helmet-Async
+         NÃO adicionar canonical estática aqui!
+         ===================================================== -->
     
-    <!-- Meta tags base (serão sobrescritas pelo React-Helmet-Async) -->
+    <!-- Meta tags base (sobrescritas pelo React-Helmet-Async por página) -->
     <title>Elite Surfing Portugal - Loja Online de Acessórios de Surf</title>
     <meta name="description" content="Loja online de equipamento de surf em Portugal. Decks, leashes, quilhas, capas, wax e acessórios. Entregas em Portugal Continental." />
+    
+    <!-- Robots base -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    
+    <!-- Author & Copyright -->
+    <meta name="author" content="Elite Surfing Portugal" />
+    <meta name="copyright" content="Elite Surfing Portugal" />
     
     <!-- Open Graph base -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Elite Surfing Portugal" />
     <meta property="og:locale" content="pt_PT" />
     <meta property="og:image" content="https://www.elitesurfing.pt/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Elite Surfing Portugal - Loja Online de Surf" />
     
     <!-- Twitter Card base -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://www.elitesurfing.pt/og-image.jpg" />
     
-    <!-- Theme -->
-    <meta name="theme-color" content="#0ea5e9" />
-    <meta name="msapplication-TileColor" content="#0ea5e9" />
+    <!-- Theme Color - Com suporte para dark mode -->
+    <meta name="theme-color" content="#f85032" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
+    <meta name="msapplication-TileColor" content="#f85032" />
+    <meta name="msapplication-TileImage" content="/favicon-96x96.png" />
     
-    <!-- Geo -->
-    <meta name="geo.region" content="PT-15" />
-    <meta name="geo.placename" content="Oeiras, Portugal" />
+    <!-- Geo & Location -->
+    <meta name="geo.region" content="PT-11" />
+    <meta name="geo.placename" content="Oeiras, Lisboa, Portugal" />
+    <meta name="geo.position" content="38.6979;-9.3107" />
+    <meta name="ICBM" content="38.6979, -9.3107" />
     
     <!-- Language -->
     <meta http-equiv="content-language" content="pt-PT" />
     
-    <!-- Preconnect para performance -->
-    <link rel="preconnect" href="https://elitesurfingeu-backend.vercel.app" />
-    <link rel="preconnect" href="https://res.cloudinary.com" />
+    <!-- Mobile App Capable -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Elite Surfing" />
+    
+    <!-- Format Detection -->
+    <meta name="format-detection" content="telephone=yes" />
+    
+    <!-- =====================================================
+         Preconnect & DNS Prefetch - Performance
+         ===================================================== -->
+    
+    <!-- Backend API -->
+    <link rel="preconnect" href="https://elitesurfingeu-backend.vercel.app" crossorigin />
+    <link rel="dns-prefetch" href="https://elitesurfingeu-backend.vercel.app" />
+    
+    <!-- Cloudinary (imagens) -->
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
     <link rel="dns-prefetch" href="https://res.cloudinary.com" />
+    
+    <!-- Google Analytics (descomentar quando ativar) -->
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
+    <link rel="preconnect" href="https://www.google-analytics.com" crossorigin />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+    
+    <!-- Meta/Facebook (descomentar quando ativar) -->
+    <link rel="dns-prefetch" href="https://connect.facebook.net" />
+    
+    <!-- =====================================================
+         Google Analytics 4
+         
+         INSTRUÇÕES:
+         1. Criar conta em https://analytics.google.com
+         2. Criar propriedade para elitesurfing.pt
+         3. Copiar o ID de medição (G-XXXXXXXXX)
+         4. Substituir 'G-XXXXXXXXX' abaixo pelo ID real
+         5. Descomentar o bloco de código
+         ===================================================== -->
+    
+    <!--
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXXXX', {
+        'anonymize_ip': true,
+        'cookie_flags': 'SameSite=None;Secure'
+      });
+    </script>
+    -->
+    
+    <!-- =====================================================
+         Meta Pixel (Facebook/Instagram)
+         
+         INSTRUÇÕES:
+         1. Criar conta em https://business.facebook.com
+         2. Ir a Events Manager > Pixels
+         3. Criar novo pixel
+         4. Copiar o Pixel ID
+         5. Substituir 'XXXXXXXXXXXXXXX' abaixo pelo ID real
+         6. Descomentar o bloco de código
+         ===================================================== -->
+    
+    <!--
+    <script>
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', 'XXXXXXXXXXXXXXX');
+      fbq('track', 'PageView');
+    </script>
+    <noscript>
+      <img height="1" width="1" style="display:none"
+           src="https://www.facebook.com/tr?id=XXXXXXXXXXXXXXX&ev=PageView&noscript=1"/>
+    </noscript>
+    -->
+    
+    <!-- =====================================================
+         Google Site Verification
+         
+         INSTRUÇÕES:
+         1. Ir a https://search.google.com/search-console
+         2. Adicionar propriedade https://www.elitesurfing.pt
+         3. Escolher verificação por "Tag HTML"
+         4. Copiar o content="XXXXX" 
+         5. Substituir abaixo e descomentar
+         ===================================================== -->
+    
+    <!--
+    <meta name="google-site-verification" content="CODIGO_DO_SEARCH_CONSOLE" />
+    -->
+    
   </head>
   <body>
+    <!-- Noscript fallback para Meta Pixel -->
+    <!--
+    <noscript>
+      <img height="1" width="1" style="display:none"
+           src="https://www.facebook.com/tr?id=XXXXXXXXXXXXXXX&ev=PageView&noscript=1"/>
+    </noscript>
+    -->
+    
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

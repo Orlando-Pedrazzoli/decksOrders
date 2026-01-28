@@ -5,8 +5,8 @@ import { ChevronLeft } from 'lucide-react';
 import { getGroupBySlug, getCategoriesByGroup } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
-// ✅ SEO Imports
-import { SEO, getCollectionSEO, BreadcrumbSchema, OrganizationSchema } from '../components/seo';
+// ✅ SEO Imports - Adicionado CollectionSchema do componente
+import { SEO, getCollectionSEO, BreadcrumbSchema, OrganizationSchema, CollectionSchema } from '../components/seo';
 
 const GroupPage = () => {
   const { group: groupSlug } = useParams();
@@ -86,9 +86,16 @@ const GroupPage = () => {
     );
   }
 
+  // ✅ Dados da collection para o schema
+  const collectionData = {
+    name: seoData.title,
+    description: seoData.description,
+    slug: groupSlug
+  };
+
   return (
     <>
-      {/* ✅ SEO Completo para Collection */}
+      {/* ✅ SEO Completo para Collection - Usando componentes */}
       <SEO
         title={seoData.title}
         description={seoData.description}
@@ -96,36 +103,10 @@ const GroupPage = () => {
         image={group.bannerImage || '/og-image.jpg'}
         type="website"
       >
-        {/* Structured Data */}
+        {/* Structured Data - Usando componentes do JsonLd.jsx */}
         <OrganizationSchema />
         <BreadcrumbSchema items={breadcrumbItems} />
-        
-        {/* ✅ CollectionPage Schema para e-commerce */}
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "CollectionPage",
-            "name": seoData.title,
-            "description": seoData.description,
-            "url": `https://www.elitesurfing.pt${seoData.url}`,
-            "image": group.bannerImage || 'https://www.elitesurfing.pt/og-image.jpg',
-            "isPartOf": {
-              "@type": "WebSite",
-              "name": "Elite Surfing Portugal",
-              "url": "https://www.elitesurfing.pt"
-            },
-            "numberOfItems": groupProducts.length,
-            "mainEntity": {
-              "@type": "ItemList",
-              "numberOfItems": groupProducts.length,
-              "itemListElement": groupProducts.slice(0, 10).map((product, index) => ({
-                "@type": "ListItem",
-                "position": index + 1,
-                "url": `https://www.elitesurfing.pt/products/${(product.category || '').toLowerCase()}/${product._id}`
-              }))
-            }
-          })}
-        </script>
+        <CollectionSchema collection={collectionData} products={groupProducts} />
       </SEO>
 
       <div className='min-h-screen'>

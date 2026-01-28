@@ -1,5 +1,15 @@
-// SEO Components - Elite Surfing Portugal
+/**
+ * SEO Components - Elite Surfing Portugal
+ * Versão: 2.0.0
+ * Última atualização: 2026-01-28
+ * 
+ * Exporta todos os componentes e utilitários de SEO
+ */
+
+// Componente principal de meta tags
 export { default as SEO } from './SEO';
+
+// Schemas JSON-LD (Structured Data)
 export { 
   OrganizationSchema, 
   WebSiteSchema, 
@@ -7,12 +17,16 @@ export {
   ProductSchema, 
   BreadcrumbSchema, 
   FAQSchema,
-  LocalBusinessSchema 
+  LocalBusinessSchema,
+  CollectionSchema,      // NOVO
+  ContactPageSchema      // NOVO
 } from './JsonLd';
+
+// Configurações e helpers
 export { 
   default as seoConfig, 
   categoryDescriptions, 
-  collectionDescriptions,  // NOVO
+  collectionDescriptions,
   getCategorySEO,
-  getCollectionSEO         // NOVO
+  getCollectionSEO
 } from './seoConfig';

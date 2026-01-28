@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import emailjs from '@emailjs/browser';
-import { SEO, LocalBusinessSchema, BreadcrumbSchema } from '../components/seo';
+// ✅ ATUALIZADO: Adicionado ContactPageSchema
+import { SEO, LocalBusinessSchema, BreadcrumbSchema, ContactPageSchema } from '../components/seo';
 import seoConfig from '../components/seo/seoConfig';
 
 const Contact = () => {
@@ -38,13 +39,14 @@ const Contact = () => {
 
   return (
     <>
-      {/* SEO - Página de Contacto com LocalBusiness Schema */}
+      {/* ✅ SEO - Página de Contacto com LocalBusiness + ContactPage Schemas */}
       <SEO 
         title={seoConfig.contact.title}
         description={seoConfig.contact.description}
         url={seoConfig.contact.url}
       >
         <LocalBusinessSchema />
+        <ContactPageSchema />
         <BreadcrumbSchema items={[
           { name: 'Home', url: '/' },
           { name: 'Contacto' }

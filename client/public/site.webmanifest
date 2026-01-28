@@ -1,7 +1,30 @@
 {
-  "name": "MyWebSite",
-  "short_name": "MySite",
+  "name": "Elite Surfing Portugal",
+  "short_name": "Elite Surfing",
+  "description": "Loja online de equipamento e acessórios de surf em Portugal. Decks, leashes, quilhas, capas e wax.",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#f85032",
+  "background_color": "#ffffff",
+  "lang": "pt-PT",
+  "dir": "ltr",
+  "categories": ["shopping", "sports"],
   "icons": [
+    {
+      "src": "/favicon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/web-app-manifest-192x192.png",
       "sizes": "192x192",
@@ -15,7 +38,37 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff",
-  "display": "standalone"
+  "shortcuts": [
+    {
+      "name": "Ver Todos os Produtos",
+      "short_name": "Produtos",
+      "description": "Explorar catálogo completo",
+      "url": "/products",
+      "icons": [{ "src": "/favicon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Decks de Surf",
+      "short_name": "Decks",
+      "description": "Coleção de decks e traction pads",
+      "url": "/collections/decks",
+      "icons": [{ "src": "/favicon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Contactar",
+      "short_name": "Contacto",
+      "description": "Fale connosco via WhatsApp",
+      "url": "/contact",
+      "icons": [{ "src": "/favicon-96x96.png", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/og-image.jpg",
+      "sizes": "1200x630",
+      "type": "image/jpeg",
+      "label": "Elite Surfing Portugal - Loja Online de Surf"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }
