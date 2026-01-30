@@ -14,7 +14,7 @@ const AllProducts = () => {
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [expandedGroups, setExpandedGroups] = useState([]);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [mobileGridCols, setMobileGridCols] = useState(2); // 🆕 1 ou 2 colunas em mobile
+  const [mobileGridCols, setMobileGridCols] = useState(1); // 🆕 1 coluna como padrão em mobile
 
   useEffect(() => {
     if (products.length === 0) {
@@ -430,7 +430,11 @@ const AllProducts = () => {
                   : 'grid-cols-2'
               } md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4`}>
                 {filteredProducts.map(product => (
-                  <ProductCard key={product._id} product={product} />
+                  <ProductCard 
+                    key={product._id} 
+                    product={product} 
+                    largeSwatches={mobileGridCols === 1}
+                  />
                 ))}
               </div>
             )}

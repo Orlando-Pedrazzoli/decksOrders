@@ -50,7 +50,7 @@ const ColorBall = ({ code1, code2, size = 20, selected = false, onClick, onMouse
   );
 };
 
-const ProductCard = memo(({ product }) => {
+const ProductCard = memo(({ product, largeSwatches = false }) => {
   const { currency, addToCart, removeFromCart, cartItems, navigate, getProductFamily } =
     useAppContext();
   
@@ -167,9 +167,9 @@ const ProductCard = memo(({ product }) => {
       {/* Image Container */}
       <div className='relative flex items-center justify-center bg-gray-50/50 rounded-lg overflow-hidden aspect-square'>
         
-        {/* Imagem - sempre visível e com hover */}
+        {/* Imagem - p-4 alterado para p-2 */}
         <div className={`
-          w-full h-full flex items-center justify-center p-4
+          w-full h-full flex items-center justify-center p-2
           transition-all duration-150 ease-out
           ${isColorTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}
         `}>
@@ -232,8 +232,8 @@ const ProductCard = memo(({ product }) => {
         
         {/* 🆕 Bolinhas de Cor - suporta cores duplas */}
         {familyProducts.length > 1 && (
-          <div className='flex items-center gap-2 mb-2'>
-            {familyProducts.slice(0, 5).map((familyProduct) => {
+          <div className={`flex items-center mb-2 ${largeSwatches ? 'gap-2.5' : 'gap-2'}`}>
+            {familyProducts.slice(0, 6).map((familyProduct) => {
               const isSelected = familyProduct._id === displayProduct._id;
               const familyOutOfStock = (familyProduct.stock || 0) <= 0;
 
@@ -242,7 +242,7 @@ const ProductCard = memo(({ product }) => {
                   key={familyProduct._id}
                   code1={familyProduct.colorCode || '#ccc'}
                   code2={familyProduct.colorCode2}
-                  size={20}
+                  size={largeSwatches ? 26 : 20}
                   selected={isSelected}
                   outOfStock={familyOutOfStock}
                   onClick={(e) => handleColorClick(familyProduct, e)}
@@ -251,8 +251,8 @@ const ProductCard = memo(({ product }) => {
                 />
               );
             })}
-            {familyProducts.length > 5 && (
-              <span className='text-xs text-gray-400'>+{familyProducts.length - 5}</span>
+            {familyProducts.length > 6 && (
+              <span className='text-xs text-gray-400'>+{familyProducts.length - 6}</span>
             )}
           </div>
         )}
