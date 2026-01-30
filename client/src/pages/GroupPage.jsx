@@ -1,39 +1,42 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, SlidersHorizontal, LayoutGrid, Rows3 } from 'lucide-react';
 import { getGroupBySlug, getCategoriesByGroup } from '../assets/assets';
 import { useAppContext } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
-// ✅ SEO Imports - Adicionado CollectionSchema do componente
 import { SEO, getCollectionSEO, BreadcrumbSchema, OrganizationSchema, CollectionSchema } from '../components/seo';
 
 const GroupPage = () => {
   const { group: groupSlug } = useParams();
   const { products, navigate } = useAppContext();
 
+  // Estados para filtros e visualização
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [mobileGridCols, setMobileGridCols] = useState(1); // 1 coluna como padrão
+
   // Obter dados do grupo
   const group = getGroupBySlug(groupSlug);
 
-  // ✅ Obter configuração SEO para esta collection
+  // Obter configuração SEO para esta collection
   const seoData = getCollectionSEO(groupSlug);
 
-  // ✅ Breadcrumbs para structured data
+  // Breadcrumbs para structured data
   const breadcrumbItems = [
     { name: 'Home', url: '/' },
     { name: group?.name || groupSlug, url: `/collections/${groupSlug}` }
   ];
 
-  // Obter categorias deste grupo (para filtrar produtos)
+  // Obter categorias deste grupo (para filtros)
   const groupCategories = getCategoriesByGroup(groupSlug);
   const groupCategoryPaths = groupCategories.map(cat => cat.path.toLowerCase());
 
-  // Filtrar produtos deste grupo e ordenar (disponíveis primeiro, esgotados no final)
+  // Filtrar produtos deste grupo e aplicar filtros de categoria
   const groupProducts = useMemo(() => {
-    const filtered = products.filter(product => {
+    let filtered = products.filter(product => {
       // Filtrar por group do produto (se existir)
       if (product.group && product.group === groupSlug) {
-        // Apenas variantes principais
         return product.isMainVariant !== false;
       }
       
@@ -46,26 +49,54 @@ const GroupPage = () => {
       return false;
     });
 
+    // Aplicar filtro de categorias selecionadas
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter(product => {
+        const productCategory = (product.category || '').toLowerCase();
+        return selectedCategories.includes(productCategory);
+      });
+    }
+
     // Ordenar: produtos disponíveis primeiro, esgotados no final
-    // Usa a mesma lógica do ProductCard: isInactive = !inStock || stock <= 0
     return filtered.sort((a, b) => {
       const aIsInactive = !a.inStock || (a.stock || 0) <= 0;
       const bIsInactive = !b.inStock || (b.stock || 0) <= 0;
       
-      // Se a está inativo e b não, a vai para o final (retorna 1)
-      // Se b está inativo e a não, b vai para o final (retorna -1)
-      // Se ambos iguais, mantém ordem (retorna 0)
       if (aIsInactive && !bIsInactive) return 1;
       if (!aIsInactive && bIsInactive) return -1;
       return 0;
     });
-  }, [products, groupSlug, groupCategoryPaths]);
+  }, [products, groupSlug, groupCategoryPaths, selectedCategories]);
+
+  // Contar produtos por categoria
+  const getCategoryProductCount = (categoryPath) => {
+    return products.filter(product => {
+      if (product.isMainVariant === false) return false;
+      return (product.category || '').toLowerCase() === categoryPath.toLowerCase();
+    }).length;
+  };
+
+  // Handlers
+  const handleCategoryChange = (categoryPath) => {
+    const lowerCasePath = categoryPath.toLowerCase();
+    setSelectedCategories(prev =>
+      prev.includes(lowerCasePath)
+        ? prev.filter(c => c !== lowerCasePath)
+        : [...prev, lowerCasePath]
+    );
+  };
+
+  const clearAllFilters = () => {
+    setSelectedCategories([]);
+    setShowFilterPanel(false);
+  };
+
+  const totalActiveFilters = selectedCategories.length;
 
   // Se grupo não existe, mostrar erro
   if (!group) {
     return (
       <>
-        {/* ✅ SEO para página 404 de collection */}
         <SEO
           title="Coleção não encontrada"
           description="A coleção que procura não existe na Elite Surfing Portugal."
@@ -86,16 +117,44 @@ const GroupPage = () => {
     );
   }
 
-  // ✅ Dados da collection para o schema
+  // Dados da collection para o schema
   const collectionData = {
     name: seoData.title,
     description: seoData.description,
     slug: groupSlug
   };
 
+  // Componente de filtro por categoria (dentro do grupo)
+  const FilterSection = ({ isMobile = false }) => (
+    <div className='flex flex-col gap-3'>
+      {groupCategories.map(category => {
+        const isSelected = selectedCategories.includes(category.path.toLowerCase());
+        const productCount = getCategoryProductCount(category.path);
+
+        return (
+          <label
+            key={category.path}
+            className='flex items-center cursor-pointer text-gray-700 hover:text-primary transition-colors duration-200'
+          >
+            <input
+              type='checkbox'
+              checked={isSelected}
+              onChange={() => handleCategoryChange(category.path)}
+              className={`form-checkbox ${isMobile ? 'h-6 w-6' : 'h-5 w-5'} text-primary rounded-md border-gray-300 focus:ring-primary transition-colors duration-200`}
+            />
+            <span className={`ml-3 ${isMobile ? 'text-base' : 'text-sm'} ${isSelected ? 'font-medium text-primary' : ''}`}>
+              {category.text}
+            </span>
+            <span className='ml-2 text-xs text-gray-400'>({productCount})</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+
   return (
     <>
-      {/* ✅ SEO Completo para Collection - Usando componentes */}
+      {/* SEO Completo para Collection */}
       <SEO
         title={seoData.title}
         description={seoData.description}
@@ -103,7 +162,6 @@ const GroupPage = () => {
         image={group.bannerImage || '/og-image.jpg'}
         type="website"
       >
-        {/* Structured Data - Usando componentes do JsonLd.jsx */}
         <OrganizationSchema />
         <BreadcrumbSchema items={breadcrumbItems} />
         <CollectionSchema collection={collectionData} products={groupProducts} />
@@ -111,23 +169,20 @@ const GroupPage = () => {
 
       <div className='min-h-screen'>
         {/* Banner Hero */}
-        <div className='relative h-[40vh] md:h-[50vh] overflow-hidden'>
+        <div className='relative h-[30vh] md:h-[38vh] overflow-hidden'>
           <img
             src={group.bannerImage}
             alt={group.name}
             className='w-full h-full object-cover'
           />
-          {/* Overlay */}
           <div className='absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/20' />
           
-          {/* Conteúdo do Banner */}
-          <div className='absolute inset-0 flex flex-col justify-end pb-10 md:pb-16 px-6 md:px-16 lg:px-24 xl:px-32'>
-            {/* Breadcrumb */}
+          <div className='absolute inset-0 flex flex-col justify-end pb-6 md:pb-10 px-6 md:px-16 lg:px-24 xl:px-32'>
             <motion.nav
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className='flex items-center gap-2 text-white/80 text-sm mb-4'
+              className='flex items-center gap-2 text-white/80 text-sm mb-2'
               aria-label="Breadcrumb"
             >
               <Link to='/' className='hover:text-white transition-colors'>Home</Link>
@@ -135,22 +190,20 @@ const GroupPage = () => {
               <span className='text-white' aria-current="page">{group.name}</span>
             </motion.nav>
 
-            {/* Título - H1 importante para SEO */}
             <motion.h1
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className='text-4xl md:text-5xl lg:text-6xl font-bold text-white tracking-wide'
+              className='text-3xl md:text-4xl lg:text-5xl font-bold text-white tracking-wide'
             >
               {group.name}
             </motion.h1>
 
-            {/* Descrição */}
             <motion.p
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className='text-white/90 text-base md:text-lg max-w-2xl mt-4'
+              className='text-white/90 text-sm md:text-base max-w-2xl mt-3'
             >
               {group.description}
             </motion.p>
@@ -158,9 +211,57 @@ const GroupPage = () => {
         </div>
 
         {/* Conteúdo */}
-        <div className='px-6 md:px-16 lg:px-24 xl:px-32 py-8'>
-          {/* Voltar Button + Contagem */}
-          <div className='flex items-center justify-between mb-8'>
+        <div className='px-6 md:px-16 lg:px-24 xl:px-32 py-6'>
+          
+          {/* Mobile Controls Bar */}
+          <div className='flex sm:hidden items-center justify-between mb-4'>
+            {/* Botão Filtro - só mostra se há categorias */}
+            {groupCategories.length > 1 ? (
+              <button
+                onClick={() => setShowFilterPanel(true)}
+                className='flex items-center gap-2 px-4 py-2.5 bg-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-300 transition-colors duration-200'
+              >
+                <SlidersHorizontal className='w-4 h-4' />
+                <span>Filtro</span>
+                {totalActiveFilters > 0 && (
+                  <span className='ml-1 bg-primary text-white text-xs px-1.5 py-0.5 rounded-full'>
+                    {totalActiveFilters}
+                  </span>
+                )}
+              </button>
+            ) : (
+              <div /> 
+            )}
+
+            {/* Toggle Visualização 1/2 colunas */}
+            <div className='flex items-center gap-1'>
+              <button
+                onClick={() => setMobileGridCols(1)}
+                className={`p-2.5 rounded-lg transition-colors duration-200 ${
+                  mobileGridCols === 1 
+                    ? 'bg-primary text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                aria-label='Ver em 1 coluna'
+              >
+                <Rows3 className='w-5 h-5' />
+              </button>
+              <button
+                onClick={() => setMobileGridCols(2)}
+                className={`p-2.5 rounded-lg transition-colors duration-200 ${
+                  mobileGridCols === 2 
+                    ? 'bg-primary text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                aria-label='Ver em 2 colunas'
+              >
+                <LayoutGrid className='w-5 h-5' />
+              </button>
+            </div>
+          </div>
+
+          {/* Desktop: Voltar + Contagem */}
+          <div className='hidden sm:flex items-center justify-between mb-6'>
             <button
               onClick={() => navigate(-1)}
               className='flex items-center gap-2 text-gray-600 hover:text-primary transition-colors group'
@@ -174,33 +275,148 @@ const GroupPage = () => {
             </p>
           </div>
 
-          {/* Grid de Produtos */}
-          {groupProducts.length === 0 ? (
-            <div className='text-center py-16 bg-gray-50 rounded-lg'>
-              <p className='text-gray-500 text-lg mb-4'>
-                Ainda não há produtos nesta coleção.
+          <div className='flex flex-col md:flex-row gap-8'>
+            {/* Filter Section for Desktop - só mostra se há mais de 1 categoria */}
+            {groupCategories.length > 1 && (
+              <div className='hidden sm:block md:w-1/4 lg:w-1/5 flex-shrink-0 bg-white rounded-lg shadow-md p-6 h-max sticky top-24'>
+                <h3 className='text-lg font-semibold text-gray-800 mb-4'>
+                  Filtrar por Modelo
+                </h3>
+                
+                <FilterSection />
+
+                {totalActiveFilters > 0 && (
+                  <button
+                    onClick={clearAllFilters}
+                    className='mt-6 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors duration-200 text-sm w-full'
+                  >
+                    Limpar Filtros ({totalActiveFilters})
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Filter Panel for Mobile - Fullscreen */}
+            {showFilterPanel && (
+              <div className='fixed inset-0 bg-white z-50 flex flex-col sm:hidden'>
+                <div className='flex justify-between items-center p-4 border-b'>
+                  <h3 className='text-xl font-semibold text-gray-800'>
+                    Filtrar {group.name}
+                  </h3>
+                  <button
+                    onClick={() => setShowFilterPanel(false)}
+                    className='p-2 text-gray-500 hover:text-gray-800 transition-colors duration-200'
+                  >
+                    <svg xmlns='http://www.w3.org/2000/svg' className='h-6 w-6' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className='flex-1 overflow-y-auto p-4'>
+                  <h4 className='text-base font-semibold text-gray-700 mb-4'>Modelos</h4>
+                  <FilterSection isMobile={true} />
+                </div>
+
+                <div className='p-4 border-t bg-white'>
+                  <div className='flex flex-col gap-3'>
+                    {totalActiveFilters > 0 && (
+                      <button
+                        onClick={clearAllFilters}
+                        className='w-full py-3 px-6 bg-gray-100 text-gray-800 font-semibold rounded-lg hover:bg-gray-200 transition-colors duration-200'
+                      >
+                        Limpar Filtros ({totalActiveFilters})
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowFilterPanel(false)}
+                      className='w-full py-3 px-6 bg-primary text-white font-semibold rounded-lg shadow-md hover:brightness-90 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+                    >
+                      Ver {groupProducts.length} Produtos
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Product Grid */}
+            <div className='flex-grow'>
+              {/* Active Filters Tags */}
+              {totalActiveFilters > 0 && (
+                <div className='flex flex-wrap gap-2 mb-4'>
+                  {selectedCategories.map(catPath => {
+                    const category = groupCategories.find(c => c.path.toLowerCase() === catPath);
+                    if (!category) return null;
+                    return (
+                      <span 
+                        key={catPath}
+                        className='inline-flex items-center gap-1 px-3 py-1 bg-primary/10 text-primary text-sm rounded-full'
+                      >
+                        {category.text}
+                        <button 
+                          onClick={() => handleCategoryChange(category.path)}
+                          className='ml-1 hover:text-primary-dull'
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Mobile: Contagem de produtos */}
+              <p className='sm:hidden text-gray-500 text-sm mb-4'>
+                {groupProducts.length} {groupProducts.length === 1 ? 'produto' : 'produtos'}
               </p>
-              <Link 
-                to='/products'
-                className='inline-block px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dull transition-colors'
-              >
-                Ver Todos os Produtos
-              </Link>
+
+              {groupProducts.length === 0 ? (
+                <div className='text-center py-16 bg-gray-50 rounded-lg'>
+                  <p className='text-gray-500 text-lg mb-4'>
+                    {totalActiveFilters > 0 
+                      ? 'Nenhum produto encontrado para os filtros selecionados.'
+                      : 'Ainda não há produtos nesta coleção.'
+                    }
+                  </p>
+                  {totalActiveFilters > 0 ? (
+                    <button
+                      onClick={clearAllFilters}
+                      className='inline-block px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dull transition-colors'
+                    >
+                      Limpar Filtros
+                    </button>
+                  ) : (
+                    <Link 
+                      to='/products'
+                      className='inline-block px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dull transition-colors'
+                    >
+                      Ver Todos os Produtos
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div className={`grid gap-4 md:gap-6 ${
+                  mobileGridCols === 1 
+                    ? 'grid-cols-1 sm:grid-cols-2' 
+                    : 'grid-cols-2'
+                } md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4`}>
+                  {groupProducts.map((product, index) => (
+                    <motion.div
+                      key={product._id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, delay: index * 0.05 }}
+                    >
+                      <ProductCard 
+                        product={product} 
+                        largeSwatches={mobileGridCols === 1}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className='grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-4 md:gap-6'>
-              {groupProducts.map((product, index) => (
-                <motion.div
-                  key={product._id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: index * 0.05 }}
-                >
-                  <ProductCard product={product} />
-                </motion.div>
-              ))}
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </>
