@@ -168,51 +168,22 @@ const GroupPage = () => {
       </SEO>
 
       <div className='min-h-screen'>
-        {/* Banner Hero */}
-        <div className='relative h-[30vh] md:h-[38vh] overflow-hidden'>
-          <img
-            src={group.bannerImage}
-            alt={group.name}
-            className='w-full h-full object-cover'
-          />
-          <div className='absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/20' />
-          
-          <div className='absolute inset-0 flex flex-col justify-end pb-6 md:pb-10 px-6 md:px-16 lg:px-24 xl:px-32'>
-            <motion.nav
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className='flex items-center gap-2 text-white/80 text-sm mb-2'
-              aria-label="Breadcrumb"
-            >
-              <Link to='/' className='hover:text-white transition-colors'>Home</Link>
-              <span>/</span>
-              <span className='text-white' aria-current="page">{group.name}</span>
-            </motion.nav>
-
-            <motion.h1
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className='text-3xl md:text-4xl lg:text-5xl font-bold text-white tracking-wide'
-            >
-              {group.name}
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className='text-white/90 text-sm md:text-base max-w-2xl mt-3'
-            >
-              {group.description}
-            </motion.p>
-          </div>
-        </div>
-
         {/* Conteúdo */}
-        <div className='px-6 md:px-16 lg:px-24 xl:px-32 py-6'>
+        <div className='px-6 md:px-16 lg:px-24 xl:px-32 py-6 md:py-8'>
           
+          {/* Breadcrumbs - Mobile apenas */}
+          <motion.nav
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className='flex sm:hidden items-center gap-2 text-gray-500 text-sm mb-4'
+            aria-label="Breadcrumb"
+          >
+            <Link to='/' className='hover:text-primary transition-colors'>Home</Link>
+            <span>/</span>
+            <span className='text-gray-800 font-medium' aria-current="page">{group.name}</span>
+          </motion.nav>
+
           {/* Mobile Controls Bar */}
           <div className='flex sm:hidden items-center justify-between mb-4'>
             {/* Botão Filtro - só mostra se há categorias */}
@@ -260,87 +231,103 @@ const GroupPage = () => {
             </div>
           </div>
 
-          {/* Desktop: Voltar + Contagem */}
-          <div className='hidden sm:flex items-center justify-between mb-6'>
-            <button
-              onClick={() => navigate(-1)}
-              className='flex items-center gap-2 text-gray-600 hover:text-primary transition-colors group'
-            >
-              <ChevronLeft className='w-5 h-5 transition-transform group-hover:-translate-x-1' />
-              <span>Voltar</span>
-            </button>
-            
-            <p className='text-gray-500 text-sm'>
-              {groupProducts.length} {groupProducts.length === 1 ? 'produto' : 'produtos'}
-            </p>
-          </div>
-
-          <div className='flex flex-col md:flex-row gap-8'>
-            {/* Filter Section for Desktop - só mostra se há mais de 1 categoria */}
-            {groupCategories.length > 1 && (
-              <div className='hidden sm:block md:w-1/4 lg:w-1/5 flex-shrink-0 bg-white rounded-lg shadow-md p-6 h-max sticky top-24'>
-                <h3 className='text-lg font-semibold text-gray-800 mb-4'>
-                  Filtrar por Modelo
+          {/* Filter Panel for Mobile - Fullscreen */}
+          {showFilterPanel && (
+            <div className='fixed inset-0 bg-white z-50 flex flex-col sm:hidden'>
+              <div className='flex justify-between items-center p-4 border-b'>
+                <h3 className='text-xl font-semibold text-gray-800'>
+                  Filtrar {group.name}
                 </h3>
-                
-                <FilterSection />
-
-                {totalActiveFilters > 0 && (
-                  <button
-                    onClick={clearAllFilters}
-                    className='mt-6 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors duration-200 text-sm w-full'
-                  >
-                    Limpar Filtros ({totalActiveFilters})
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowFilterPanel(false)}
+                  className='p-2 text-gray-500 hover:text-gray-800 transition-colors duration-200'
+                >
+                  <svg xmlns='http://www.w3.org/2000/svg' className='h-6 w-6' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
+                    <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+                  </svg>
+                </button>
               </div>
-            )}
 
-            {/* Filter Panel for Mobile - Fullscreen */}
-            {showFilterPanel && (
-              <div className='fixed inset-0 bg-white z-50 flex flex-col sm:hidden'>
-                <div className='flex justify-between items-center p-4 border-b'>
-                  <h3 className='text-xl font-semibold text-gray-800'>
-                    Filtrar {group.name}
-                  </h3>
+              <div className='flex-1 overflow-y-auto p-4'>
+                <h4 className='text-base font-semibold text-gray-700 mb-4'>Modelos</h4>
+                <FilterSection isMobile={true} />
+              </div>
+
+              <div className='p-4 border-t bg-white'>
+                <div className='flex flex-col gap-3'>
+                  {totalActiveFilters > 0 && (
+                    <button
+                      onClick={clearAllFilters}
+                      className='w-full py-3 px-6 bg-gray-100 text-gray-800 font-semibold rounded-lg hover:bg-gray-200 transition-colors duration-200'
+                    >
+                      Limpar Filtros ({totalActiveFilters})
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowFilterPanel(false)}
-                    className='p-2 text-gray-500 hover:text-gray-800 transition-colors duration-200'
+                    className='w-full py-3 px-6 bg-primary text-white font-semibold rounded-lg shadow-md hover:brightness-90 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
                   >
-                    <svg xmlns='http://www.w3.org/2000/svg' className='h-6 w-6' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-                      <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
-                    </svg>
+                    Ver {groupProducts.length} Produtos
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
 
-                <div className='flex-1 overflow-y-auto p-4'>
-                  <h4 className='text-base font-semibold text-gray-700 mb-4'>Modelos</h4>
-                  <FilterSection isMobile={true} />
-                </div>
+          <div className='flex flex-col md:flex-row gap-8'>
+            {/* Coluna da Esquerda: Breadcrumb + Filtros */}
+            {groupCategories.length > 1 && (
+              <div className='hidden sm:block md:w-1/4 lg:w-1/5 flex-shrink-0'>
+                {/* Breadcrumb - Desktop */}
+                <motion.nav
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className='flex items-center gap-2 text-gray-500 text-sm mb-4'
+                  aria-label="Breadcrumb"
+                >
+                  <Link to='/' className='hover:text-primary transition-colors'>Home</Link>
+                  <span>/</span>
+                  <span className='text-gray-800 font-medium' aria-current="page">{group.name}</span>
+                </motion.nav>
 
-                <div className='p-4 border-t bg-white'>
-                  <div className='flex flex-col gap-3'>
-                    {totalActiveFilters > 0 && (
-                      <button
-                        onClick={clearAllFilters}
-                        className='w-full py-3 px-6 bg-gray-100 text-gray-800 font-semibold rounded-lg hover:bg-gray-200 transition-colors duration-200'
-                      >
-                        Limpar Filtros ({totalActiveFilters})
-                      </button>
-                    )}
+                {/* Filtros */}
+                <div className='bg-white rounded-lg shadow-md p-6 sticky top-32'>
+                  <h3 className='text-lg font-semibold text-gray-800 mb-4'>
+                    Filtrar por Modelo
+                  </h3>
+                  
+                  <FilterSection />
+
+                  {totalActiveFilters > 0 && (
                     <button
-                      onClick={() => setShowFilterPanel(false)}
-                      className='w-full py-3 px-6 bg-primary text-white font-semibold rounded-lg shadow-md hover:brightness-90 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+                      onClick={clearAllFilters}
+                      className='mt-6 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors duration-200 text-sm w-full'
                     >
-                      Ver {groupProducts.length} Produtos
+                      Limpar Filtros ({totalActiveFilters})
                     </button>
-                  </div>
+                  )}
                 </div>
               </div>
             )}
 
             {/* Product Grid */}
             <div className='flex-grow'>
+              {/* Desktop: Voltar + Contagem */}
+              <div className='hidden sm:flex items-center justify-between mb-6'>
+                <button
+                  onClick={() => navigate(-1)}
+                  className='flex items-center gap-2 text-gray-600 hover:text-primary transition-colors group'
+                >
+                  <ChevronLeft className='w-5 h-5 transition-transform group-hover:-translate-x-1' />
+                  <span>Voltar</span>
+                </button>
+                
+                <p className='text-gray-500 text-sm'>
+                  {groupProducts.length} {groupProducts.length === 1 ? 'produto' : 'produtos'}
+                </p>
+              </div>
+
               {/* Active Filters Tags */}
               {totalActiveFilters > 0 && (
                 <div className='flex flex-wrap gap-2 mb-4'>

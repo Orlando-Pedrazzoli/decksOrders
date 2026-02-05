@@ -232,7 +232,7 @@ const ProductCard = memo(({ product, largeSwatches = false }) => {
         
         {/* 🆕 Bolinhas de Cor - suporta cores duplas */}
         {familyProducts.length > 1 && (
-          <div className={`flex items-center mb-2 ${largeSwatches ? 'gap-2.5' : 'gap-2'}`}>
+         <div className={`flex items-center justify-center mb-2 ${largeSwatches ? 'gap-2.5' : 'gap-2'}`}>
             {familyProducts.slice(0, 6).map((familyProduct) => {
               const isSelected = familyProduct._id === displayProduct._id;
               const familyOutOfStock = (familyProduct.stock || 0) <= 0;
