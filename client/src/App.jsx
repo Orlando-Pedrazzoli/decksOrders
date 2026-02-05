@@ -60,10 +60,13 @@ const App = () => {
     <div className='text-default min-h-screen text-gray-700 bg-white'>
      {/* ✅ AnnouncementBar + Navbar - apenas fora do seller - EMPACOTADOS EM STICKY */}
 {!isSellerPath && (
-  <div className="sticky top-0 z-50">
-    <AnnouncementBar />
-    <Navbar />
-  </div>
+  <>
+    <div className="fixed top-0 left-0 right-0 z-50">
+      <AnnouncementBar />
+      <Navbar />
+    </div>
+    <div className="h-[104px]" /> {/* Spacer - ajusta conforme altura real */}
+  </>
 )}
      
       
