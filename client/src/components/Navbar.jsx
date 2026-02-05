@@ -191,11 +191,18 @@ const Navbar = () => {
   );
 
   return (
-   <nav className={`sticky top-0 flex items-center justify-between px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b z-50 transition-all duration-300 ${
-     isTransparent 
-       ? 'bg-transparent border-white/10' 
-       : 'bg-white border-gray-300 shadow-sm'
-   }`}>
+<nav
+  className={`z-50 left-0 right-0
+  flex items-center justify-between
+  px-6 md:px-16 lg:px-24 xl:px-32 py-4 border-b
+  transition-[background-color,border-color,box-shadow] duration-300
+  ${
+    isTransparent
+      ? 'bg-transparent border-white/10'
+      : 'bg-white border-gray-300 shadow-sm'
+  }`}
+>
+
       
       {/* ===== MOBILE: Menu Icon (Left) ===== */}
       <button

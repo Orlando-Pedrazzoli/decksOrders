@@ -30,7 +30,7 @@ import ScrollToTop from './components/ScrollToTop';
 import HealthCheck from './components/HealthCheck';
 import WhatsAppButton from './components/WhatsAppButton';
 import CartSidebar from './components/CartSidebar';
-import GroupPage from './pages/GroupPage'; // 🆕 Import GroupPage
+import GroupPage from './pages/GroupPage';
 
 // ✅ Importa o CookieConsent
 import CookieConsent from 'react-cookie-consent';
@@ -39,7 +39,7 @@ const App = () => {
   const location = useLocation();
   const isSellerPath = location.pathname.includes('seller');
   const isHomepage = location.pathname === '/';
-  const isCollectionPage = location.pathname.startsWith('/collections/'); // 🆕 Detectar página de coleção
+  const isCollectionPage = location.pathname.startsWith('/collections/');
   const { showUserLogin, isSeller, isSellerLoading } = useAppContext();
 
   // ✅ OTIMIZADO: Loading APENAS na área de seller
@@ -55,14 +55,17 @@ const App = () => {
   }
 
   return (
-    <div className='text-default min-h-screen text-gray-700 bg-white overflow-x-hidden'>
-      {/* ✅ AnnouncementBar + Navbar - apenas fora do seller */}
-      {!isSellerPath && (
-        <>
-          <AnnouncementBar />
-          <Navbar />
-        </>
-      )}
+    // ✅ FIX: Removido overflow-x-hidden - usar overflow-x: clip no CSS (index.css)
+    // overflow-x-hidden cria scroll context que QUEBRA position: sticky
+    <div className='text-default min-h-screen text-gray-700 bg-white'>
+     {/* ✅ AnnouncementBar + Navbar - apenas fora do seller - EMPACOTADOS EM STICKY */}
+{!isSellerPath && (
+  <div className="sticky top-0 z-50">
+    <AnnouncementBar />
+    <Navbar />
+  </div>
+)}
+     
       
       {showUserLogin ? <Login /> : null}
 
@@ -104,7 +107,7 @@ const App = () => {
       >
         <Routes>
           <Route path='/' element={<Home />} />
-          <Route path='/collections/:group' element={<GroupPage />} /> {/* 🆕 Nova rota */}
+          <Route path='/collections/:group' element={<GroupPage />} />
           <Route path='/products' element={<AllProducts />} />
           <Route path='/products/:category' element={<ProductCategory />} />
           <Route path='/products/:category/:id' element={<ProductDetails />} />
