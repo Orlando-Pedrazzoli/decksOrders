@@ -6,7 +6,7 @@ const banners = [
   {
     id: 1,
     heading: 'EXPLORE A COLEÇÃO',
-    description: 'Desenvolvido para oferecer conforto e aderência superior, o deck Elite Surfing garante conexão total entre o pé e a prancha, permitindo máxima velocidade, resposta e drive nas manobras mais exigentes.',
+    description: 'Os decks Elite Surfing garante conexão total entre o pé e a prancha, permitindo máxima velocidade, resposta e drive nas manobras mais exigentes.',
     ctaText: 'VER COLEÇÃO DE DECKS',
     ctaLink: '/collections/decks', // 🆕 Link para group decks
     image: 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=1200&q=80',
@@ -15,7 +15,7 @@ const banners = [
   {
     id: 2,
     heading: 'LEASHES',
-    description: 'Os leashes Elite Surfing unem leveza, durabilidade e confiança absoluta. Projetados para funcionar em ondas pequenas ou condições mais exigentes, contam com construção em peça única, sem emendas, para máxima segurança e performance.',
+    description: 'Projetados para funcionar em ondas pequenas ou condições mais exigentes, contam com construção em peça única, sem emendas, para máxima segurança e performance.',
     ctaText: 'VER COLEÇÃO DE LEASHES',
     ctaLink: '/collections/leashes', // 🆕 Link para group leashes
     image: 'https://images.unsplash.com/photo-1455264745730-cb3b76250ae8?w=1200&q=80',
