@@ -28,7 +28,8 @@ import black_arrow_icon from './black_arrow_icon.svg';
 import white_arrow_icon from './white_arrow_icon.svg';
 import add_address_iamge from './add_address_image.svg';
 import decks_banner from './decks-banner.jpg';
-import decks_card from './decks-card.jpg';
+import decks_card from './decks-card1.jpg';
+import decks_card2 from './decks-card2.jpg';
 
 export const assets = {
   logo,
@@ -62,6 +63,7 @@ export const assets = {
   empty_cart,
   decks_banner,
   decks_card,
+  decks_card2,
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -73,7 +75,7 @@ export const groups = [
     name: 'Decks',
     slug: 'decks',
     description: 'Traction pads de alta performance para todas as condições. Tecnologia EVA premium com texturas que garantem aderência máxima.',
-    image: 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800&q=80',
+    image: decks_card2,
     bannerImage: decks_banner,
   },
   {
