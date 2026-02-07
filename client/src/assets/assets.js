@@ -28,6 +28,7 @@ import black_arrow_icon from './black_arrow_icon.svg';
 import white_arrow_icon from './white_arrow_icon.svg';
 import add_address_iamge from './add_address_image.svg';
 import decks_banner from './decks-banner.jpg';
+import decks_card from './decks-card.jpg';
 
 export const assets = {
   logo,
@@ -60,6 +61,7 @@ export const assets = {
   arrow_down,
   empty_cart,
   decks_banner,
+  decks_card,
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -79,7 +81,7 @@ export const groups = [
     name: 'Leashes',
     slug: 'leashes',
     description: 'Leashes premium para máxima segurança e durabilidade. Construídos para suportar as condições mais exigentes.',
-    image: 'https://images.unsplash.com/photo-1455264745730-cb3b76250ae8?w=800&q=80',
+    image: decks_card,
     bannerImage: 'https://images.unsplash.com/photo-1455264745730-cb3b76250ae8?w=1920&q=80',
   },
   {
